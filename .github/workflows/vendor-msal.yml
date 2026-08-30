@@ -1,0 +1,54 @@
+name: Vendor MSAL locally
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/vendor-msal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  vendor-msal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download official MSAL package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf package msal-browser-*.tgz
+          npm pack @azure/msal-browser@2.38.3
+          tar -xzf azure-msal-browser-2.38.3.tgz
+          cp package/lib/msal-browser.min.js ./msal-browser.min.js
+          rm -rf package azure-msal-browser-2.38.3.tgz
+
+      - name: Point Portal to local MSAL
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = 'https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js'
+          new = './msal-browser.min.js'
+          if old in s:
+              s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+
+      - name: Commit vendored library
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html msal-browser.min.js
+          if git diff --cached --quiet; then
+            echo 'Nothing to commit'
+            exit 0
+          fi
+          git commit -m 'fix: self-host MSAL for Portal login'
+          git push
