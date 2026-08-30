@@ -1,0 +1,29 @@
+name: Prepare Portal Core v2
+
+on:
+  push:
+    paths:
+      - 'scripts/prepare_portal_core.py'
+      - '.github/workflows/prepare-portal-core-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Portal
+        run: python scripts/prepare_portal_core.py
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "refactor: prepare Portal for custom domain and dynamic apps"
+          git push
