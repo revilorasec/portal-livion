@@ -1,0 +1,41 @@
+name: Portal client app integration
+on:
+  push:
+    paths:
+      - '.github/workflows/portal-client-app-integration.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch portal
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('portal-theme.css?v=2','portal-theme.css?v=3')
+          s=s.replace("token=tr.accessToken;ctx=await api('/context');", "token=tr.accessToken;window.__PORTAL_TOKEN__=token;ctx=await api('/context');")
+          icon_fn=r'''function appIcon(key){
+          const icons={
+          rh:`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"></rect><circle cx="12" cy="9" r="2.5"></circle><path d="M7.5 17c.8-2.3 2.3-3.5 4.5-3.5s3.7 1.2 4.5 3.5"></path><path d="M8 6h1"></path></svg>`,
+          fretes:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v10H3z"></path><path d="M14 10h4l3 3v3h-7z"></path><circle cx="7" cy="18" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>`,
+          'reparos-claro':`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5 5L4 17l3 3 5.7-5.7a4 4 0 0 0 5-5l-2.4 2.4-3-3z"></path><path d="M5.5 15.5l3 3"></path></svg>`
+          };return icons[key]||`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect></svg>`}
+          '''
+          if 'function appIcon(key)' not in s:
+              s=s.replace('function renderCards(){',icon_fn+'\nfunction renderCards(){')
+          s=s.replace('<div class="icon">${a.icon||\'▣\'}</div>','<div class="icon">${appIcon(a.key)}</div>')
+          old="currentApp=a;$('workspaceTitle').textContent=a.title;$('workspaceFrame').src=a.href;$('workspace').classList.remove('hidden')"
+          new="currentApp=a;$('workspaceTitle').textContent=a.title;$('openExternal').classList.toggle('hidden',a.key==='reparos-claro');$('workspaceFrame').src=a.href;$('workspace').classList.remove('hidden')"
+          s=s.replace(old,new)
+          p.write_text(s,encoding='utf-8')
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "feat: integrate secure client repairs app"
+          git push
