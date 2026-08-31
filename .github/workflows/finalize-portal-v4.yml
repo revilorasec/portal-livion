@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Rebuild exact original Status Reparos Claro HTML
         shell: bash
         run: |
@@ -43,18 +44,83 @@ jobs:
           grep -q 'Base operacional' cliente-claro.html
           grep -q 'Jornada dos equipamentos' cliente-claro.html
 
-          echo "Original Claro HTML rebuilt successfully: $(wc -c < cliente-claro.html) bytes"
+      - name: Preserve original UI and secure the live data channel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
 
-      - name: Commit exact original app
+          app = Path('cliente-claro.html')
+          s = app.read_text(encoding='utf-8')
+
+          # Never publish the embedded database snapshot. The interface stays original,
+          # but all operational data must come from the protected live API.
+          s, n = re.subn(r"const SNAPSHOT=\[.*?\];\s*\nconst DEFAULT_ENDPOINT=", "const SNAPSHOT=[];\nconst DEFAULT_ENDPOINT=", s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('Could not remove embedded snapshot')
+
+          s = re.sub(
+              r"const DEFAULT_ENDPOINT='[^']+';",
+              "const DEFAULT_ENDPOINT='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/claro-data';\nlet PORTAL_TOKEN='';",
+              s,
+              count=1,
+          )
+
+          s = re.sub(
+              r"function getEndpoint\(\)\{.*?\}\nfunction saveEndpoint\(v\)\{.*?\}",
+              "function getEndpoint(){return DEFAULT_ENDPOINT}\nfunction saveEndpoint(v){return DEFAULT_ENDPOINT}",
+              s,
+              count=1,
+              flags=re.S,
+          )
+
+          old = "let res=await fetch(url.toString(),{cache:'no-store',signal:controller.signal});"
+          new = "if(!PORTAL_TOKEN)throw new Error('AUTH_REQUIRED');let res=await fetch(url.toString(),{cache:'no-store',signal:controller.signal,headers:{Authorization:'Bearer '+PORTAL_TOKEN}});"
+          if old not in s:
+              raise SystemExit('Could not find original live fetch call')
+          s = s.replace(old, new, 1)
+
+          old_init = "refreshData(false);setInterval(()=>refreshData(false),AUTO_REFRESH_MS)}"
+          new_init = "setLiveState('','Aguardando autenticação...');setText('lastUpdate','Validando acesso pelo Portal Livion');window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==window.parent)return;let d=e.data||{};if(d.type==='LIVION_AUTH'&&d.token){PORTAL_TOKEN=d.token;refreshData(false)}});if(window.parent===window)setText('lastUpdate','Abra este aplicativo pelo Portal Livion');setInterval(()=>{if(PORTAL_TOKEN)refreshData(false)},AUTO_REFRESH_MS)}"
+          if old_init not in s:
+              raise SystemExit('Could not find original init tail')
+          s = s.replace(old_init, new_init, 1)
+
+          # Keep the original Configurar button visually, but prevent endpoint changes.
+          s = s.replace("$('saveConfig').onclick=()=>{let v=txt($('endpointInput').value);if(v&&!/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/.+\\/exec(?:\\?.*)?$/i.test(v)){alert('Cole uma URL válida do aplicativo da web terminada em /exec.');return}saveEndpoint(v||DEFAULT_ENDPOINT);closeConfig();refreshData(true)};",
+                        "$('saveConfig').onclick=()=>{closeConfig();refreshData(true)};", 1)
+
+          app.write_text(s, encoding='utf-8')
+
+          # Pass the already validated Entra token to the same-origin Claro iframe
+          # without exposing the token in the URL.
+          idx = Path('index.html')
+          h = idx.read_text(encoding='utf-8')
+          old_open = "async function openApp(a){try{ctx=await api('/context');if(!ctx.apps.includes(a.key))throw new Error('FORBIDDEN');currentApp=a;$('workspaceTitle').textContent=a.title;$('openExternal').classList.toggle('hidden',a.key==='reparos-claro');$('workspaceFrame').src=a.href;$('workspace').classList.remove('hidden')}catch{alert('Seu acesso mudou ou expirou. Entre novamente.')}}"
+          new_open = "async function openApp(a){try{ctx=await api('/context');if(!ctx.apps.includes(a.key))throw new Error('FORBIDDEN');currentApp=a;$('workspaceTitle').textContent=a.title;$('openExternal').classList.toggle('hidden',a.key==='reparos-claro');const frame=$('workspaceFrame');frame.onload=()=>{if(a.key==='reparos-claro'&&frame.contentWindow)frame.contentWindow.postMessage({type:'LIVION_AUTH',token},location.origin)};frame.src=a.href;$('workspace').classList.remove('hidden')}catch{alert('Seu acesso mudou ou expirou. Entre novamente.')}}"
+          if old_open not in h:
+              raise SystemExit('Could not find Portal openApp function')
+          h = h.replace(old_open, new_open, 1)
+          idx.write_text(h, encoding='utf-8')
+          PY
+
+          grep -q "const SNAPSHOT=\[\];" cliente-claro.html
+          grep -q "functions/v1/claro-data" cliente-claro.html
+          grep -q "LIVION_AUTH" cliente-claro.html
+          grep -q "LIVION_AUTH" index.html
+
+      - name: Commit original secure app
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add cliente-claro.html
+          git add cliente-claro.html index.html
           if git diff --cached --quiet; then
             echo 'No app change to commit'
           else
-            git commit -m 'feat: restore exact original Status Reparos Claro interface'
+            git commit -m 'feat: publish original Status Reparos Claro with protected live data'
             git push
           fi
