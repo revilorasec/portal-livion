@@ -3,7 +3,7 @@ name: Finalize Portal v4
 on:
   push:
     paths:
-      - '.build/status-reparos.part1'
+      - '.build/status-reparos.part1a'
       - '.build/status-reparos.part2'
       - '.github/workflows/finalize-portal-v4.yml'
   workflow_dispatch:
@@ -18,32 +18,25 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Rebuild exact secure Status Reparos Claro HTML and switch official logo
+      - name: Rebuild original Status Reparos Claro HTML
         shell: bash
         run: |
           set -euo pipefail
-          cat .build/status-reparos.part1 .build/status-reparos.part2 | base64 -d | xz -d > cliente-claro.html
-          python3 - <<'PY'
-          from pathlib import Path
-          css=Path('portal-theme.css').read_text(encoding='utf-8')
-          css=css.replace("url('./livion-logo.svg?v=3')", "url('./assets/livion-logo.png?v=4')")
-          css=css.replace('visual refresh v3','visual refresh v4')
-          Path('portal-theme.css').write_text(css, encoding='utf-8')
-          p=Path('index.html')
-          html=p.read_text(encoding='utf-8')
-          html=html.replace('portal-theme.css?v=3','portal-theme.css?v=4')
-          p.write_text(html, encoding='utf-8')
-          PY
-          rm -f .build/status-reparos.part1 .build/status-reparos.part2
+          cat .build/status-reparos.part1a .build/status-reparos.part2 | base64 -d | xz -d > cliente-claro.html
+          test -s cliente-claro.html
+          grep -q 'Portal de Acompanhamento Claro' cliente-claro.html
+          grep -q 'Visão executiva' cliente-claro.html
+          grep -q 'SLA & fluxo' cliente-claro.html
+          grep -q 'LPU comercial' cliente-claro.html
       - name: Commit published changes
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add cliente-claro.html portal-theme.css index.html .build/status-reparos.part1 .build/status-reparos.part2
+          git add cliente-claro.html
           if git diff --cached --quiet; then
             echo 'No changes to commit'
           else
-            git commit -m 'feat: publish exact secure Status Reparos Claro and official logo'
+            git commit -m 'feat: restore original Status Reparos Claro HTML'
             git push
           fi
