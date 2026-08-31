@@ -1,0 +1,3 @@
+/* Official Livion logo override */
+.brand{background-image:url('./assets/livion-logo.png?v=official-20260831')!important;background-size:contain!important;background-repeat:no-repeat!important;background-position:left center!important}
+.auth-card .mark{background-image:url('./assets/livion-logo.png?v=official-20260831')!important;background-size:contain!important;background-repeat:no-repeat!important;background-position:center!important}
