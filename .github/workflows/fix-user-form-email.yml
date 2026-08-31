@@ -1,0 +1,53 @@
+name: Fix user form email state
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-user-form-email.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix new-user draft state
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          s = s.replace(
+              "function renderUsers(){const f=formData();$('tabContent').innerHTML=",
+              "function renderUsers(){const f=formData();const isExistingUser=!!(editing&&users.some(u=>u.email===editing.email));$('tabContent').innerHTML="
+          )
+          s = s.replace("${editing?'Editar usuário':'Cadastrar usuário'}", "${isExistingUser?'Editar usuário':'Cadastrar usuário'}")
+          s = s.replace("${editing?'disabled':''}", "${isExistingUser?'disabled':''}")
+          s = s.replace("${editing?'Salvar alterações':'Cadastrar usuário'}", "${isExistingUser?'Salvar alterações':'Cadastrar usuário'}")
+          s = s.replace("${editing?'<button id=\"cancelEdit\" class=\"btn\">Cancelar edição</button>':''}", "${isExistingUser?'<button id=\"cancelEdit\" class=\"btn\">Cancelar edição</button>':''}")
+          s = s.replace(
+              "$('fProfile').onchange=e=>{editing={...(editing||f),profile:e.target.value};renderUsers()};",
+              "$('fProfile').onchange=e=>{const draft=collect();editing={...draft,_draft:true,apps_json:JSON.stringify(draft.apps),companies_json:JSON.stringify(draft.companies),actions_json:JSON.stringify(draft.actions)};renderUsers()};"
+          )
+
+          p.write_text(s, encoding='utf-8')
+
+      - name: Verify patch
+        shell: python
+        run: |
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8')
+          assert "const isExistingUser=!!(editing&&users.some(u=>u.email===editing.email))" in s
+          assert "${isExistingUser?'disabled':''}" in s
+          assert "const draft=collect();editing={...draft,_draft:true" in s
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix: keep email editable when creating users"
+          git push
