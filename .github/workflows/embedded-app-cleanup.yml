@@ -1,0 +1,36 @@
+name: Clean embedded app chrome
+on:
+  push:
+    paths:
+      - '.github/workflows/embedded-app-cleanup.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove duplicate Livion branding from embedded Claro view
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('cliente-claro.html')
+          s=p.read_text(encoding='utf-8')
+          css='''\n/* Portal embed: the Portal owns the global Livion brand/navigation. */\nhtml.portal-embedded .livion,html.portal-embedded .divider{display:none!important}\nhtml.portal-embedded .brand{gap:0!important}\nhtml.portal-embedded .hero{border-radius:0!important;border-left:0!important;border-right:0!important;margin-top:0!important}\nhtml.portal-embedded .app{padding-top:10px!important}\n'''
+          if 'html.portal-embedded .livion' not in s:
+              s=s.replace('</style>',css+'</style>',1)
+          js="<script>if(window.self!==window.top)document.documentElement.classList.add('portal-embedded');</script>"
+          if 'portal-embedded' not in s.split('</body>')[0][-400:]:
+              s=s.replace('</body>',js+'\n</body>',1)
+          p.write_text(s,encoding='utf-8')
+      - name: Verify
+        run: |
+          grep -q 'html.portal-embedded .livion' cliente-claro.html
+          grep -q "classList.add('portal-embedded')" cliente-claro.html
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cliente-claro.html
+          git commit -m "feat: simplify Claro chrome inside Portal"
+          git push
