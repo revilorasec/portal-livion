@@ -1,0 +1,37 @@
+/* Unified Portal navigation — desktop + mobile */
+.workspace{background:#f4f7fb!important}
+.workspace-bar{height:76px!important;padding:0 18px!important;gap:14px!important;background:rgba(255,255,255,.98)!important;border-bottom:1px solid rgba(17,34,61,.09)!important;box-shadow:0 3px 16px rgba(24,56,96,.05)!important;overflow:hidden}
+.workspace iframe{height:calc(100vh - 76px)!important;background:#f4f7fb}
+.workspace-brand{width:196px;height:54px;flex:0 0 196px;border:0;background:transparent url('./assets/livion-logo.png?v=6') left center/contain no-repeat;cursor:pointer;border-radius:10px}
+.workspace-brand:hover{background-color:#f8fafc}
+.workspace-apps{display:flex;align-items:center;gap:7px;min-width:0;overflow-x:auto;scrollbar-width:none;padding:6px 1px}
+.workspace-apps::-webkit-scrollbar{display:none}
+.workspace-app{height:50px;display:flex;align-items:center;gap:9px;border:1px solid transparent;border-radius:13px;background:transparent;padding:5px 10px;color:#46617e;white-space:nowrap;transition:.16s ease;opacity:.76}
+.workspace-app:hover{opacity:1;background:#f4f7fb;border-color:#e5ebf3}
+.workspace-app.active{opacity:1;background:#edf4fb;border-color:#d9e6f3;color:#123f78;box-shadow:inset 0 -3px 0 #f4c400,0 5px 14px rgba(31,67,111,.07);font-weight:800}
+.workspace-app-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#fff;border:1px solid #e0e8f2;flex:none;overflow:hidden}
+.workspace-app-icon svg{width:21px;height:21px;stroke:#174579;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.workspace-app-icon img{width:30px!important;height:30px!important;object-fit:contain!important}
+.workspace-app-name{font-size:12px;max-width:170px;overflow:hidden;text-overflow:ellipsis}
+.workspace-external{white-space:nowrap;flex:none}
+
+/* Never crop the official Livion artwork. */
+.brand,.auth-card .mark,.workspace-brand{background-size:contain!important;background-repeat:no-repeat!important;background-position:left center!important}
+.auth-card .mark{background-position:center!important}
+
+@media(max-width:900px){
+ .workspace-bar{padding:0 10px!important;gap:8px!important}
+ .workspace-brand{width:142px;flex-basis:142px;height:48px}
+ .workspace-app{padding:5px 7px}.workspace-app-name{display:none}.workspace-app.active .workspace-app-name{display:inline;max-width:130px}
+}
+@media(max-width:620px){
+ .workspace-bar{height:62px!important;padding:0 7px!important;gap:5px!important}
+ .workspace iframe{height:calc(100vh - 62px)!important}
+ .workspace-brand{width:105px;flex-basis:105px;height:42px}
+ .workspace-apps{gap:4px;flex:1}
+ .workspace-app{height:44px;padding:4px 5px;border-radius:11px}
+ .workspace-app-icon{width:34px;height:34px;border-radius:9px}
+ .workspace-app.active .workspace-app-name{display:none}
+ .workspace-external{display:none!important}
+}
+@media(max-width:380px){.workspace-brand{width:90px;flex-basis:90px}.workspace-app-icon{width:32px;height:32px}.workspace-app{padding:3px}}
