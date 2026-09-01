@@ -2,7 +2,7 @@
 .workspace{background:#f4f7fb!important}
 .workspace-bar{height:76px!important;padding:0 18px!important;gap:14px!important;background:rgba(255,255,255,.98)!important;border-bottom:1px solid rgba(17,34,61,.09)!important;box-shadow:0 3px 16px rgba(24,56,96,.05)!important;overflow:hidden}
 .workspace iframe{height:calc(100vh - 76px)!important;background:#f4f7fb}
-.workspace-brand{width:196px;height:54px;flex:0 0 196px;border:0;background:transparent url('./assets/livion-logo.png?v=6') left center/contain no-repeat;cursor:pointer;border-radius:10px}
+.workspace-brand{width:196px;height:54px;flex:0 0 196px;border:0;background:transparent url('./assets/livion-logo.png?v=7') left center/contain no-repeat;cursor:pointer;border-radius:10px}
 .workspace-brand:hover{background-color:#f8fafc}
 .workspace-apps{display:flex;align-items:center;gap:7px;min-width:0;overflow-x:auto;scrollbar-width:none;padding:6px 1px}
 .workspace-apps::-webkit-scrollbar{display:none}
@@ -16,7 +16,8 @@
 .workspace-external{white-space:nowrap;flex:none}
 
 /* Never crop the official Livion artwork. */
-.brand,.auth-card .mark,.workspace-brand{background-size:contain!important;background-repeat:no-repeat!important;background-position:left center!important}
+.brand,.auth-card .mark,.workspace-brand{background-image:url('./assets/livion-logo.png?v=7')!important;background-size:contain!important;background-repeat:no-repeat!important;background-position:left center!important}
+.brand{width:218px!important;height:54px!important;flex:0 0 218px!important}
 .auth-card .mark{background-position:center!important}
 
 @media(max-width:900px){
@@ -33,5 +34,6 @@
  .workspace-app-icon{width:34px;height:34px;border-radius:9px}
  .workspace-app.active .workspace-app-name{display:none}
  .workspace-external{display:none!important}
+ .brand{width:128px!important;height:42px!important;flex-basis:128px!important}
 }
-@media(max-width:380px){.workspace-brand{width:90px;flex-basis:90px}.workspace-app-icon{width:32px;height:32px}.workspace-app{padding:3px}}
+@media(max-width:380px){.workspace-brand{width:90px;flex-basis:90px}.workspace-app-icon{width:32px;height:32px}.workspace-app{padding:3px}.brand{width:112px!important;flex-basis:112px!important}}
