@@ -1,0 +1,34 @@
+name: Patch RH portal session bridge
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-rh-session-bridge.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch portal iframe session bridge
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          pattern=r"async function openApp\(a\)\{try\{ctx=await api\('/context'\);if\(!ctx\.apps\.includes\(a\.key\)\)throw new Error\('FORBIDDEN'\);currentApp=a;\$\('workspaceTitle'\)\.textContent=a\.title;\$\('openExternal'\)\.classList\.toggle\('hidden',a\.key==='reparos-claro'\);\$\('workspaceFrame'\)\.src=a\.href;\$\('workspace'\)\.classList\.remove\('hidden'\)\}catch\{alert\('Seu acesso mudou ou expirou\. Entre novamente\.'\)\}\}"
+          repl="""async function openApp(a){try{ctx=await api('/context');if(!ctx.apps.includes(a.key))throw new Error('FORBIDDEN');currentApp=a;$('workspaceTitle').textContent=a.title;$('openExternal').classList.toggle('hidden',a.key==='reparos-claro');const frame=$('workspaceFrame');frame.onload=()=>{if(a.key==='rh'){try{frame.contentWindow.postMessage({type:'PORTAL_SESSION',token,context:ctx},'https://revilorasec.github.io')}catch(e){console.warn('RH session bridge',e)}}};frame.src=a.href;$('workspace').classList.remove('hidden')}catch{alert('Seu acesso mudou ou expirou. Entre novamente.')}}"""
+          ns,n=re.subn(pattern,repl,s,count=1)
+          if n!=1:
+              raise SystemExit(f'openApp anchor not found ({n})')
+          p.write_text(ns,encoding='utf-8')
+      - name: Verify
+        run: grep -q "PORTAL_SESSION" index.html
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "feat: bridge Portal session to RH app"
+          git push
