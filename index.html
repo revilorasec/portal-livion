@@ -78,5 +78,6 @@ function renderCompanies(){$('tabContent').innerHTML=`<section class="section"><
 async function loadAudit(){try{audit=(await api('/audit')).audit||[];$('tabContent').innerHTML=`<section class="section"><h2>Auditoria</h2><p class="help">Alterações administrativas recentes.</p><div class="table-wrap"><table><thead><tr><th>Data</th><th>Administrador</th><th>Ação</th><th>Alvo</th></tr></thead><tbody>${audit.map(r=>`<tr><td>${new Date(r.created_at).toLocaleString('pt-BR')}</td><td>${esc(r.actor_email)}</td><td>${esc(r.action==='USER_UPSERT'?'Usuário salvo':r.action==='USER_DELETE'?'Usuário excluído':r.action==='ENTRA_INVITE_STATUS'?'Status de convite Entra':r.action)}</td><td>${esc(r.target)}</td></tr>`).join('')}</tbody></table></div></section>`}catch(e){$('tabContent').innerHTML='<section class="section"><h2>Auditoria</h2><p>'+esc(e.message)+'</p></section>'}}
 init();
 </script>
+<script src="./portal-admin-v2.js?v=1"></script>
 </body>
 </html>
