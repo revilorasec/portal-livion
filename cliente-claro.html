@@ -121,6 +121,12 @@ button,input,select{font:inherit}.app{max-width:1720px;margin:auto;padding:20px}
 .executive-kpis{grid-template-columns:repeat(7,1fr)}
 @media(max-width:1500px){.executive-kpis{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:900px){.executive-kpis{grid-template-columns:repeat(2,1fr)}}
+
+/* Portal embed: the Portal owns the global Livion brand/navigation. */
+html.portal-embedded .livion,html.portal-embedded .divider{display:none!important}
+html.portal-embedded .brand{gap:0!important}
+html.portal-embedded .hero{border-radius:0!important;border-left:0!important;border-right:0!important;margin-top:0!important}
+html.portal-embedded .app{padding-top:10px!important}
 </style>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -477,5 +483,6 @@ async function refreshData(manual=false){if(refreshing)return;let endpoint=getEn
 function init(){rebuildFilterOptions();applyFilters(false);document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===b.dataset.tab));if(b.dataset.tab==='geografia')setTimeout(()=>renderGeography(),30)});FILTER_ORDER.forEach(id=>$(id).addEventListener('change',()=>applyFilters()));$('fDateFrom').addEventListener('change',()=>applyFilters());$('fDateTo').addEventListener('change',()=>applyFilters());$('fSearch').addEventListener('input',()=>applyFilters());$('clearBtn').onclick=clearFilters;$('exportBtn').onclick=exportExcel;$('refreshBtn').onclick=()=>refreshData(true);$('clearGeoBtn').onclick=geoReset;document.querySelectorAll('.kpi[data-stage]').forEach(e=>e.onclick=()=>setStage(e.dataset.stage));$('prevPage').onclick=()=>{if(currentPage>1){currentPage--;renderData()}};$('nextPage').onclick=()=>{currentPage++;renderData()};$('closeDrawer').onclick=()=>$('drawerBackdrop').classList.remove('open');$('drawerBackdrop').onclick=e=>{if(e.target===$('drawerBackdrop'))$('drawerBackdrop').classList.remove('open')};document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('drawerBackdrop').classList.remove('open');closeConfig()}});refreshData(false);setInterval(()=>refreshData(false),AUTO_REFRESH_MS)}
 if(window.top===window.self){window.location.replace('./')}else{try{init()}catch(err){console.error(err);setLiveState('error','Erro ao iniciar');setText('lastUpdate','O portal não conseguiu concluir a inicialização')}}
 </script>
+<script>if(window.self!==window.top)document.documentElement.classList.add('portal-embedded');</script>
 </body>
 </html>
