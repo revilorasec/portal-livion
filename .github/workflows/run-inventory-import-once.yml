@@ -1,0 +1,14 @@
+name: One-time inventory import
+on:
+  push:
+    paths:
+      - '.github/workflows/run-inventory-import-once.yml'
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger inventory import
+        run: |
+          set -euo pipefail
+          curl -fsS 'https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/inventory-import?token=livion-inventory-import-20260901-v1' | tee /tmp/result.json
+          grep -q '"ok":true' /tmp/result.json
