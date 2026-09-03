@@ -74,4 +74,24 @@ movement=function(type){
  const saveDocumentBase=saveFn;
  saveFn=async()=>{const xml=$('nfeXml').files[0],danfe=$('nfeDanfe').files[0];lastMovementId='';await saveDocumentBase();if(lastMovementId){await uploadDocument(xml,'NFE_XML',lastMovementId);await uploadDocument(danfe,'DANFE',lastMovementId)}}
 };
+const productDropdownBase=openProduct;
+function catalogValues(type,current){const vals=[...(D.catalog||[]).filter(x=>x.option_type===type&&x.active!==false).map(x=>x.value)];if(current&&!vals.includes(current))vals.unshift(current);return vals}
+function replaceWithSelect(id,type,current){const old=$(id);if(!old)return;const s=document.createElement('select');s.id=id;s.innerHTML='<option value="">Selecione…</option>'+catalogValues(type,current).map(v=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(v)}</option>`).join('');old.replaceWith(s)}
+openProduct=function(p={}){
+ productDropdownBase(p);
+ const type=$('pType');if(type)type.innerHTML=catalogValues('TYPE',p.item_type||'Componente').map(v=>`<option value="${esc(v)}" ${v===(p.item_type||'Componente')?'selected':''}>${esc(v)}</option>`).join('');
+ replaceWithSelect('pCat','CATEGORY',p.category||'');
+ replaceWithSelect('pUnit','UNIT',p.unit||'UNIDADE');
+ const evidence=$('pEvidence')?.closest('.field');if(evidence)evidence.classList.add('evidence-field')
+};
+const renderListsBase=renderLists;
+renderLists=function(){
+ renderListsBase();
+ const grid=$('cadastros').querySelector('.grid');let card=$('catalogCard');if(!card){card=document.createElement('div');card.id='catalogCard';card.className='card';grid.appendChild(card)}
+ const groups=[['TYPE','Tipos'],['CATEGORY','Categorias'],['UNIT','Unidades']];
+ card.innerHTML='<h3>Listas de produtos</h3><div class="sub">Cadastre as opções usadas nos campos Tipo, Categoria e Unidade.</div>'+groups.map(([k,label])=>`<div class="catalog-group"><b>${label}</b><div class="catalog-add"><input data-new-catalog="${k}" placeholder="Nova opção"><button class="btn" data-add-catalog="${k}">Adicionar</button></div><div class="catalog-chips">${catalogValues(k,'').map(v=>`<span class="catalog-chip">${esc(v)} <button title="Desativar" data-remove-catalog="${k}" data-value="${esc(v)}">×</button></span>`).join('')||'<small class="muted">Nenhuma opção cadastrada.</small>'}</div></div>`).join('');
+ card.querySelectorAll('[data-add-catalog]').forEach(b=>b.onclick=async()=>{const type=b.dataset.addCatalog,input=card.querySelector(`[data-new-catalog="${type}"]`),value=input.value.trim();if(!value)return;await api('/catalog-option',{method:'POST',body:JSON.stringify({option_type:type,value})});await reload()});
+ card.querySelectorAll('[data-remove-catalog]').forEach(b=>b.onclick=async()=>{const option=(D.catalog||[]).find(x=>x.option_type===b.dataset.removeCatalog&&x.value===b.dataset.value);if(!option)return;await api('/catalog-option',{method:'POST',body:JSON.stringify({...option,active:false})});await reload()})
+};
+const inventoryFixStyle=document.createElement('style');inventoryFixStyle.textContent='.evidence-field{display:flex!important;align-items:center;min-height:60px;padding-top:22px}.evidence-field span{display:flex;align-items:center;gap:10px;white-space:nowrap}.evidence-field input{width:20px!important;height:20px;margin:0}.catalog-group{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}.catalog-add{display:flex;gap:7px;margin:8px 0}.catalog-add input{flex:1;border:1px solid #ccd6e4;border-radius:9px;padding:9px}.catalog-chips{display:flex;gap:6px;flex-wrap:wrap}.catalog-chip{background:#eef4fb;border-radius:999px;padding:5px 8px}.catalog-chip button{border:0;background:none;color:#c42832;cursor:pointer;font-size:16px}.photo-gallery img{width:96px;height:96px}';document.head.appendChild(inventoryFixStyle);
 </script></body></html>
