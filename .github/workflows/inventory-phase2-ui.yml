@@ -1,0 +1,91 @@
+name: Inventory phase 2 UI
+on:
+  push:
+    paths:
+      - '.github/workflows/inventory-phase2-ui.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch inventory UI with PowerShell
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $path='estoque.html'
+          $s=Get-Content -LiteralPath $path -Raw -Encoding UTF8
+          function Replace-OnceLiteral([string]$Text,[string]$Old,[string]$New,[string]$Name){
+            $count=([regex]::Matches($Text,[regex]::Escape($Old))).Count
+            if($count -ne 1){ throw "$Name anchor count=$count" }
+            return $Text.Replace($Old,$New)
+          }
+          function Replace-OnceRegex([string]$Text,[string]$Pattern,[string]$Replacement,[string]$Name){
+            $rx=[regex]::new($Pattern,[System.Text.RegularExpressions.RegexOptions]::Singleline)
+            $count=$rx.Matches($Text).Count
+            if($count -ne 1){ throw "$Name regex count=$count" }
+            return $rx.Replace($Text,[System.Text.RegularExpressions.MatchEvaluator]{param($m) $Replacement},1)
+          }
+
+          $old='.person-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #edf1f5}'
+          $new=$old+'.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.choice-card{border:1px solid var(--line);border-radius:14px;padding:18px;background:#fff;cursor:pointer;text-align:left}.choice-card:hover{border-color:#9bb5d4;box-shadow:var(--shadow)}.choice-card b{display:block;font-size:15px;margin-bottom:4px}.product-preview{display:flex;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8fbff}.product-preview img{width:72px;height:72px;border-radius:10px;object-fit:cover;border:1px solid var(--line);background:#fff}.nfe-head{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.nfe-head>div{padding:9px;border:1px solid var(--line);border-radius:9px;background:#fbfcfe}.nfe-head small{display:block;color:var(--muted)}.nfe-table{width:100%;border-collapse:collapse;min-width:1000px}.nfe-table th,.nfe-table td{padding:8px;border-bottom:1px solid #edf1f5;text-align:left;vertical-align:top}.nfe-table th{font-size:10px;text-transform:uppercase;color:#718096;background:#fbfcfe}.danger-link{border-color:#efb7bc!important;color:var(--bad)!important}.status-inactive{opacity:.6}@media(max-width:760px){.choice-grid{grid-template-columns:1fr}.nfe-head{grid-template-columns:1fr 1fr}}'
+          $s=Replace-OnceLiteral $s $old $new 'css'
+
+          $s=Replace-OnceLiteral $s "const API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/inventory-api';let token='',D=null,saveFn=null;" "const API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/inventory-api';let token='',D=null,saveFn=null,nfeState=null;" 'state'
+          $s=Replace-OnceLiteral $s '<th>Responsável</th>' '<th>Registrado por</th>' 'movement header'
+          $s=Replace-OnceLiteral $s 'Buscar produto, documento, responsável…' 'Buscar produto, documento, solicitante, fornecedor ou usuário…' 'movement search placeholder'
+
+          $oldModal='function modal(title,html,fn){$(''modalTitle'').textContent=title;$(''modalBody'').innerHTML=html;saveFn=fn;$(''modal'').classList.remove(''hidden'')}function closeModal(){$(''modal'').classList.add(''hidden'');saveFn=null}'
+          $newModal='function modal(title,html,fn){$(''modalTitle'').textContent=title;$(''modalBody'').innerHTML=html;saveFn=fn;$(''modalSave'').textContent=''Salvar'';$(''modalSave'').classList.remove(''hidden'');$(''modalSave'').disabled=false;$(''modal'').classList.remove(''hidden'')}function closeModal(){$(''modal'').classList.add(''hidden'');$(''modalSave'').classList.remove(''hidden'');$(''modalSave'').textContent=''Salvar'';saveFn=null;nfeState=null}'
+          $s=Replace-OnceLiteral $s $oldModal $newModal 'modal functions'
+
+          $movementReplacement=@'
+function productChoiceText(p){return `${p.pn} — ${p.description}`}
+function partyChoiceText(x){return `${x.name}${x.document?` — ${x.document}`:''}`}
+function resolveProductChoice(v){let q=String(v||'').trim().toLowerCase();if(!q)return null;let rows=(D.stock||[]).filter(x=>x.status!=='INATIVO'),exact=rows.find(x=>[x.product_id,x.pn,x.internal_code,productChoiceText(x)].some(z=>String(z||'').toLowerCase()===q));if(exact)return exact;let m=rows.filter(x=>[x.pn,x.internal_code,x.description].some(z=>String(z||'').toLowerCase().includes(q)));return m.length===1?m[0]:null}
+function resolvePartyChoice(v,rows,id){let q=String(v||'').trim().toLowerCase();if(!q)return null;let active=(rows||[]).filter(x=>x.status!=='INATIVO'),exact=active.find(x=>[x[id],x.name,x.document,partyChoiceText(x)].some(z=>String(z||'').toLowerCase()===q));if(exact)return exact;let m=active.filter(x=>[x.name,x.document].some(z=>String(z||'').toLowerCase().includes(q)));return m.length===1?m[0]:null}
+function productDatalist(id='productChoices'){return `<datalist id="${id}">${(D.stock||[]).filter(p=>p.status!=='INATIVO').map(p=>`<option value="${esc(productChoiceText(p))}">${esc(p.pn)}</option>`).join('')}</datalist>`}
+function partyDatalist(rows,id,key){return `<datalist id="${id}">${(rows||[]).filter(x=>x.status!=='INATIVO').map(x=>`<option value="${esc(partyChoiceText(x))}">${esc(x[key])}</option>`).join('')}</datalist>`}
+function productPreviewHtml(p){if(!p)return '<span class="muted">Selecione um componente/insumo para visualizar.</span>';return `${p.photo_url?`<img src="${esc(p.photo_url)}" alt="">`:'<span class="thumb"></span>'}<div><b>${esc(p.pn)} — ${esc(p.description)}</b><br><small class="muted">Saldo: ${fmt(p.balance)} ${esc(p.unit||'')} · Local: ${esc(p.default_location||'—')}</small></div>`}
+function updateMovementPreview(){let p=resolveProductChoice($('fProductSearch')?.value);if($('fProductPreview'))$('fProductPreview').innerHTML=productPreviewHtml(p)}
+function movement(type){let exit=type==='SAIDA',entry=type==='ENTRADA',parties=entry?(D.suppliers||[]):(D.requesters||[]),partyKey=entry?'supplier_id':'requester_id',partyLabel=entry?'Fornecedor':'Solicitante';modal(entry?'Registrar entrada manual':'Registrar saída',`<div class="form"><div class="field full"><label>Produto</label><input id="fProductSearch" list="movementProducts" placeholder="Digite PN ou descrição…" autocomplete="off">${productDatalist('movementProducts')}</div><div class="field full"><div id="fProductPreview" class="product-preview">${productPreviewHtml(null)}</div></div><div class="field"><label>Quantidade</label><input id="fQty" type="number" min="0.0001" step="any"></div><div class="field"><label>${partyLabel}</label><input id="fPartySearch" list="movementParties" placeholder="Digite para pesquisar…" autocomplete="off">${partyDatalist(parties,'movementParties',partyKey)}</div>${entry?`<div class="field"><label>Valor total da entrada (R$)</label><input id="fTotal" type="number" step="0.01" min="0"></div>`:`<div class="field"><label>Finalidade</label><select id="fPurpose"><option>CONSUMO_INTERNO</option><option>PROJETO</option><option>MANUTENCAO</option><option>LABORATORIO_TESTE</option><option>PERDA_AVARIA</option></select></div>`}<div class="field"><label>NF / Documento / Referência</label><input id="fDoc"></div><div class="field full"><label>Observações</label><textarea id="fNotes"></textarea></div></div>`,async()=>{let p=resolveProductChoice($('fProductSearch').value);if(!p)throw new Error('Selecione um produto válido da lista.');let party=resolvePartyChoice($('fPartySearch').value,parties,partyKey);if(!$('fPartySearch').value.trim()===false&&!party){}if($('fPartySearch').value.trim()&&!party)throw new Error(`Selecione ${partyLabel.toLowerCase()} válido da lista.`);let q=Number($('fQty').value),body={movement_type:type,product_id:p.product_id,quantity:q,document_number:$('fDoc').value,notes:$('fNotes').value};if(entry){body.supplier_id=party?.supplier_id||null;body.total_value=$('fTotal').value===''?null:Number($('fTotal').value);body.unit_value=body.total_value&&q?body.total_value/q:null}else{body.requester_id=party?.requester_id||null;body.purpose=$('fPurpose').value}await api('/movement',{method:'POST',body:JSON.stringify(body)});closeModal();flash(entry?'Entrada registrada.':'Saída registrada.');await reload()});$('fProductSearch').oninput=updateMovementPreview;$('fProductSearch').onchange=updateMovementPreview}
+function entryChoice(){modal('Nova entrada',`<div class="choice-grid"><button id="entryManual" class="choice-card"><b>Entrada manual</b><span class="muted">Para item único ou lançamento pontual.</span></button><button id="entryNfe" class="choice-card"><b>Entrada por NF-e (XML)</b><span class="muted">Lê fornecedor e itens da nota antes de confirmar o estoque.</span></button></div>`,null);$('modalSave').classList.add('hidden');$('entryManual').onclick=()=>movement('ENTRADA');$('entryNfe').onclick=openNfeImport}
+function openNfeImport(){modal('Entrada por NF-e',`<div class="form"><div class="field full"><label>Arquivo XML da NF-e</label><input id="nfeFile" type="file" accept=".xml,text/xml,application/xml"></div><div class="field full"><button id="nfeReadBtn" type="button" class="btn primary">Ler e conferir XML</button></div><div id="nfePreview" class="field full"><div class="empty">Selecione um XML. Nenhuma movimentação será criada antes da confirmação.</div></div></div>`,confirmNfe);$('modalSave').textContent='Confirmar entrada';$('modalSave').disabled=true;$('nfeReadBtn').onclick=readNfe}
+async function readNfe(){let f=$('nfeFile').files?.[0];if(!f)throw new Error('Selecione o XML da NF-e.');let xml=await f.text(),fd=new FormData();fd.append('file',f);$('nfeReadBtn').disabled=true;$('nfeReadBtn').textContent='Lendo…';try{let preview=await api('/nfe-preview',{method:'POST',body:fd});nfeState={xml,preview};renderNfePreview();$('modalSave').disabled=!!preview.duplicate}catch(e){alert(e.message);throw e}finally{$('nfeReadBtn').disabled=false;$('nfeReadBtn').textContent='Ler e conferir XML'}}
+function renderNfePreview(){let p=nfeState?.preview;if(!p)return;let inv=p.invoice||{};if(p.duplicate){$('nfePreview').innerHTML=`<div class="card"><h3>NF-e já importada</h3><p>Nota ${esc(inv.invoice_number||p.existing?.invoice_number||'')} já está registrada. Nova entrada bloqueada.</p><small class="muted">Importada por ${esc(p.existing?.imported_by||'—')} em ${dt(p.existing?.created_at)}</small></div>`;return}let prodList=productDatalist('nfeProducts');$('nfePreview').innerHTML=`<div class="card"><h3>Conferência da NF-e</h3><div class="nfe-head"><div><small>NF</small><b>${esc(inv.invoice_number||'—')} / Série ${esc(inv.series||'—')}</b></div><div><small>Fornecedor</small><b>${esc(inv.supplier_name||'—')}</b></div><div><small>CNPJ</small><b>${esc(inv.supplier_document||'—')}</b></div><div><small>Valor</small><b>${money(inv.total_value)}</b></div></div><div class="sub">${p.supplier?'Fornecedor já cadastrado.':'Fornecedor será cadastrado automaticamente ao confirmar.'} Itens reconhecidos ficam vinculados; nos demais escolha um produto existente ou deixe em branco e informe o tipo para cadastrar novo.</div><div class="table-wrap"><table class="nfe-table"><thead><tr><th>#</th><th>Código fornecedor</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Produto Livion</th><th>Tipo se novo</th></tr></thead><tbody>${(p.items||[]).map((it,i)=>`<tr><td>${i+1}</td><td><b>${esc(it.supplier_sku||'—')}</b></td><td>${esc(it.description||'')}</td><td>${fmt(it.quantity)} ${esc(it.unit||'')}</td><td>${money(it.unit_price)}</td><td><input id="nProd${i}" list="nfeProducts" value="${esc(it.product_id?(it.product_name||productChoiceText((D.stock||[]).find(x=>x.product_id===it.product_id)||{pn:it.product_id,description:''})): '')}" placeholder="Pesquisar ou deixar vazio"></td><td><select id="nType${i}"><option value="">Selecione…</option><option>Componente</option><option>Insumo</option></select>${it.product_id?'<small class="muted">já identificado</small>':''}</td></tr>`).join('')}</tbody></table></div>${prodList}</div>`}
+async function confirmNfe(){if(!nfeState?.preview||nfeState.preview.duplicate)throw new Error('NF-e não disponível para confirmação.');let items=(nfeState.preview.items||[]).map((it,i)=>{let typed=$(`nProd${i}`).value.trim(),p=typed?resolveProductChoice(typed):null;if(typed&&!p)throw new Error(`Item ${i+1}: escolha um produto existente da lista ou deixe o campo vazio para cadastrar novo.`);let itemType=p?null:$(`nType${i}`).value;if(!p&&!itemType)throw new Error(`Item ${i+1}: informe se o novo cadastro é Componente ou Insumo.`);return{product_id:p?.product_id||null,item_type:itemType||null,category:null}});let r=await api('/nfe-confirm',{method:'POST',body:JSON.stringify({invoice:nfeState.preview.invoice,items,xml:nfeState.xml})});closeModal();flash(`NF-e importada: ${r.items||items.length} item(ns).`);await reload()}
+function openProduct
+'@
+          $s=Replace-OnceRegex $s 'function movement\(type\)\{.*?\}\nfunction openProduct' $movementReplacement 'movement/NFe functions'
+
+          $personReplacement=@'
+function person(kind,p={}){let req=kind==='requester',idKey=req?'requester_id':'supplier_id';modal(p[idKey]?(req?'Editar solicitante':'Editar fornecedor'):(req?'Cadastrar solicitante':'Cadastrar fornecedor'),`<div class="form"><div class="field full"><label>Nome</label><input id="xName" value="${esc(p.name||'')}"></div><div class="field"><label>CPF / CNPJ / Documento</label><input id="xDoc" value="${esc(p.document||'')}"></div><div class="field"><label>Telefone</label><input id="xPhone" value="${esc(p.phone||'')}"></div><div class="field"><label>Email</label><input id="xEmail" value="${esc(p.email||'')}"></div>${req?`<div class="field"><label>Setor</label><input id="xExtra" value="${esc(p.department||'')}"></div><div class="field"><label>Status</label><select id="xStatus"><option ${p.status==='INATIVO'?'':'selected'}>ATIVO</option><option ${p.status==='INATIVO'?'selected':''}>INATIVO</option></select></div>${photoFields('xp',1)}<div class="field full"><label>Foto atual</label>${gallery({photo_url:p.photo_url})}</div>`:`<div class="field full"><label>Endereço</label><input id="xExtra" value="${esc(p.address||'')}"></div><div class="field"><label>Status</label><select id="xStatus"><option ${p.status==='INATIVO'?'':'selected'}>ATIVO</option><option ${p.status==='INATIVO'?'selected':''}>INATIVO</option></select></div><div class="field"><label>Logo / foto do fornecedor</label><input id="xp1" type="file" accept="image/jpeg,image/png,image/webp"></div><div class="field full"><label>Logo atual</label>${gallery({photo_url:p.photo_url})}</div>${p[idKey]?`<div class="field full"><button type="button" id="xDelete" class="btn danger-link">Excluir fornecedor</button><small class="muted">Se houver histórico, o fornecedor será inativado em vez de apagado.</small></div>`:''}`}</div>`,async()=>{let b={[idKey]:p[idKey]||null,name:$('xName').value,document:$('xDoc').value,phone:$('xPhone').value,email:$('xEmail').value,status:$('xStatus').value};b[req?'department':'address']=$('xExtra').value;const r=await api('/'+kind,{method:'POST',body:JSON.stringify(b)});await uploadPhotos(req?'REQUESTER':'SUPPLIER',r.id,'xp',1);closeModal();flash('Cadastro salvo.');await reload()});if(!req&&p[idKey]&&$('xDelete'))$('xDelete').onclick=async()=>{if(!confirm(`Excluir ${p.name}? Se possuir histórico ele será apenas inativado.`))return;try{let r=await api(`/supplier?id=${encodeURIComponent(p[idKey])}`,{method:'DELETE'});closeModal();flash(r.mode==='EXCLUIDO'?'Fornecedor excluído.':'Fornecedor inativado para preservar o histórico.');await reload()}catch(e){alert(e.message)}}}
+async function reload
+'@
+          $s=Replace-OnceRegex $s 'function person\(kind,p=\{\}\)\{.*?\}\nasync function reload' $personReplacement 'person function'
+
+          $oldEvents='$(''quickEntry'').onclick=$(''mEntry'').onclick=()=>movement(''ENTRADA'');$(''quickExit'').onclick=$(''mExit'').onclick=()=>movement(''SAIDA'');'
+          $newEvents='$(''quickEntry'').onclick=$(''mEntry'').onclick=entryChoice;$(''quickExit'').onclick=$(''mExit'').onclick=()=>movement(''SAIDA'');'
+          $s=Replace-OnceLiteral $s $oldEvents $newEvents 'entry handlers'
+
+          Set-Content -LiteralPath $path -Value $s -Encoding UTF8 -NoNewline
+      - name: Verify patched UI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $s=Get-Content -LiteralPath estoque.html -Raw -Encoding UTF8
+          @('Entrada por NF-e','Logo / foto do fornecedor','Excluir fornecedor','updateMovementPreview','Registrado por','nfe-preview','nfe-confirm') | ForEach-Object { if(-not $s.Contains($_)){ throw "missing: $_" } }
+          $m=[regex]::Match($s,'(?s)<script>\s*(const API=.*)</script></body></html>')
+          if(-not $m.Success){ throw 'inline JS not found' }
+          Set-Content -LiteralPath inventory-inline-check.js -Value $m.Groups[1].Value -Encoding UTF8
+          node --check inventory-inline-check.js
+          Remove-Item inventory-inline-check.js
+      - name: Commit inventory UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add estoque.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "feat: add inventory NF-e and supplier UI"
+          git push
