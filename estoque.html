@@ -61,4 +61,17 @@ movement=function(type){
  if(photoLabel)photoLabel.textContent='Foto do solicitante segurando o item retirado';
  party.onchange=()=>{const r=(D.requesters||[]).find(x=>x.requester_id===party.value);wrap.innerHTML=r?`<label>Solicitante selecionado</label>${gallery({photo_url:r.photo_url})}<small class="muted"><b>${esc(r.name)}</b>${r.department?' · '+esc(r.department):''}</small>`:'<small class="muted">Selecione o solicitante para visualizar sua foto.</small>'}
 };
+let lastMovementId='';
+const apiMovementBase=api;
+api=async function(path,opt={}){const r=await apiMovementBase(path,opt);if(path==='/movement'&&r?.id)lastMovementId=r.id;return r};
+async function uploadDocument(file,type,movementId){if(!file)return;const fd=new FormData();fd.append('file',file);await api(`/document?movement_id=${encodeURIComponent(movementId)}&document_type=${type}`,{method:'POST',body:fd})}
+const movementDocumentsBase=movement;
+movement=function(type){
+ movementDocumentsBase(type);
+ if(type!=='ENTRADA')return;
+ const notes=$('fNotes').closest('.field'),box=document.createElement('div');box.className='field full';box.innerHTML=`<div class="form"><div class="field"><label>Importar XML da NF-e</label><input id="nfeXml" type="file" accept=".xml,application/xml,text/xml"></div><div class="field"><label>Anexar ou fotografar DANFE / nota fiscal</label><input id="nfeDanfe" type="file" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp" capture="environment"></div></div><div id="nfePreview" class="muted" style="margin-top:8px"></div>`;notes.before(box);
+ $('nfeXml').onchange=async()=>{const f=$('nfeXml').files[0],preview=$('nfePreview');if(!f){preview.textContent='';return}try{const xml=new DOMParser().parseFromString(await f.text(),'application/xml');if(xml.querySelector('parsererror'))throw Error('XML inválido');const val=n=>xml.getElementsByTagName(n)[0]?.textContent?.trim()||'',key=(xml.querySelector('infNFe')?.getAttribute('Id')||'').replace(/^NFe/,''),number=val('nNF'),issuer=val('xNome'),cnpj=val('CNPJ'),items=xml.getElementsByTagName('det').length;if(number)$('fDoc').value=number;preview.innerHTML=`<b>NF-e lida com sucesso</b><br>Número: ${esc(number||'não identificado')} · Emitente: ${esc(issuer||cnpj||'não identificado')} · Itens: ${items}${key?`<br>Chave: ${esc(key)}`:''}`}catch(e){preview.innerHTML='<b>Não foi possível ler o XML.</b> Verifique se é um XML válido de NF-e.'}};
+ const saveDocumentBase=saveFn;
+ saveFn=async()=>{const xml=$('nfeXml').files[0],danfe=$('nfeDanfe').files[0];lastMovementId='';await saveDocumentBase();if(lastMovementId){await uploadDocument(xml,'NFE_XML',lastMovementId);await uploadDocument(danfe,'DANFE',lastMovementId)}}
+};
 </script></body></html>
