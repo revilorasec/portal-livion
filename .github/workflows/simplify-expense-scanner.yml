@@ -1,0 +1,35 @@
+name: Simplify expense scanner
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/simplify_expense_scanner.py
+      - .github/workflows/simplify-expense-scanner.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python tools/simplify_expense_scanner.py
+      - name: Validate
+        run: |
+          grep -q 'Nota fiscal reconhecida · Ver dados da nota' despesas-reembolsos-v2.html
+          grep -q 'applyFiscalToExpense' despesas-reembolsos-v2.js
+          grep -q 'Combustível' despesas-reembolsos-v2.js
+          grep -q 'despesas-reembolsos-v2.js?v=7' despesas-reembolsos-v2.html
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add despesas-reembolsos-v2.html despesas-reembolsos-v2.js
+          if git diff --cached --quiet; then
+            echo 'No changes'
+          else
+            git commit -m 'feat: simplify receipt scanner and auto-categorize expenses'
+            git push
+          fi
