@@ -1,0 +1,32 @@
+name: Patch Expenses QR and Cards
+
+on:
+  push:
+    paths:
+      - 'tools/patch_expenses_cards_qr.py'
+      - '.github/workflows/patch-expenses-qr-cards.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply expenses QR and cards patch
+        run: python3 tools/patch_expenses_cards_qr.py
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add despesas-reembolsos-v2.html despesas-reembolsos-v2.js index.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "feat: add live QR scanner and expense cards"
+            git push
+          fi
