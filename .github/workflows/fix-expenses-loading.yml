@@ -1,0 +1,33 @@
+name: Fix expenses loading
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/fix_expenses_loading_syntax.py
+      - .github/workflows/fix-expenses-loading.yml
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python tools/fix_expenses_loading_syntax.py
+      - run: node --check despesas-reembolsos-v2.js
+      - name: Commit fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add despesas-reembolsos-v2.js
+          if git diff --cached --quiet; then
+            echo 'No changes'
+          else
+            git commit -m 'fix: corrige carregamento do app de despesas'
+            git push
+          fi
