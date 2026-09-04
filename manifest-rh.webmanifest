@@ -4,7 +4,7 @@
   "short_name": "RH Livion",
   "description": "Aplicativo de Recursos Humanos da Livion Solutions.",
   "lang": "pt-BR",
-  "start_url": "./install-app.html?app=rh&launch=1",
+  "start_url": "./?app=rh",
   "scope": "./",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
