@@ -1,0 +1,19 @@
+name: Check expenses JavaScript
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - despesas-reembolsos-v2.js
+      - .github/workflows/check-expenses-js.yml
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check syntax
+        run: node --check despesas-reembolsos-v2.js
