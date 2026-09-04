@@ -7,14 +7,38 @@
   "start_url": "./?app=rh",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "any",
-  "background_color": "#eef2f8",
-  "theme_color": "#0f1c3f",
+  "background_color": "#24507d",
+  "theme_color": "#24507d",
   "icons": [
-    {"src":"./assets/icons/livion-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
-    {"src":"./assets/icons/livion-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
-    {"src":"./assets/icons/livion-192.png","sizes":"192x192","type":"image/png","purpose":"maskable"},
-    {"src":"./assets/icons/livion-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+    {
+      "src": "./assets/app-icons/rh-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/app-icons/rh-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/app-icons/rh-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./assets/app-icons/rh-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
