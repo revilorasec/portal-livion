@@ -1,0 +1,20 @@
+{
+  "id": "./pwa/despesas-reembolsos",
+  "name": "Despesas e Reembolsos · Livion",
+  "short_name": "Despesas Livion",
+  "description": "Aplicativo de despesas, aprovações e reembolsos da Livion Solutions.",
+  "lang": "pt-BR",
+  "start_url": "./?app=despesas-reembolsos",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f4f7fb",
+  "theme_color": "#10234a",
+  "icons": [
+    {"src":"./assets/icons/livion-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"./assets/icons/livion-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"./assets/icons/livion-192.png","sizes":"192x192","type":"image/png","purpose":"maskable"},
+    {"src":"./assets/icons/livion-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ]
+}
