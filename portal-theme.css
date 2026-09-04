@@ -18,3 +18,8 @@ body{background:radial-gradient(circle at 12% 0%,rgba(33,79,143,.055),transparen
 .field:has(#v3Photo4){display:none!important}
 .v3-user .v3-photo-strip img:nth-child(n+2),
 #tabContent .mini .v3-photo-strip img:nth-child(n+2){display:none!important}
+
+/* Ícone íntegro da Claro e ajustes finais para toque, tablet e celular. */
+.app-card[data-key='reparos-claro'] .icon{background:#fff url('./claro-logo.svg?v=5') center/82% auto no-repeat!important}
+@media(max-width:900px){.top{padding-inline:16px!important}.btn{min-height:42px}.app-card .btn{min-height:42px!important}.settings{grid-template-columns:170px minmax(0,1fr)!important}.section{padding:20px!important}}
+@media(max-width:620px){html,body{max-width:100%;overflow-x:hidden}.top{padding-inline:10px!important}.top-actions #configBtn{font-size:0!important;width:42px}.top-actions #configBtn:after{content:'⚙';font-size:18px}.shell{width:100%!important}.cards,.app-card{width:100%!important}.settings{grid-template-columns:1fr!important}.sidebar{position:static!important;display:flex!important;overflow-x:auto!important}.sidebar button{min-width:max-content;min-height:44px}.workspace{height:100dvh!important}.workspace iframe{height:calc(100dvh - 62px)!important}.workspace-app,.workspace-brand,.workspace-external,.top-actions .btn{min-height:44px}}
