@@ -34,15 +34,23 @@
  .workspace-app{padding:5px 7px}.workspace-app-name{display:none}.workspace-app.active .workspace-app-name{display:inline;max-width:130px}
 }
 @media(max-width:620px){
- .workspace-bar{height:62px!important;padding:0 7px!important;gap:5px!important}
+ .workspace-bar{height:62px!important;padding:0 6px!important;gap:4px!important}
  .workspace iframe{height:calc(100vh - 62px)!important}
- .workspace-brand{width:105px;flex-basis:105px;height:42px;background-size:auto 135%!important}
- .workspace-apps{gap:4px;flex:1}
- .workspace-app{height:44px;padding:4px 5px;border-radius:11px}
- .workspace-app-icon{width:34px;height:34px;border-radius:9px}
- .workspace-app.active .workspace-app-name{display:none}
+ /* No celular o botão do Portal vira apenas o ícone Livion para liberar espaço. */
+ .workspace-brand{width:40px!important;flex:0 0 40px!important;height:42px!important;background-image:url('./assets/icons/livion-64.png?v=1')!important;background-size:34px 34px!important;background-repeat:no-repeat!important;background-position:center!important;border-radius:10px}
+ /* Todos os apps liberados ficam simultaneamente visíveis; sem rolagem escondendo os últimos itens. */
+ .workspace-apps{display:flex;align-items:center;justify-content:space-between;gap:2px;flex:1 1 auto;min-width:0;overflow:visible;padding:4px 0}
+ .workspace-app{height:44px;flex:1 1 0;min-width:0;max-width:42px;padding:3px 2px;border-radius:10px;justify-content:center;gap:0}
+ .workspace-app-icon{width:34px;height:34px;border-radius:9px;flex:0 0 34px}
+ .workspace-app-name,.workspace-app.active .workspace-app-name{display:none}
  .workspace-external{display:none!important}
  .brand{width:128px!important;height:42px!important;flex-basis:128px!important;background-size:auto 145%!important}
  .auth-card .mark{background-size:auto 125%!important}
 }
-@media(max-width:380px){.workspace-brand{width:90px;flex-basis:90px;background-size:auto 125%!important}.workspace-app-icon{width:32px;height:32px}.workspace-app{padding:3px}.brand{width:112px!important;flex-basis:112px!important;background-size:auto 130%!important}}
+@media(max-width:380px){
+ .workspace-bar{padding-left:4px!important;padding-right:4px!important;gap:2px!important}
+ .workspace-brand{width:36px!important;flex-basis:36px!important;background-size:31px 31px!important}
+ .workspace-app{max-width:38px;padding:2px 1px}
+ .workspace-app-icon{width:31px;height:31px;flex-basis:31px}
+ .brand{width:112px!important;flex-basis:112px!important;background-size:auto 130%!important}
+}
