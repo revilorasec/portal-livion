@@ -19,7 +19,7 @@
 /* The official PNG contains large white margins around the artwork.
    Scale the original canvas so the artwork itself fills the header without being clipped. */
 .brand,.workspace-brand,.auth-card .mark{
- background-image:url('./assets/livion-logo.png?v=8')!important;
+ background-image:url('./livion-logo.svg?v=9')!important;
  background-repeat:no-repeat!important;
  background-position:center!important;
  border:0!important;
