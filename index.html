@@ -4,7 +4,14 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="theme-color" content="#0b1733" />
+<meta name="application-name" content="Portal Livion" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Portal Livion" />
 <title>Portal Livion</title>
+<link rel="manifest" href="./manifest.webmanifest?v=1" />
+<link rel="icon" href="./assets/icons/livion-64.png?v=1" type="image/png" />
+<link rel="apple-touch-icon" href="./assets/icons/livion-180.png?v=1" />
 <script src="./msal-browser.min.js"></script>
 <link rel="stylesheet" href="./portal-theme.css?v=4" />
 <link rel="stylesheet" href="./unified-nav.css?v=2" />
@@ -23,7 +30,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1p
 <body>
 <div id="auth" class="auth"><div class="auth-card"><div class="mark">L</div><div class="kicker">Portal corporativo</div><h1 id="authTitle">Validando acesso...</h1><p id="authText">Use sua conta Microsoft corporativa.</p><div id="authMsg" class="msg hidden"></div><button id="loginBtn" class="btn primary hidden">Entrar com Microsoft</button></div></div>
 <div id="app" class="hidden">
-<header class="top"><a class="brand" href="#" id="homeLink"><div class="mark">L</div><div><b>Livion Solutions</b><small>Portal corporativo</small></div></a><div class="top-actions"><span id="profilePill" class="pill"></span><span id="userPill" class="pill user-pill"></span><button id="configBtn" class="btn hidden">Configurações</button><button id="logoutBtn" class="btn">Sair</button></div></header>
+<header class="top"><a class="brand" href="#" id="homeLink"><div class="mark">L</div><div><b>Livion Solutions</b><small>Portal corporativo</small></div></a><div class="top-actions"><span id="profilePill" class="pill"></span><span id="userPill" class="pill user-pill"></span><button id="installBtn" class="btn hidden">Instalar Portal</button><button id="configBtn" class="btn hidden">Configurações</button><button id="logoutBtn" class="btn">Sair</button></div></header>
 <main class="shell"><section id="home"><div class="hero"><div class="kicker">Aplicativos</div><h1>Portal Livion</h1><p>Escolha um aplicativo liberado para o seu usuário.</p></div><div id="appCards" class="cards"></div></section><section id="settingsView" class="hidden"><div class="hero"><div class="kicker">Administração</div><h1>Usuários e permissões</h1><p>O login é feito pela Microsoft. O Portal não cria nem armazena senhas.</p></div><div class="settings"><aside class="sidebar" id="tabs"><button data-tab="users" class="active">Usuários</button><button data-tab="profiles">Perfis</button><button data-tab="companies">Empresas e clientes</button><button data-tab="audit">Auditoria</button></aside><div class="stack" id="tabContent"></div></div></section></main>
 </div>
 <div id="workspace" class="workspace hidden"><div class="workspace-bar"><button id="workspaceHome" class="workspace-brand" title="Portal Livion" aria-label="Portal Livion"></button><nav id="workspaceApps" class="workspace-apps" aria-label="Aplicativos liberados"></nav><span class="grow"></span><button id="openExternal" class="btn workspace-external">Abrir em nova guia</button></div><iframe id="workspaceFrame" title="Aplicativo Livion"></iframe></div>
@@ -33,12 +40,16 @@ const CLIENT='88cf5cba-9f67-467d-8a51-9638200bed52',TENANT='911e1aee-070e-421b-a
 const REDIRECT=new URL('./',window.location.href).href;
 const GRAPH_INVITE_SCOPE='User.Invite.All';
 let msalApp,ctx,token,catalog,users=[],audit=[],editing=null,currentApp=null;
+let installPrompt=null;
 const $=id=>document.getElementById(id), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const portalSessionChannel='BroadcastChannel' in window?new BroadcastChannel('livion-portal-session'):null;
 const api=async(path,opt={})=>{const r=await fetch(API+path,{...opt,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',...(opt.headers||{})},cache:'no-store'});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.error||String(r.status));return b};
 async function refreshPortalToken(forceRefresh=false){const account=msalApp?.getActiveAccount()||msalApp?.getAllAccounts()?.[0];if(!account)throw new Error('Sessão Microsoft não encontrada');const result=await msalApp.acquireTokenSilent({scopes:['User.Read'],account,forceRefresh});token=result.accessToken;window.__PORTAL_TOKEN__=token;return token}
 window.__PORTAL_GET_TOKEN__=refreshPortalToken;
 if(portalSessionChannel)portalSessionChannel.onmessage=async e=>{if(e.data?.type!=='PORTAL_TOKEN_REQUEST'||!e.data?.requestId)return;try{const currentToken=await refreshPortalToken(false);portalSessionChannel.postMessage({type:'PORTAL_TOKEN_RESPONSE',requestId:e.data.requestId,token:currentToken,context:ctx})}catch{}};
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('installBtn').classList.remove('hidden')});
+window.addEventListener('appinstalled',()=>{installPrompt=null;$('installBtn').classList.add('hidden')});
+$('installBtn').onclick=async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('installBtn').classList.add('hidden')};
 async function init(){
  if(window.opener && window.opener!==window){document.documentElement.style.visibility='hidden';return}
  try{msalApp=new msal.PublicClientApplication({auth:{clientId:CLIENT,authority:'https://login.microsoftonline.com/'+TENANT,redirectUri:REDIRECT,postLogoutRedirectUri:REDIRECT},cache:{cacheLocation:'sessionStorage'}});await msalApp.initialize?.();const rr=await msalApp.handleRedirectPromise();let account=rr?.account||msalApp.getAllAccounts()[0];if(!account)return signedOut();msalApp.setActiveAccount(account);let tr;try{tr=await msalApp.acquireTokenSilent({scopes:['User.Read'],account})}catch{await msalApp.acquireTokenRedirect({scopes:['User.Read'],account});return}token=tr.accessToken;window.__PORTAL_TOKEN__=token;ctx=await api('/context');showPortal();}catch(e){$('authTitle').textContent='Acesso não liberado';$('authText').textContent=e.message==='FORBIDDEN'?'Seu usuário ainda não foi liberado no Portal Livion.':'Não foi possível validar sua sessão.';$('authMsg').textContent=e.message;$('authMsg').classList.remove('hidden');$('loginBtn').classList.remove('hidden')}
@@ -72,6 +83,7 @@ async function deleteUser(email){if(!confirm('Excluir '+email+'? O histórico de
 function renderProfiles(){$('tabContent').innerHTML=`<section class="section"><h2>Perfis</h2><p class="help">Os perfis funcionam como modelos iniciais de permissão.</p><div class="profile-grid">${catalog.profiles.map(p=>`<article class="mini"><h3>${p.label}</h3><p>${p.description}</p><small><b>Apps:</b> ${p.defaultApps.join(', ')||'nenhum'}<br><b>Empresas:</b> ${p.defaultCompanies.join(', ')||'nenhuma'}<br><b>Ações:</b> ${p.defaultActions.join(', ')||'nenhuma'}</small></article>`).join('')}</div></section>`}
 function renderCompanies(){$('tabContent').innerHTML=`<section class="section"><h2>Empresas internas</h2><p class="help">Empresas usadas pelos usuários internos.</p><div class="company-grid">${catalog.companies.map(c=>`<article class="mini"><b>${c.label}</b><p>Código: ${c.key}</p></article>`).join('')}</div></section><section class="section"><h2>Clientes</h2><p class="help">Clientes/escopos usados nos aplicativos externos.</p><div class="company-grid">${(catalog.clients||[]).map(c=>`<article class="mini"><b>${c.label}</b><p>Código: ${c.key}</p></article>`).join('')}</div></section>`}
 async function loadAudit(){try{audit=(await api('/audit')).audit||[];$('tabContent').innerHTML=`<section class="section"><h2>Auditoria</h2><p class="help">Alterações administrativas recentes.</p><div class="table-wrap"><table><thead><tr><th>Data</th><th>Administrador</th><th>Ação</th><th>Alvo</th></tr></thead><tbody>${audit.map(r=>`<tr><td>${new Date(r.created_at).toLocaleString('pt-BR')}</td><td>${esc(r.actor_email)}</td><td>${esc(r.action==='USER_UPSERT'?'Usuário salvo':r.action==='USER_DELETE'?'Usuário excluído':r.action==='ENTRA_INVITE_STATUS'?'Status de convite Entra':r.action)}</td><td>${esc(r.target)}</td></tr>`).join('')}</tbody></table></div></section>`}catch(e){$('tabContent').innerHTML='<section class="section"><h2>Auditoria</h2><p>'+esc(e.message)+'</p></section>'}}
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(e=>console.warn('PWA',e)));
 init();
 </script>
 <script src="./portal-admin-v2.js?v=1"></script>
