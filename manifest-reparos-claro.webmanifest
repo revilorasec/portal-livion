@@ -1,0 +1,20 @@
+{
+  "id": "./pwa/reparos-claro",
+  "name": "Status Reparos Claro · Livion",
+  "short_name": "Reparos Claro",
+  "description": "Acompanhamento dos reparos Claro no Portal Livion.",
+  "lang": "pt-BR",
+  "start_url": "./?app=reparos-claro",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#d71920",
+  "icons": [
+    {"src":"./assets/icons/livion-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"./assets/icons/livion-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"./assets/icons/livion-192.png","sizes":"192x192","type":"image/png","purpose":"maskable"},
+    {"src":"./assets/icons/livion-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ]
+}
