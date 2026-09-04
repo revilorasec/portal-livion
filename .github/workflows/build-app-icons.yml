@@ -1,0 +1,40 @@
+name: Build individual app icons
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/build_app_icons.py
+      - .github/workflows/build-app-icons.yml
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - run: python scripts/build_app_icons.py
+      - name: Validate outputs
+        run: |
+          test -f assets/app-icons/rh-192.png
+          test -f assets/app-icons/fretes-192.png
+          test -f assets/app-icons/reparos-claro-192.png
+          test -f assets/app-icons/estoque-192.png
+          test -f assets/app-icons/despesas-reembolsos-192.png
+          grep -q 'assets/app-icons/rh-192.png' manifest-rh.webmanifest
+          grep -q 'assets/app-icons/fretes-192.png' manifest-fretes.webmanifest
+          grep -q 'apple-touch-icon' install-app.html
+      - name: Commit generated assets
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/app-icons manifest-*.webmanifest install-app.html index.html sw.js
+          if git diff --cached --quiet; then
+            echo 'No changes'
+          else
+            git commit -m 'feat: add distinct PWA icons for each app'
+            git push
+          fi
