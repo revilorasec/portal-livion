@@ -18,12 +18,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Fix publisher replacements
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tools/refine_expenses_scanner_catalogs_maps.py')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace("re.subn(pattern,replacement,js,count=1,flags=re.S)", "re.subn(pattern,lambda m: replacement,js,count=1,flags=re.S)")
+          p.write_text(s,encoding='utf-8')
+          PY
       - run: python tools/refine_expenses_scanner_catalogs_maps.py
       - run: node --check despesas-reembolsos-v2.js
       - name: Commit patch
         run: |
           git config user.name revilorasec
           git config user.email cesar.oliver@gmail.com
-          git add despesas-reembolsos-v2.html despesas-reembolsos-v2.js
+          git add despesas-reembolsos-v2.html despesas-reembolsos-v2.js tools/refine_expenses_scanner_catalogs_maps.py
           git diff --cached --quiet || git commit -m "feat: refina scanner fiscal e cadastros"
           git push
