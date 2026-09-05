@@ -1,0 +1,29 @@
+name: Add card bank and brand dropdowns
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/add_card_bank_brand_dropdowns.py
+      - .github/workflows/add-card-bank-brand-dropdowns.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python tools/add_card_bank_brand_dropdowns.py
+      - run: node --check despesas-reembolsos-v2.js
+      - name: Commit patch
+        run: |
+          git config user.name revilorasec
+          git config user.email cesar.oliver@gmail.com
+          git add despesas-reembolsos-v2.html despesas-reembolsos-v2.js
+          git diff --cached --quiet || git commit -m "feat: adiciona bancos e bandeiras aos cartoes"
+          git push
