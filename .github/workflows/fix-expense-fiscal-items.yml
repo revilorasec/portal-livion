@@ -1,0 +1,29 @@
+name: Fix expense fiscal items
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/fix_expense_fiscal_items.py
+      - .github/workflows/fix-expense-fiscal-items.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python tools/fix_expense_fiscal_items.py
+      - run: node --check despesas-reembolsos-v2.js
+      - name: Commit patch
+        run: |
+          git config user.name revilorasec
+          git config user.email cesar.oliver@gmail.com
+          git add despesas-reembolsos-v2.html despesas-reembolsos-v2.js
+          git diff --cached --quiet || git commit -m "fix: filtra metadados dos itens fiscais"
+          git push
