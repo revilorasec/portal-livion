@@ -1,0 +1,29 @@
+name: Refactor expense entry clean
+on:
+  push:
+    paths:
+      - tools/refactor_expense_entry_clean.py
+      - .github/workflows/refactor-expense-entry-clean.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python tools/refactor_expense_entry_clean.py
+      - run: node --check despesas-reembolsos-v2.js
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add despesas-reembolsos-v2.html despesas-reembolsos-v2.js
+          git diff --cached --quiet || git commit -m "feat: simplifica cadastro de despesas"
+          git push
