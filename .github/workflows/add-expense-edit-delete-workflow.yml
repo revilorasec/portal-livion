@@ -1,0 +1,33 @@
+name: Add expense edit delete workflow
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/add_expense_edit_delete_workflow.py'
+      - '.github/workflows/add-expense-edit-delete-workflow.yml'
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: python tools/add_expense_edit_delete_workflow.py
+      - run: node --check despesas-reembolsos-v2.js
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add despesas-reembolsos-v2.html despesas-reembolsos-v2.js
+          git commit -m "feat: adiciona edicao exclusao e cores nas despesas"
+          git push
