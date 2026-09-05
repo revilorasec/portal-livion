@@ -1,0 +1,30 @@
+name: Add card sharing privacy
+on:
+  push:
+    paths:
+      - tools/add_card_sharing_privacy.py
+      - .github/workflows/add-card-sharing-privacy.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python tools/add_card_sharing_privacy.py
+      - run: node --check despesas-reembolsos-v2.js
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add despesas-reembolsos-v2.html despesas-reembolsos-v2.js
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: compartilhamento seguro de cartoes"
+          git push
