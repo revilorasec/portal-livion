@@ -5,9 +5,18 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $sourceRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'docs\onedrive-apps'
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 
 if (-not (Test-Path -LiteralPath $sourceRoot)) {
-    throw "Pasta dos manuais não encontrada: $sourceRoot"
+    $downloadRoot = Join-Path $env:TEMP "portal-livion-manuais-$stamp"
+    $archivePath = Join-Path $downloadRoot 'portal-livion-main.zip'
+    New-Item -ItemType Directory -Path $downloadRoot -Force | Out-Null
+    Invoke-WebRequest -Uri 'https://github.com/revilorasec/portal-livion/archive/refs/heads/main.zip' -OutFile $archivePath
+    Expand-Archive -LiteralPath $archivePath -DestinationPath $downloadRoot -Force
+    $sourceRoot = Join-Path $downloadRoot 'portal-livion-main\docs\onedrive-apps'
+    if (-not (Test-Path -LiteralPath $sourceRoot)) {
+        throw "Não foi possível obter os manuais do Portal Livion."
+    }
 }
 
 $apps = @(
@@ -20,7 +29,6 @@ $apps = @(
 )
 
 New-Item -ItemType Directory -Path $PortalRoot -Force | Out-Null
-$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 
 foreach ($app in $apps) {
     $appPath = Join-Path $PortalRoot $app.Name
