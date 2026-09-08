@@ -3,6 +3,15 @@ param(
     [string]$PortalRoot = "C:\OneDrive - Livion Solutions\00-PORTAL LIVION"
 )
 
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    $pwshCommand = Get-Command 'pwsh' -ErrorAction SilentlyContinue
+    if (-not $pwshCommand) {
+        throw 'Este organizador requer PowerShell 7 ou superior para preservar corretamente os nomes com acentos.'
+    }
+    & $pwshCommand.Source -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -PortalRoot $PortalRoot
+    exit $LASTEXITCODE
+}
+
 $ErrorActionPreference = 'Stop'
 $sourceRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'docs\onedrive-apps'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
