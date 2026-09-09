@@ -337,8 +337,8 @@
 
   function setupCanvas(canvas, minimumHeight) {
     const ratio = window.devicePixelRatio || 1;
-    const width = Math.max(canvas.clientWidth, 280);
-    const height = Math.max(canvas.clientHeight, minimumHeight);
+    const width = Math.max(Math.round(canvas.clientWidth), 1);
+    const height = Math.max(Math.round(canvas.clientHeight || minimumHeight), 1);
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
     const context = canvas.getContext('2d');
@@ -353,7 +353,15 @@
   }
 
   function compactNumber(value) {
-    return new Intl.NumberFormat('pt-BR', {notation: Number(value) >= 10000 ? 'compact' : 'standard', maximumFractionDigits: 1}).format(Number(value || 0));
+    return new Intl.NumberFormat('pt-BR', {notation: Number(value) >= 10000 ? 'compact' : 'standard', maximumFractionDigits: 0}).format(Number(value || 0));
+  }
+
+  function integerAxisMaximum(maximum, divisions = 4) {
+    const rawStep = Math.max(1, Number(maximum || 0) / divisions);
+    const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+    const normalized = rawStep / magnitude;
+    const niceNormalized = [1, 2, 3, 5, 10].find(value => value >= normalized) || 10;
+    return Math.max(divisions, Math.ceil(niceNormalized * magnitude) * divisions);
   }
 
   function drawTrendChart() {
@@ -364,7 +372,7 @@
     const chartWidth = width - left - right, chartHeight = height - top - bottom;
     const values = rows.flatMap(row => [Number(row.entry_movements || 0), Number(row.exit_movements || 0)]);
     const maximum = Math.max(1, ...values);
-    const roundedMax = Math.max(5, Math.ceil(maximum / 5) * 5);
+    const roundedMax = integerAxisMaximum(maximum);
     context.font = '11px Segoe UI';
     context.textBaseline = 'middle';
     context.strokeStyle = '#e7edf5';
