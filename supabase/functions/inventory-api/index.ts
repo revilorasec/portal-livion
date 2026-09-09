@@ -61,7 +61,8 @@ const movementV17Base=movement;
 movement=async function(a:any,b:any){
   const result=await movementV17Base(a,b);
   if(String(b.movement_type||'').toUpperCase()==='ENTRADA'&&b.product_id&&b.supplier_id){
-    const link=await db.from('inventory_product_suppliers').upsert({product_id:b.product_id,supplier_id:b.supplier_id,last_unit_price:b.unit_value==null?null:Number(b.unit_value),last_purchase_at:result.occurred_at||new Date().toISOString(),active:true,updated_at:new Date().toISOString()},{onConflict:'product_id,supplier_id'});
+    const supplierLink:any={product_id:b.product_id,supplier_id:b.supplier_id,last_purchase_at:result.occurred_at||new Date().toISOString(),active:true,updated_at:new Date().toISOString()};if(b.unit_value!=null)supplierLink.last_unit_price=Number(b.unit_value);
+    const link=await db.from('inventory_product_suppliers').upsert(supplierLink,{onConflict:'product_id,supplier_id'});
     if(link.error)await audit(a,'INVENTORY_PRODUCT_SUPPLIER_WARNING',b.product_id,{supplier_id:b.supplier_id,error:link.error.message}).catch(()=>{});
   }
   return result;
