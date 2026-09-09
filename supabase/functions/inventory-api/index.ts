@@ -23,5 +23,87 @@ async function invoiceConfirm(a:any,b:any){if(!can(a,'estoque.movimentar_entrada
 async function productHistory(a:any,u:URL){if(!can(a,'estoque.visualizar_historico')&&!a.admin)throw Error('FORBIDDEN');const id=String(u.searchParams.get('product_id')||'');if(!id)throw Error('INVALID_PRODUCT');const movements=await db.from('inventory_movements').select('*').eq('product_id',id).order('occurred_at',{ascending:false}).limit(5000);if(movements.error)throw movements.error;const movementRows=movements.data||[],movementIds=movementRows.map((m:any)=>m.movement_id),itemLinks=movementIds.length?(await db.from('inventory_invoice_items').select('invoice_id,movement_id').in('movement_id',movementIds).limit(5000)).data||[]:[],refs=[...new Set([...movementRows.filter((m:any)=>m.reference_type==='NFE'&&m.reference_id).map((m:any)=>m.reference_id),...itemLinks.map((x:any)=>x.invoice_id)])],inv=refs.length?(await db.from('inventory_invoices').select('invoice_id,invoice_number,access_key,supplier_id,supplier_name,issued_at,source').in('invoice_id',refs)).data||[]:[];return{movements:movementRows.map((m:any)=>{const invoiceId=m.reference_type==='NFE'&&m.reference_id?m.reference_id:itemLinks.find((x:any)=>x.movement_id===m.movement_id)?.invoice_id;return{...m,invoice:inv.find((x:any)=>x.invoice_id===invoiceId)||null}})}}
 async function deleteInvoice(a:any,u:URL){if(!a.admin)throw Error('FORBIDDEN');const id=String(u.searchParams.get('invoice_id')||'');if(!id)throw Error('INVALID_INVOICE');const inv=await db.from('inventory_invoices').select('*').eq('invoice_id',id).maybeSingle();if(inv.error)throw inv.error;if(!inv.data)throw Error('NOT_FOUND');if(inv.data.status!=='PREVIEW')throw Error('INVOICE_DELETE_NOT_ALLOWED');const docs=await db.from('inventory_documents').select('*').eq('invoice_id',id);if(docs.error)throw docs.error;const delDocs=await db.from('inventory_documents').delete().eq('invoice_id',id);if(delDocs.error)throw delDocs.error;const del=await db.from('inventory_invoices').delete().eq('invoice_id',id).eq('status','PREVIEW');if(del.error)throw del.error;for(const f of docs.data||[])if(f.object_path)await db.storage.from(f.bucket).remove([f.object_path]);if(inv.data.object_path)await db.storage.from(inv.data.bucket).remove([inv.data.object_path]);await audit(a,'INVENTORY_NFE_DRAFT_DELETE',id,{invoice_number:inv.data.invoice_number,access_key:inv.data.access_key,supplier_name:inv.data.supplier_name||inv.data.raw_data?.supplier_name||null});return{ok:true}}
 async function documentUpload(a:any,r:Request,u:URL){if(!can(a,'estoque.movimentar_entrada'))throw Error('FORBIDDEN');const movementId=String(u.searchParams.get('movement_id')||''),kind=String(u.searchParams.get('document_type')||'OTHER').toUpperCase();if(!movementId||!['NFE_XML','DANFE','OTHER'].includes(kind))throw Error('INVALID_DOCUMENT_TARGET');const f=(await r.formData()).get('file'),allowed=['application/xml','text/xml','application/pdf','image/jpeg','image/png','image/webp'];if(!(f instanceof File)||!allowed.includes(f.type)||f.size<=0||f.size>10485760)throw Error('INVALID_DOCUMENT');const ext=(f.name.split('.').pop()||'bin').replace(/[^a-z0-9]/gi,'').toLowerCase(),path=`movements/${movementId}/${crypto.randomUUID()}.${ext}`,up=await db.storage.from('inventory-nfe').upload(path,f,{contentType:f.type});if(up.error)throw up.error;const ins=await db.from('inventory_documents').insert({movement_id:movementId,document_type:kind,bucket:'inventory-nfe',object_path:path,original_name:f.name,mime_type:f.type,byte_size:f.size,created_by:a.email});if(ins.error){await db.storage.from('inventory-nfe').remove([path]);throw ins.error}await audit(a,'INVENTORY_DOCUMENT_UPLOAD',movementId,{document_type:kind,original_name:f.name});return{ok:true}}
-async function catalogOption(a:any,b:any){if(!can(a,'estoque.editar_produto')&&!can(a,'estoque.cadastrar_produto'))throw Error('FORBIDDEN');const type=String(b.option_type||'').toUpperCase(),value=String(b.value||'').trim();if(!['TYPE','CATEGORY','UNIT'].includes(type)||!value)throw Error('INVALID_CATALOG_OPTION');const row:any={option_type:type,value,active:b.active!==false,sort_order:Number(b.sort_order||100),created_by:a.email,updated_at:new Date().toISOString()};if(b.option_id)row.option_id=b.option_id;const r=await db.from('inventory_catalog_options').upsert(row,{onConflict:b.option_id?'option_id':'option_type,value'}).select().single();if(r.error)throw r.error;await audit(a,'INVENTORY_CATALOG_UPSERT',r.data.option_id,{option_type:type,value,active:row.active});return{ok:true,option:r.data}}
-Deno.serve(async r=>{if(r.method==='OPTIONS')return new Response('',{headers:cors});let a:any;try{a=await auth(r);const u=new URL(r.url),p=u.pathname.split('/').pop();if(r.method==='GET'&&p==='health')return json({ok:true,version:16});if(r.method==='GET'&&p==='bootstrap')return json(await bootstrap(a));if(r.method==='GET'&&p==='report')return json(await report(a,u));if(r.method==='GET'&&p==='invoices')return json(await invoices(a,u));if(r.method==='GET'&&p==='product-history')return json(await productHistory(a,u));if(r.method==='POST'&&p==='invoice-import')return json(await invoiceImport(a,r));if(r.method==='POST'&&p==='invoice-confirm')return json(await invoiceConfirm(a,await r.json()));if(r.method==='POST'&&p==='movement')return json(await movement(a,await r.json()));if(r.method==='POST'&&p==='product')return json(await product(a,await r.json()));if(r.method==='POST'&&p==='product-favorite')return json(await productFavorite(a,await r.json()));if(r.method==='POST'&&p==='requester')return json(await person(a,await r.json(),'requester'));if(r.method==='POST'&&p==='supplier')return json(await person(a,await r.json(),'supplier'));if(r.method==='DELETE'&&p==='invoices')return json(await deleteInvoice(a,u));if(r.method==='DELETE'&&p==='requester')return json(await deletePerson(a,u,'requester'));if(r.method==='DELETE'&&p==='supplier')return json(await deletePerson(a,u,'supplier'));if(['POST','DELETE'].includes(r.method)&&p==='media')return json(await upload(a,r,u));if(r.method==='POST'&&p==='document')return json(await documentUpload(a,r,u));if(r.method==='POST'&&p==='catalog-option')return json(await catalogOption(a,await r.json()));return json({error:'NOT_FOUND'},404)}catch(e){const m=String(e?.message||e),status=m.includes('UNAUTHORIZED')?401:m.includes('FORBIDDEN')?403:m.includes('NOT_FOUND')?404:m.includes('INVOICE_DUPLICATE')||m.includes('duplicate key')?409:m.includes('INVALID')||m.includes('INSUFFICIENT')?400:500;if(a&&status===403)await audit(a,'INVENTORY_ACCESS_DENIED','inventory-api',{message:m}).catch(()=>{});return json({error:m},status)}})
+async function catalogOption(a:any,b:any){if(!can(a,'estoque.editar_produto')&&!can(a,'estoque.cadastrar_produto'))throw Error('FORBIDDEN');const type=String(b.option_type||'').toUpperCase(),value=String(b.value||'').trim();if(!['TYPE','CATEGORY','UNIT','LOCATION'].includes(type)||!value)throw Error('INVALID_CATALOG_OPTION');const row:any={option_type:type,value,active:b.active!==false,sort_order:Number(b.sort_order||100),created_by:a.email,updated_at:new Date().toISOString()};if(b.option_id)row.option_id=b.option_id;const r=await db.from('inventory_catalog_options').upsert(row,{onConflict:b.option_id?'option_id':'option_type,value'}).select().single();if(r.error)throw r.error;await audit(a,'INVENTORY_CATALOG_UPSERT',r.data.option_id,{option_type:type,value,active:row.active});return{ok:true,option:r.data}}
+
+const bootstrapV17Base=bootstrap;
+bootstrap=async function(a:any){
+  const data=await bootstrapV17Base(a);
+  const [partsResult,compatResult,supplierLinksResult]=await Promise.all([
+    db.from('inventory_parts').select('*').order('description').limit(3000),
+    db.from('inventory_product_parts').select('product_id,part_id').limit(10000),
+    db.from('inventory_product_suppliers').select('product_id,supplier_id').eq('active',true).limit(10000)
+  ]);
+  if(partsResult.error)throw partsResult.error;
+  if(compatResult.error)throw compatResult.error;
+  if(supplierLinksResult.error)throw supplierLinksResult.error;
+  const parts=partsResult.data||[],partMedia=await mediaMap('PART',parts.map((x:any)=>x.part_id));
+  for(const item of parts){
+    item.media=partMedia[item.part_id]||[];
+    item.photo_url=item.media[0]?.url||null;
+    item.photo_url_2=item.media[1]?.url||null;
+  }
+  const partIdsByProduct=new Map<string,string[]>(),supplierIdsByProduct=new Map<string,string[]>();
+  for(const link of compatResult.data||[]){const values=partIdsByProduct.get(link.product_id)||[];values.push(link.part_id);partIdsByProduct.set(link.product_id,values)}
+  for(const link of supplierLinksResult.data||[]){const values=supplierIdsByProduct.get(link.product_id)||[];if(!values.includes(link.supplier_id))values.push(link.supplier_id);supplierIdsByProduct.set(link.product_id,values)}
+  const supplierNames=new Map((data.suppliers||[]).map((x:any)=>[x.supplier_id,x.name]));
+  for(const item of data.stock||[]){
+    item.part_ids=partIdsByProduct.get(item.product_id)||[];
+    item.supplier_ids=supplierIdsByProduct.get(item.product_id)||[];
+    item.supplier_names=item.supplier_ids.map((id:string)=>supplierNames.get(id)).filter(Boolean);
+  }
+  data.parts=parts;
+  data.product_part_links=compatResult.data||[];
+  data.permissions.part=data.permissions.product;
+  return data;
+};
+
+const movementV17Base=movement;
+movement=async function(a:any,b:any){
+  const result=await movementV17Base(a,b);
+  if(String(b.movement_type||'').toUpperCase()==='ENTRADA'&&b.product_id&&b.supplier_id){
+    const link=await db.from('inventory_product_suppliers').upsert({product_id:b.product_id,supplier_id:b.supplier_id,last_unit_price:b.unit_value==null?null:Number(b.unit_value),last_purchase_at:result.occurred_at||new Date().toISOString(),active:true,updated_at:new Date().toISOString()},{onConflict:'product_id,supplier_id'});
+    if(link.error)await audit(a,'INVENTORY_PRODUCT_SUPPLIER_WARNING',b.product_id,{supplier_id:b.supplier_id,error:link.error.message}).catch(()=>{});
+  }
+  return result;
+};
+
+const productV17Base=product;
+product=async function(a:any,b:any){
+  const supplied=Array.isArray(b.part_ids),partIds=supplied?[...new Set(b.part_ids.map((x:any)=>String(x)).filter(Boolean))]:[];
+  if(partIds.length){const valid=await db.from('inventory_parts').select('part_id').in('part_id',partIds);if(valid.error)throw valid.error;if((valid.data||[]).length!==partIds.length)throw Error('INVALID_PART_LINK')}
+  const result=await productV17Base(a,b),productId=result.product_id;
+  if(supplied){
+    if(partIds.length){const added=await db.from('inventory_product_parts').upsert(partIds.map(partId=>({product_id:productId,part_id:partId,created_by:a.email})),{onConflict:'product_id,part_id'});if(added.error)throw added.error}
+    const existing=await db.from('inventory_product_parts').select('part_id').eq('product_id',productId);if(existing.error)throw existing.error;
+    const removed=(existing.data||[]).map((x:any)=>x.part_id).filter((id:string)=>!partIds.includes(id));
+    if(removed.length){const del=await db.from('inventory_product_parts').delete().eq('product_id',productId).in('part_id',removed);if(del.error)throw del.error}
+    await audit(a,'INVENTORY_PRODUCT_PARTS_SET',productId,{part_ids:partIds});
+  }
+  return result;
+};
+
+async function part(a:any,b:any){
+  if(!can(a,b.part_id?'estoque.editar_produto':'estoque.cadastrar_produto'))throw Error('FORBIDDEN');
+  const id=b.part_id||crypto.randomUUID(),before=b.part_id?(await db.from('inventory_parts').select('*').eq('part_id',id).maybeSingle()).data:null,row:any={part_id:id,pn:String(b.pn||'').trim(),description:String(b.description||'').trim(),manufacturer:String(b.manufacturer||'').trim()||null,client_name:String(b.client_name||'').trim()||null,status:b.status==='INATIVO'?'INATIVO':'ATIVO',notes:String(b.notes||'').trim()||null,created_by:before?.created_by||a.email,updated_at:new Date().toISOString()};
+  if(!row.pn||!row.description)throw Error('INVALID_PART');
+  const saved=await db.from('inventory_parts').upsert(row,{onConflict:'part_id'}).select('part_id').single();if(saved.error)throw saved.error;
+  await audit(a,'INVENTORY_PART_UPSERT',id,{before,after:row});
+  return{ok:true,part_id:id};
+}
+
+const uploadV17Base=upload;
+upload=async function(a:any,r:Request,u:URL){
+  const type=String(u.searchParams.get('entity_type')||'').toUpperCase();
+  if(type!=='PART')return uploadV17Base(a,r,u);
+  if(!can(a,'estoque.editar_produto')&&!can(a,'estoque.cadastrar_produto'))throw Error('FORBIDDEN');
+  const id=String(u.searchParams.get('entity_id')||''),pos=Number(u.searchParams.get('position'));if(!id||pos<1||pos>2)throw Error('INVALID_MEDIA_TARGET');
+  const target=await db.from('inventory_parts').select('part_id').eq('part_id',id).maybeSingle();if(target.error||!target.data)throw Error('INVALID_MEDIA_TARGET');
+  const old=(await db.from('inventory_media').select('*').match({entity_type:type,entity_id:id,position:pos}).maybeSingle()).data;
+  if(r.method==='DELETE'){if(old){await db.storage.from(old.bucket).remove([old.object_path]);await db.from('inventory_media').delete().eq('media_id',old.media_id)}return{ok:true}}
+  const file=(await r.formData()).get('file');if(!(file instanceof File)||!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10485760)throw Error('INVALID_PHOTO');
+  const ext=file.type.split('/')[1].replace('jpeg','jpg'),path=`part/${id}/${crypto.randomUUID()}.${ext}`,stored=await db.storage.from('inventory-media').upload(path,file,{contentType:file.type});if(stored.error)throw stored.error;
+  const saved=await db.from('inventory_media').upsert({entity_type:type,entity_id:id,position:pos,bucket:'inventory-media',object_path:path,mime_type:file.type,byte_size:file.size,created_by:a.email},{onConflict:'entity_type,entity_id,position'});if(saved.error){await db.storage.from('inventory-media').remove([path]);throw saved.error}if(old)await db.storage.from(old.bucket).remove([old.object_path]);
+  await audit(a,'INVENTORY_MEDIA_UPSERT',id,{type,position:pos});return{ok:true};
+};
+
+Deno.serve(async r=>{if(r.method==='OPTIONS')return new Response('',{headers:cors});let a:any;try{a=await auth(r);const u=new URL(r.url),p=u.pathname.split('/').pop();if(r.method==='GET'&&p==='health')return json({ok:true,version:17});if(r.method==='GET'&&p==='bootstrap')return json(await bootstrap(a));if(r.method==='GET'&&p==='report')return json(await report(a,u));if(r.method==='GET'&&p==='invoices')return json(await invoices(a,u));if(r.method==='GET'&&p==='product-history')return json(await productHistory(a,u));if(r.method==='POST'&&p==='invoice-import')return json(await invoiceImport(a,r));if(r.method==='POST'&&p==='invoice-confirm')return json(await invoiceConfirm(a,await r.json()));if(r.method==='POST'&&p==='movement')return json(await movement(a,await r.json()));if(r.method==='POST'&&p==='product')return json(await product(a,await r.json()));if(r.method==='POST'&&p==='part')return json(await part(a,await r.json()));if(r.method==='POST'&&p==='product-favorite')return json(await productFavorite(a,await r.json()));if(r.method==='POST'&&p==='requester')return json(await person(a,await r.json(),'requester'));if(r.method==='POST'&&p==='supplier')return json(await person(a,await r.json(),'supplier'));if(r.method==='DELETE'&&p==='invoices')return json(await deleteInvoice(a,u));if(r.method==='DELETE'&&p==='requester')return json(await deletePerson(a,u,'requester'));if(r.method==='DELETE'&&p==='supplier')return json(await deletePerson(a,u,'supplier'));if(['POST','DELETE'].includes(r.method)&&p==='media')return json(await upload(a,r,u));if(r.method==='POST'&&p==='document')return json(await documentUpload(a,r,u));if(r.method==='POST'&&p==='catalog-option')return json(await catalogOption(a,await r.json()));return json({error:'NOT_FOUND'},404)}catch(e){const m=String(e?.message||e),status=m.includes('UNAUTHORIZED')?401:m.includes('FORBIDDEN')?403:m.includes('NOT_FOUND')?404:m.includes('INVOICE_DUPLICATE')||m.includes('duplicate key')?409:m.includes('INVALID')||m.includes('INSUFFICIENT')?400:500;if(a&&status===403)await audit(a,'INVENTORY_ACCESS_DENIED','inventory-api',{message:m}).catch(()=>{});return json({error:m},status)}})

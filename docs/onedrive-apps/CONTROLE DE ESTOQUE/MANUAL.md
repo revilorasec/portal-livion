@@ -1,6 +1,6 @@
 # Manual técnico — Controle de Estoque
 
-Atualizado em: 08/09/2026
+Atualizado em: 09/09/2026
 
 ## Identificação
 
@@ -32,6 +32,8 @@ Tabelas confirmadas no código e migrations:
 - `inventory_lot_allocations`;
 - `inventory_product_costs`;
 - `inventory_product_suppliers`;
+- `inventory_parts`;
+- `inventory_product_parts`;
 - `inventory_supplier_price_history`;
 - `inventory_legacy_snapshot`;
 - `inventory_deployment_snapshots`.
@@ -74,6 +76,13 @@ CONTROLE DE ESTOQUE
 - fornecedor da NF-e exibido pelo nome fiscal lido no XML, mesmo antes do vínculo cadastral;
 - bloqueio de XML duplicado pela chave de acesso;
 - exclusão de rascunhos de NF-e restrita a administradores.
+- cadastro centralizado das localizações físicas usadas no estoque;
+- localização do produto selecionada por lista pesquisável, preservando os locais antigos;
+- pesquisa de estoque por fornecedor, tanto pelo texto quanto por filtro pesquisável;
+- relação produto-fornecedor recuperada das entradas históricas e atualizada nas novas entradas manuais ou por NF-e;
+- cadastro de peças para reparo com PN, descrição, fabricante, cliente, status, observações e até duas fotos;
+- vínculo de um componente ou insumo com uma ou várias peças nas quais ele pode ser utilizado;
+- exportação dos cadastros passa a incluir uma planilha de peças e as localizações na planilha de listas.
 
 ## Estado de dados conhecido
 
@@ -81,6 +90,9 @@ CONTROLE DE ESTOQUE
 - 7 notas fiscais antigas recuperadas a partir de 15 entradas que continham fornecedor e número de nota;
 - notas antigas são apenas uma visão fiscal do histórico existente: a recuperação não cria novas movimentações nem altera saldos;
 - registros `RHCS001` e `LIVION001` continuam tratados como referências internas, não como números de nota fiscal.
+- 58 localizações distintas do cadastro anterior foram incorporadas ao catálogo de localizações;
+- 289 relações produto-fornecedor foram reconstruídas a partir das entradas históricas;
+- a nova tabela de peças inicia vazia para receber os cadastros reais, sem criação de dados fictícios.
 
 ## Continuidade
 
