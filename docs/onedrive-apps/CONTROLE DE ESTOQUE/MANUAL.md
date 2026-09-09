@@ -65,7 +65,8 @@ CONTROLE DE ESTOQUE
 - histórico por componente;
 - permissões pelo Portal.
 - campos de seleção pesquisáveis: o usuário pode digitar para filtrar as opções;
-- duas datas por movimentação: data/hora real, informada ou atual, e data/hora automática de registro no sistema;
+- duas datas por movimentação: data/hora real e data/hora automática de registro no sistema;
+- nas entradas e saídas, a data real vem preenchida com o dia atual e pode ser alterada pelo calendário; a hora permanece automática e é atualizada no momento de salvar;
 - recuperação das notas fiscais identificáveis do Excel original, sem duplicar as entradas;
 - filtros de notas por número/chave, fornecedor, componente e status;
 - fornecedor da NF-e exibido pelo nome fiscal lido no XML, mesmo antes do vínculo cadastral;
