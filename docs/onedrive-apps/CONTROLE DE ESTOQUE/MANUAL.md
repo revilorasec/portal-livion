@@ -1,6 +1,6 @@
 # Manual técnico — Controle de Estoque
 
-Atualizado em: 07/09/2026
+Atualizado em: 08/09/2026
 
 ## Identificação
 
@@ -64,16 +64,25 @@ CONTROLE DE ESTOQUE
 - filtros, ordenação, exportações e relatórios;
 - histórico por componente;
 - permissões pelo Portal.
+- campos de seleção pesquisáveis: o usuário pode digitar para filtrar as opções;
+- duas datas por movimentação: data/hora real, informada ou atual, e data/hora automática de registro no sistema;
+- recuperação das notas fiscais identificáveis do Excel original, sem duplicar as entradas;
+- filtros de notas por número/chave, fornecedor, componente e status;
+- fornecedor da NF-e exibido pelo nome fiscal lido no XML, mesmo antes do vínculo cadastral;
+- bloqueio de XML duplicado pela chave de acesso;
+- exclusão de rascunhos de NF-e restrita a administradores.
 
 ## Estado de dados conhecido
 
-Foi relatada a correção da listagem para exibir 2.529 movimentações da base original. Esse número é histórico informado e deve ser reconfirmado diretamente no banco antes de nova migração ou publicação.
+- 2.529 movimentações originais do AppSheet preservadas;
+- 7 notas fiscais antigas recuperadas a partir de 15 entradas que continham fornecedor e número de nota;
+- notas antigas são apenas uma visão fiscal do histórico existente: a recuperação não cria novas movimentações nem altera saldos;
+- registros `RHCS001` e `LIVION001` continuam tratados como referências internas, não como números de nota fiscal.
 
 ## Continuidade
 
-- Reconciliar `inventory_stock_current` com a soma das movimentações.
+- Reconciliar `inventory_stock_current` com a soma das movimentações após toda alteração de banco.
 - Não editar saldo diretamente sem trilha de auditoria.
 - Testar XML com múltiplos itens, produto não vinculado, fornecedor novo/existente e confirmação da nota.
 - Validar FIFO, anexos, fotos, filtros, ordenação, exportações e permissões.
 - Migrations e Edge Functions devem permanecer versionadas no repositório.
-
