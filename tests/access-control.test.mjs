@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canAccessApp, contextFromRow } from '../lib/access-control.mjs';
+import { APP_KEYS, canAccessApp, contextFromRow } from '../lib/access-control.mjs';
 
 test('usuário inativo não recebe contexto', () => {
   assert.equal(contextFromRow({ active: 0, profile: 'OPERACIONAL' }), null);
@@ -8,7 +8,7 @@ test('usuário inativo não recebe contexto', () => {
 
 test('administrador recebe todos os apps cadastrados', () => {
   const context = contextFromRow({ active: 1, profile: 'ADMINISTRADOR', email: 'admin@example.com', name: 'Admin' });
-  assert.deepEqual(context?.apps.sort(), ['fretes', 'rh']);
+  assert.deepEqual(context?.apps.sort(), [...APP_KEYS].sort());
   assert.equal(context?.administrator, true);
 });
 

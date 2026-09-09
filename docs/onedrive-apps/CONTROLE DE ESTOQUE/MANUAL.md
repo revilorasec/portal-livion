@@ -67,6 +67,8 @@ CONTROLE DE ESTOQUE
 - campos de seleção pesquisáveis: o usuário pode digitar para filtrar as opções;
 - duas datas por movimentação: data/hora real e data/hora automática de registro no sistema;
 - nas entradas e saídas, a data real vem preenchida com o dia atual e pode ser alterada pelo calendário; a hora permanece automática e é atualizada no momento de salvar;
+- painel inicial executivo com indicadores acionáveis, saúde do estoque, ritmo mensal, itens críticos, consumo, movimentações recentes e navegação pelos cards e gráficos;
+- produtos podem ser marcados com uma estrela como favoritos e passam a aparecer no painel inicial para consulta rápida de saldo e status;
 - recuperação das notas fiscais identificáveis do Excel original, sem duplicar as entradas;
 - filtros de notas por número/chave, fornecedor, componente e status;
 - fornecedor da NF-e exibido pelo nome fiscal lido no XML, mesmo antes do vínculo cadastral;
