@@ -1,5 +1,6 @@
 (function () {
   const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+  const FISCAL_SMART_API = 'https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/fiscal-smart-api';
   let qrStream = null;
   let qrFrame = 0;
 
@@ -185,6 +186,66 @@
     showInvoiceReview(await api('/invoice-import', {method: 'POST', body: form}));
   }
 
+  function fiscalNumber(value) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    let text = String(value || '').replace(/R\$\s*/gi, '').replace(/\s/g, '');
+    if (!text) return null;
+    if (text.includes(',')) text = text.replace(/\./g, '').replace(',', '.');
+    const number = Number(text.replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function fiscalDate(value) {
+    const text = String(value || '').trim();
+    const br = text.match(/^(\d{2})[\/.-](\d{2})[\/.-](\d{2}|\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (!br) return text || null;
+    let year = Number(br[3]);
+    if (br[3].length === 2) year += year >= 70 ? 1900 : 2000;
+    return `${year}-${br[2]}-${br[1]}T${br[4] || '12'}:${br[5] || '00'}:${br[6] || '00'}-03:00`;
+  }
+
+  function itemFromFiscalText(value, index) {
+    const parts = String(value || '').split(/\s+[—–]\s+/).map(part => part.trim()).filter(Boolean);
+    const quantity = parts[1]?.match(/^([0-9.,]+)(?:\s+([A-Za-z]{1,6}))?/);
+    if (!parts[0] || !quantity) return null;
+    const unitPrice = parts.find(part => /^x\s*(?:R\$)?/i.test(part));
+    const moneyParts = parts.filter(part => /R\$/i.test(part));
+    return {line_number: index + 1, description: parts[0], quantity: fiscalNumber(quantity[1]), unit: quantity[2]?.toUpperCase() || null, unit_price: fiscalNumber(unitPrice), total_value: fiscalNumber(moneyParts[moneyParts.length - 1])};
+  }
+
+  function fiscalMetadata(result, qr) {
+    const fiscal = result?.fiscal || {};
+    const details = Array.isArray(fiscal.item_details) && fiscal.item_details.length ? fiscal.item_details : (fiscal.items || []).map(itemFromFiscalText).filter(Boolean);
+    const items = details.map((item, index) => {
+      const quantity = fiscalNumber(item.quantity);
+      const total = fiscalNumber(item.total_value);
+      let unitPrice = fiscalNumber(item.unit_value ?? item.unit_price);
+      if (unitPrice == null && quantity && total != null) unitPrice = total / quantity;
+      return {line_number: index + 1, supplier_sku: item.code || item.supplier_sku || null, barcode: item.barcode || null, description: String(item.description || '').trim(), quantity, unit: item.unit || null, unit_price: unitPrice, total_value: total, ncm: item.ncm || null, cfop: item.cfop || null, raw_data: {source: result.source || 'FISCAL_SMART'}};
+    });
+    const accessKey = qrAccessKey(fiscal.access_key || qr);
+    if (!accessKey || !items.length || items.some(item => !item.description || !item.quantity || item.quantity <= 0)) throw new Error('A consulta fiscal não informou os itens e quantidades com segurança. Use o XML desta nota como alternativa.');
+    return {
+      access_key: accessKey, invoice_number: fiscal.number || null, series: fiscal.series || null,
+      operation_nature: fiscal.operation_nature || null, issued_at: fiscalDate(fiscal.date_time || fiscal.issued_at),
+      supplier_document: fiscal.cnpj || null, supplier_name: fiscal.legal_name || fiscal.trade_name || fiscal.establishment || null,
+      recipient_document: fiscal.consumer_document || null, recipient_name: fiscal.consumer_name || null,
+      total_value: fiscalNumber(fiscal.value) ?? items.reduce((sum, item) => sum + Number(item.total_value || 0), 0),
+      raw_data: {model: fiscal.model || null, supplier_address: fiscal.address || null, qr_source: result.source || 'FISCAL_SMART'}, items
+    };
+  }
+
+  async function importQrLookup(raw) {
+    token = await renewToken(false) || token;
+    const response = await fetch(FISCAL_SMART_API + '/resolve', {method: 'POST', headers: {authorization: 'Bearer ' + token, 'content-type': 'application/json'}, body: JSON.stringify({qr: raw}), cache: 'no-store'});
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'A consulta fiscal do QR não respondeu.');
+    const metadata = fiscalMetadata(result, raw);
+    if (invoiceCache.some(invoice => invoice.access_key === metadata.access_key)) throw new Error('Esta nota fiscal já foi importada.');
+    stopQrCamera();
+    showInvoiceReview(await api('/invoice-import-qr', {method: 'POST', body: JSON.stringify({metadata, source: result.source || 'FISCAL_SMART'})}));
+  }
+
   function qrEntry() {
     stopQrCamera();
     modal('Escanear QR Code da nota fiscal', `
@@ -194,16 +255,18 @@
         <div class="field"><label>Chave de acesso ou conteúdo do QR</label><input id="invoiceQrValue" inputmode="numeric" placeholder="Também é possível digitar a chave de 44 números"></div>
         <div id="invoiceQrStatus" class="nfe-help">O QR identifica a nota. O estoque só será alterado depois da aprovação.</div>
         <a id="invoiceQrOpen" class="btn hidden" target="_blank" rel="noopener">Abrir consulta da nota</a>
-        <div class="field"><label>XML autorizado da mesma nota</label><input id="invoiceQrXml" type="file" accept=".xml,application/xml,text/xml"><small>O XML fornece todos os itens, quantidades, fornecedor e valores.</small></div>
+        <div class="field"><label>XML da mesma nota (alternativa)</label><input id="invoiceQrXml" type="file" accept=".xml,application/xml,text/xml"><small>Use somente quando a consulta do QR não devolver os itens completos.</small></div>
       </div>`, async () => {
-        const key = qrAccessKey($('invoiceQrValue').value);
+        const raw = $('invoiceQrValue').value.trim();
+        const key = qrAccessKey(raw);
         const file = $('invoiceQrXml').files[0];
         if (!key) throw new Error('Leia o QR ou informe uma chave de acesso com 44 números.');
-        if (!file) throw new Error('Selecione o XML autorizado para carregar todos os itens.');
         $('modalSave').disabled = true;
-        await importQrXml(file, key);
+        $('invoiceQrStatus').textContent = file ? 'Lendo o XML e preparando a conferência…' : 'Consultando a nota e identificando os itens comprados…';
+        try { file ? await importQrXml(file, key) : await importQrLookup(raw); }
+        catch (error) { $('modalSave').disabled = false; throw error; }
       });
-    $('modalSave').textContent = 'Ler itens e revisar';
+    $('modalSave').textContent = 'Consultar itens e revisar';
     const status = $('invoiceQrStatus');
     let detector = null;
     try { if ('BarcodeDetector' in window) detector = new BarcodeDetector({formats: ['qr_code']}); } catch {}
@@ -213,7 +276,7 @@
       if (!key) { status.innerHTML = '<span class="bad-text">O código foi lido, mas não contém uma chave de 44 números.</span>'; return false; }
       stopQrCamera();
       const duplicate = invoiceCache.find(invoice => invoice.access_key === key);
-      status.innerHTML = duplicate ? `<span class="bad-text"><b>Nota já importada:</b> NF-e ${esc(duplicate.invoice_number || '')}.</span>` : `<b>QR identificado</b><br>Chave ${esc(key)}. Selecione o XML da mesma nota.`;
+      status.innerHTML = duplicate ? `<span class="bad-text"><b>Nota já importada:</b> NF-e ${esc(duplicate.invoice_number || '')}.</span>` : `<b>QR identificado</b><br>Chave ${esc(key)}. Clique em “Consultar itens e revisar”.`;
       $('modalSave').disabled = !!duplicate;
       try { const url = new URL(raw); if (/^https?:$/.test(url.protocol)) { $('invoiceQrOpen').href = url.href; $('invoiceQrOpen').classList.remove('hidden'); } } catch {}
       return !duplicate;
@@ -267,7 +330,7 @@
       <div class="entry-choice entry-choice-v18">
         <button id="chooseManual" class="entry-option"><b>✍ Entrada manual</b><span>Selecione um produto e informe a quantidade recebida.</span></button>
         <button id="chooseXml" class="entry-option"><b>▣ Importar XML da NF-e</b><span>Leia todos os itens da nota e faça as entradas em conjunto.</span></button>
-        <button id="chooseQr" class="entry-option qr-entry-option"><b>⌗ Escanear QR da nota</b><span>Leia a chave pela câmera, valide o XML e revise todos os itens.</span></button>
+        <button id="chooseQr" class="entry-option qr-entry-option"><b>⌗ Escanear QR da nota</b><span>Consulte os itens comprados e revise antes de dar entrada.</span></button>
       </div>`, () => {});
     $('modalSave').classList.add('hidden');
     $('chooseManual').onclick = manualEntry;
