@@ -73,26 +73,88 @@
     const selected = new Set(product.part_ids || []);
     field.innerHTML = `
       <label>Peças em que este componente pode ser usado</label>
-      <input id="productPartSearch" type="search" placeholder="Digite PN, descrição, fabricante ou cliente…">
-      <div id="productPartOptions" class="product-part-options"></div>
-      <small>Marque uma ou mais peças compatíveis. Novas peças são cadastradas em Cadastros.</small>`;
+      <button id="productPartPickerOpen" class="part-picker-trigger" type="button" aria-haspopup="dialog">
+        <span><b>Selecionar peças compatíveis</b><small>Pesquise por PN, descrição, fabricante ou cliente</small></span>
+        <strong id="productPartCount">Nenhuma selecionada</strong>
+      </button>
+      <div id="productPartSummary" class="product-part-summary" aria-live="polite"></div>
+      <small>Abra a lista para selecionar ou revisar as peças. Novas peças são cadastradas em Cadastros.</small>`;
     const form = $('modalBody')?.querySelector('.form');
     const locationField = $('pLoc')?.closest('.field');
     if (locationField) locationField.after(field); else form?.appendChild(field);
-    const draw = () => {
-      const query = normalize($('productPartSearch').value);
-      const parts = (D.parts || []).filter(part => part.status !== 'INATIVO' && (!query || [part.pn, part.description, part.manufacturer, part.client_name].some(value => normalize(value).includes(query))));
-      $('productPartOptions').innerHTML = parts.map(part => `
-        <label class="product-part-option">
-          <input type="checkbox" data-product-part="${esc(part.part_id)}" ${selected.has(part.part_id) ? 'checked' : ''}>
-          ${part.photo_url ? `<img src="${esc(part.photo_url)}" alt="">` : '<span class="part-photo-placeholder">▦</span>'}
-          <span><b>${esc(part.pn)}</b><small>${esc(part.description)}${part.manufacturer ? ' · ' + esc(part.manufacturer) : ''}</small></span>
-        </label>`).join('') || '<div class="empty compact-empty">Nenhuma peça encontrada.</div>';
-      $('productPartOptions').querySelectorAll('[data-product-part]').forEach(input => input.onchange = () => input.checked ? selected.add(input.dataset.productPart) : selected.delete(input.dataset.productPart));
+    const partById = id => (D.parts || []).find(part => part.part_id === id);
+    const renderSummary = () => {
+      const parts = [...selected].map(partById).filter(Boolean).sort((a, b) => tableTextCollator.compare(a.pn || '', b.pn || ''));
+      $('productPartCount').textContent = parts.length ? `${parts.length} selecionada${parts.length === 1 ? '' : 's'}` : 'Nenhuma selecionada';
+      $('productPartSummary').innerHTML = parts.length
+        ? parts.slice(0, 4).map(part => `<span class="product-part-chip" title="${esc(part.description || part.pn)}">${esc(part.pn)}</span>`).join('') + (parts.length > 4 ? `<span class="product-part-chip more">+${parts.length - 4}</span>` : '')
+        : '<span class="product-part-empty">Nenhuma peça vinculada.</span>';
     };
-    $('productPartSearch').oninput = draw;
+    const openPicker = () => {
+      const draft = new Set(selected);
+      const overlay = document.createElement('div');
+      overlay.className = 'part-picker-backdrop';
+      overlay.innerHTML = `
+        <section class="part-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="partPickerTitle">
+          <header class="part-picker-head">
+            <div><h3 id="partPickerTitle">Selecionar peças compatíveis</h3><small>Marque todos os PNs em que este componente ou insumo pode ser usado.</small></div>
+            <button type="button" class="part-picker-close" aria-label="Fechar">×</button>
+          </header>
+          <div class="part-picker-tools">
+            <input id="partPickerSearch" type="search" placeholder="Pesquisar PN, descrição, fabricante ou cliente…" autocomplete="off">
+            <label class="part-picker-selected-only"><input id="partPickerSelectedOnly" type="checkbox"> Somente selecionadas</label>
+          </div>
+          <div id="partPickerStatus" class="part-picker-status" aria-live="polite"></div>
+          <div id="productPartOptions" class="product-part-options"></div>
+          <footer class="part-picker-actions"><button type="button" class="btn part-picker-cancel">Cancelar</button><button type="button" class="btn primary part-picker-apply">Aplicar seleção</button></footer>
+        </section>`;
+      document.body.appendChild(overlay);
+      const search = overlay.querySelector('#partPickerSearch');
+      const selectedOnly = overlay.querySelector('#partPickerSelectedOnly');
+      const options = overlay.querySelector('#productPartOptions');
+      const status = overlay.querySelector('#partPickerStatus');
+      const draw = () => {
+        const query = normalize(search.value);
+        const parts = (D.parts || [])
+          .filter(part => part.status !== 'INATIVO' || draft.has(part.part_id))
+          .filter(part => !selectedOnly.checked || draft.has(part.part_id))
+          .filter(part => !query || [part.pn, part.description, part.manufacturer, part.client_name].some(value => normalize(value).includes(query)))
+          .sort((a, b) => tableTextCollator.compare(a.pn || '', b.pn || ''));
+        status.textContent = `${draft.size} selecionada${draft.size === 1 ? '' : 's'} · ${parts.length} exibida${parts.length === 1 ? '' : 's'}`;
+        options.innerHTML = parts.map(part => `
+          <label class="product-part-option ${draft.has(part.part_id) ? 'selected' : ''}">
+            <input type="checkbox" data-product-part="${esc(part.part_id)}" ${draft.has(part.part_id) ? 'checked' : ''}>
+            ${part.photo_url ? `<img src="${esc(part.photo_url)}" alt="">` : '<span class="part-photo-placeholder">▦</span>'}
+            <span><b>${esc(part.pn)}</b><small>${esc(part.description)}${part.manufacturer ? ' · ' + esc(part.manufacturer) : ''}${part.client_name ? ' · ' + esc(part.client_name) : ''}${part.status === 'INATIVO' ? ' · INATIVA' : ''}</small></span>
+          </label>`).join('') || '<div class="empty compact-empty">Nenhuma peça encontrada.</div>';
+        options.querySelectorAll('[data-product-part]').forEach(input => input.onchange = () => {
+          if (input.checked) draft.add(input.dataset.productPart); else draft.delete(input.dataset.productPart);
+          if (selectedOnly.checked) draw(); else {
+            input.closest('.product-part-option').classList.toggle('selected', input.checked);
+            status.textContent = `${draft.size} selecionada${draft.size === 1 ? '' : 's'} · ${parts.length} exibida${parts.length === 1 ? '' : 's'}`;
+          }
+        });
+      };
+      const closePicker = () => { document.removeEventListener('keydown', onKeydown); overlay.remove(); };
+      const onKeydown = event => { if (event.key === 'Escape') { event.preventDefault(); closePicker(); } };
+      search.oninput = draw;
+      selectedOnly.onchange = draw;
+      overlay.querySelector('.part-picker-close').onclick = closePicker;
+      overlay.querySelector('.part-picker-cancel').onclick = closePicker;
+      overlay.querySelector('.part-picker-apply').onclick = () => {
+        selected.clear();
+        draft.forEach(id => selected.add(id));
+        renderSummary();
+        closePicker();
+      };
+      overlay.onclick = event => { if (event.target === overlay) closePicker(); };
+      document.addEventListener('keydown', onKeydown);
+      draw();
+      requestAnimationFrame(() => search.focus());
+    };
+    $('productPartPickerOpen').onclick = openPicker;
     field._selectedPartIds = selected;
-    draw();
+    renderSummary();
   }
 
   const apiV17Base = api;

@@ -11,7 +11,7 @@ const migration = readFileSync(new URL('../supabase/migrations/20260909130000_ad
 test('carrega os recursos v17 depois do painel v16', () => {
   assert.ok(html.indexOf('estoque-dashboard-v16.js') < html.indexOf('estoque-assets-v17.js'));
   assert.match(html, /estoque-assets-v17\.css/);
-  assert.match(serviceWorker, /portal-livion-v8/);
+  assert.match(serviceWorker, /portal-livion-v9/);
   assert.match(serviceWorker, /estoque-assets-v17\.js/);
 });
 
@@ -26,6 +26,11 @@ test('produto usa localização pesquisável e aceita várias peças compatívei
   assert.match(frontend, /catalogValues\('LOCATION'/);
   assert.match(frontend, /makeSearchableDropdown\('pLoc'/);
   assert.match(frontend, /_selectedPartIds/);
+  assert.match(frontend, /part-picker-backdrop/);
+  assert.match(frontend, /Somente selecionadas/);
+  assert.match(frontend, /Aplicar seleção/);
+  assert.match(frontend, /parts\.slice\(0, 4\)/);
+  assert.doesNotMatch(frontend, /id="productPartSearch"/);
   assert.match(api, /INVENTORY_PRODUCT_PARTS_SET/);
 });
 
