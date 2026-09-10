@@ -3,16 +3,31 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const html = readFileSync(new URL('../estoque.html', import.meta.url), 'utf8');
+const portal = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const frontend = readFileSync(new URL('../estoque-assets-v17.js', import.meta.url), 'utf8');
 const serviceWorker = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../supabase/functions/inventory-api/index.ts', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/20260909130000_add_inventory_locations_and_parts.sql', import.meta.url), 'utf8');
+const versionCatalogSql = readFileSync(new URL('../Scripts/update-portal-app-versions.sql', import.meta.url), 'utf8');
 
 test('carrega os recursos v17 depois do painel v16', () => {
   assert.ok(html.indexOf('estoque-dashboard-v16.js') < html.indexOf('estoque-assets-v17.js'));
   assert.match(html, /estoque-assets-v17\.css/);
-  assert.match(serviceWorker, /portal-livion-v9/);
-  assert.match(serviceWorker, /estoque-assets-v17\.js/);
+  assert.match(serviceWorker, /portal-livion-v10/);
+  assert.match(html, /estoque-assets-v17\.js\?v=18/);
+  assert.match(serviceWorker, /estoque-assets-v17\.js\?v=18/);
+});
+
+test('portal e aplicativo exibem versões identificáveis', () => {
+  assert.match(portal, /PORTAL_VERSION='2026\.09\.10\.1'/);
+  assert.match(portal, /id="portalVersion"/);
+  assert.match(portal, /id="workspaceVersion"/);
+  assert.match(portal, /class="app-card-version"/);
+  assert.match(portal, /function stampFrameVersion/);
+  assert.match(html, /data-app-version="3"/);
+  assert.match(html, /class="app-release">v3/);
+  assert.match(versionCatalogSql, /estoque\.html\?v=3/);
+  assert.match(versionCatalogSql, /where key in/);
 });
 
 test('estoque pesquisa e filtra fornecedores', () => {
