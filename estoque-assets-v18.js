@@ -136,9 +136,49 @@
     return changed;
   }
 
+  async function uploadInvoiceDocument(file, movementId, invoiceId) {
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    const target = new URLSearchParams({document_type: 'DANFE'});
+    if (movementId) target.set('movement_id', movementId);
+    if (invoiceId) target.set('invoice_id', invoiceId);
+    await api('/document?' + target.toString(), {method: 'POST', body: form});
+  }
+
+  function addInvoiceDocuments(detail) {
+    const root = document.querySelector('.invoice-review-root');
+    if (!root) return;
+    const documents = detail.documents || [];
+    const panel = document.createElement('section');
+    panel.className = 'invoice-document-panel';
+    panel.innerHTML = `
+      <div class="invoice-document-heading"><div><b>Foto ou PDF da nota</b><small>${documents.length ? `${documents.length} arquivo${documents.length === 1 ? '' : 's'} anexado${documents.length === 1 ? '' : 's'}` : 'Nenhum arquivo anexado'}</small></div></div>
+      <div class="invoice-document-list">${documents.map(document => document.mime_type?.startsWith('image/')
+        ? `<a href="${esc(document.url)}" target="_blank" rel="noopener" class="invoice-document-image"><img src="${esc(document.url)}" alt="${esc(document.original_name || 'Foto da nota')}"><span>${esc(document.original_name || 'Abrir foto')}</span></a>`
+        : `<a href="${esc(document.url)}" target="_blank" rel="noopener" class="btn">Abrir ${esc(document.original_name || 'documento')}</a>`).join('')}</div>
+      ${D.permissions.entry ? `<div class="invoice-document-upload"><label class="field"><span>Adicionar foto ou PDF</span><input id="invoiceDocumentFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" capture="environment"></label><button type="button" class="btn primary" id="invoiceDocumentUpload">Anexar à nota</button></div>` : ''}`;
+    root.appendChild(panel);
+    if ($('invoiceDocumentUpload')) $('invoiceDocumentUpload').onclick = async () => {
+      const file = $('invoiceDocumentFile').files[0];
+      if (!file) return alert('Escolha uma foto ou um PDF da nota.');
+      $('invoiceDocumentUpload').disabled = true;
+      try {
+        await uploadInvoiceDocument(file, null, detail.invoice.invoice_id);
+        const refreshed = await api(`/invoices?invoice_id=${encodeURIComponent(detail.invoice.invoice_id)}`);
+        showInvoiceReview(refreshed);
+        flash('Arquivo anexado à nota fiscal.');
+      } catch (error) {
+        $('invoiceDocumentUpload').disabled = false;
+        alert(error.message);
+      }
+    };
+  }
+
   const showInvoiceReviewBase = showInvoiceReview;
   showInvoiceReview = function (detail) {
     showInvoiceReviewBase(detail);
+    addInvoiceDocuments(detail);
     if (detail.invoice.status === 'CONFIRMED') return;
     detail.items.forEach(item => {
       item.name_action ||= 'KEEP';
@@ -324,6 +364,47 @@
       } catch (error) { status.innerHTML = `<span class="bad-text">${esc(error.message)}</span>`; $('modalSave').disabled = true; }
     };
   }
+
+  manualEntry = function () {
+    const idempotencyKey = crypto.randomUUID();
+    modal('Registrar entrada manual', `
+      <div class="form">
+        <div class="field full"><label>Produto</label><select id="fProduct">${opts(D.stock || [], 'product_id', 'description')}</select></div>
+        <div id="fProductPreview" class="field full"><small class="muted">Selecione um item para visualizar suas fotos.</small></div>
+        <div class="field"><label>Quantidade</label><input id="fQty" type="number" min="0.0001" step="any"></div>
+        <div class="field"><label>Fornecedor</label><select id="fParty">${opts((D.suppliers || []).filter(item => personStatus(item) === 'ATIVO'), 'supplier_id', 'name')}</select></div>
+        <div class="field"><label>Valor total da entrada (R$)</label><input id="fTotal" type="number" step="0.01" min="0"></div>
+        <div class="field"><label>Número da nota / documento</label><input id="fDoc"><small>Quando informado, o registro aparecerá em Notas Fiscais.</small></div>
+        <div class="field full"><label>Anexar ou fotografar DANFE / nota fiscal</label><input id="manualDanfe" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" capture="environment"></div>
+        <div class="field full"><label>Observações</label><textarea id="fNotes"></textarea></div>
+      </div>`, async () => {
+        const quantity = Number($('fQty').value);
+        if (!$('fProduct').value || !Number.isFinite(quantity) || quantity <= 0) throw new Error('Selecione o produto e informe uma quantidade válida.');
+        const totalValue = $('fTotal').value === '' ? null : Number($('fTotal').value);
+        if (totalValue != null && (!Number.isFinite(totalValue) || totalValue < 0)) throw new Error('Informe um valor total válido.');
+        const documentNumber = $('fDoc').value.trim();
+        const result = await api('/movement', {method: 'POST', body: JSON.stringify({
+          movement_type: 'ENTRADA', product_id: $('fProduct').value, quantity,
+          supplier_id: $('fParty').value || null, total_value: totalValue,
+          unit_value: totalValue == null ? null : totalValue / quantity,
+          document_number: documentNumber, notes: $('fNotes').value,
+          idempotency_key: idempotencyKey
+        })});
+        if ($('manualDanfe').files[0]) await uploadInvoiceDocument($('manualDanfe').files[0], result.id, result.invoice_id);
+        closeModal();
+        flash(documentNumber ? 'Entrada registrada e nota fiscal adicionada.' : 'Entrada manual registrada.');
+        await reload();
+        await loadInvoices();
+      });
+    $('modalSave').classList.remove('hidden');
+    $('modalSave').textContent = 'Registrar entrada';
+    $('fProduct').onchange = () => {
+      const product = (D.stock || []).find(item => item.product_id === $('fProduct').value);
+      $('fProductPreview').innerHTML = product ? `${gallery(product)}<small><b>${esc(product.pn)}</b> · Saldo atual: ${fmt(product.balance)} ${esc(product.unit || '')}</small>` : '<small class="muted">Selecione um produto.</small>';
+    };
+    makeSearchableDropdown('fProduct', () => $('fProduct').onchange());
+    makeSearchableDropdown('fParty', () => {});
+  };
 
   entryChoice = function () {
     modal('Como deseja dar entrada?', `
