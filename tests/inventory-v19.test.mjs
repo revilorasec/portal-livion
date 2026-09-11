@@ -6,6 +6,7 @@ const frontend = readFileSync(new URL('../estoque-assets-v18.js', import.meta.ur
 const css = readFileSync(new URL('../estoque-assets-v18.css', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../supabase/functions/inventory-api/index.ts', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/20260911180000_inventory_manual_invoices.sql', import.meta.url), 'utf8');
+const storageMigration = readFileSync(new URL('../supabase/migrations/20260911193000_allow_inventory_nfe_images.sql', import.meta.url), 'utf8');
 
 test('entrada manual cria vínculo com a lista de notas sem repetir o saldo', () => {
   assert.match(api, /inventory_register_manual_invoice_entry/);
@@ -29,4 +30,7 @@ test('nota aberta mostra anexos privados e permite adicionar foto ou PDF', () =>
   assert.match(api, /requestedInvoiceId/);
   assert.match(api, /file\.size>10485760/);
   assert.match(css, /invoice-document-panel/);
+  for (const mime of ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']) assert.match(storageMigration, new RegExp(mime.replace('/', '\\/')));
+  assert.match(storageMigration, /where id='inventory-nfe'/);
+  assert.doesNotMatch(storageMigration, /public\s*=\s*true/);
 });
