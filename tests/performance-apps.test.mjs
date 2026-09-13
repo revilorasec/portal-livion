@@ -1,0 +1,46 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import path from 'node:path';
+
+const root = path.resolve(import.meta.dirname, '..');
+const combined = readFileSync(path.join(root, 'desempenho-funcionarios', 'index.html'), 'utf8');
+const nokia = readFileSync(path.join(root, 'painel-executivo-nokia', 'index.html'), 'utf8');
+
+test('publica os dois HTMLs sem incorporar dados internos', () => {
+  assert.match(combined, /const SNAPSHOT=\[\]/);
+  assert.match(nokia, /const SNAPSHOT=\[\]/);
+  assert.doesNotMatch(combined, /AKfy/);
+  assert.doesNotMatch(nokia, /AKfy/);
+  assert.match(combined, /Desempenho técnico consolidado/);
+  assert.match(nokia, /Painel Executivo Nokia/);
+});
+
+test('consulta o serviço autenticado ao abrir e a cada 30 segundos', () => {
+  assert.match(combined, /desempenho-api\/panel-data/);
+  assert.match(nokia, /desempenho-api\/panel-data/);
+  assert.match(combined, /fetchPanelPayload\('combined'\)/);
+  assert.match(nokia, /fetchPanelPayload\('nokia'\)/);
+  assert.match(combined, /setInterval\(refreshData,30000\)/);
+  assert.match(nokia, /setInterval\(refreshData,30000\)/);
+  assert.match(combined, /if\(\$\('refreshBtn'\)\.disabled\)return/);
+  assert.match(nokia, /if\(\$\('refreshBtn'\)\.disabled\)return/);
+});
+
+test('os dois painéis oferecem apresentação seletiva com proteção financeira', () => {
+  for (const html of [combined, nokia]) {
+    assert.match(html, /id="presentationBtn"/);
+    assert.match(html, /id="presentationNames"/);
+    assert.match(html, /id="presentationHideAll"/);
+    assert.match(html, /Todos os valores em reais serão ocultados/);
+    assert.match(html, /presentationMode\?'Valor oculto'/);
+    assert.match(html, /function presentationName\(name\)/);
+  }
+  assert.match(nokia, /safe\[key\]='Oculto'/);
+});
+
+test('o Portal trata os dois painéis como aplicativos internos separados', () => {
+  const portal = readFileSync(path.join(root, 'index.html'), 'utf8');
+  assert.match(portal, /'painel-executivo-nokia'/);
+  assert.match(portal, /\['reparos-claro','desempenho-funcionarios','painel-executivo-nokia'\]/);
+});
