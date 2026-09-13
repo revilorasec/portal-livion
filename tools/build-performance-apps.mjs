@@ -86,7 +86,7 @@ function buildCombined() {
   html = replaceOnce(html, `catch(e){console.error(e);$('sourceStatus').textContent='Falha · snapshot mantido'}`, `catch(e){console.error(e);$('sourceStatus').textContent=e.message==='PORTAL_REQUIRED'?'Abra pelo Portal':'Falha na atualização'}`, 'falha combinado');
   html = replaceOnce(html, 'Object.values(FILTERS).forEach(id=>$(id).onchange=applyFilters);', presentationRuntime('combined') + '\nObject.values(FILTERS).forEach(id=>$(id).onchange=applyFilters);', 'runtime combinado');
   html = replaceOnce(html, `$('settingsBtn').onclick=()=>{$('endpointInput').value=localStorage.getItem('combinedEndpoint')||'';$('settingsModal').classList.add('open')};$('saveEndpoint').onclick=()=>{localStorage.setItem('combinedEndpoint',$('endpointInput').value.trim());$('settingsModal').classList.remove('open');refreshData()};`, '', 'configuração antiga combinado');
-  html = replaceOnce(html, `init(SNAPSHOT);if(localStorage.getItem('combinedEndpoint'))refreshData();setInterval(()=>{if(localStorage.getItem('combinedEndpoint'))refreshData()},60000);`, 'init(SNAPSHOT);refreshData();setInterval(refreshData,30000);', 'inicialização combinado');
+  html = replaceOnce(html, `init(SNAPSHOT);if(localStorage.getItem('combinedEndpoint'))refreshData();setInterval(()=>{if(localStorage.getItem('combinedEndpoint'))refreshData()},60000);`, 'if(SNAPSHOT.length)init(SNAPSHOT);refreshData();setInterval(refreshData,30000);', 'inicialização combinado');
   return html;
 }
 
