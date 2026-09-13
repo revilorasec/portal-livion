@@ -73,6 +73,7 @@ $('presentationHideAll').onclick=()=>startPresentation(true);
 
 function buildCombined() {
   let html = stripSnapshot(fs.readFileSync(path.join(sourceRoot, 'Painel_Desempenho_Tecnicos_CLARO_NOKIA.html'), 'utf8'));
+  html = html.replaceAll('combinedActiveTechs', 'portalCombinedActiveTechsV8');
   html = replaceOnce(html, '</style></head>', presentationCss + '</style></head>', 'CSS combinado');
   html = replaceOnce(html, '<span id="sourceStatus" class="status">Snapshot local</span>', '<span id="sourceStatus" class="status">Conectando ao Portal</span>', 'status inicial combinado');
   html = replaceOnce(html, '<button id="refreshBtn" class="btn">Atualizar</button><button id="settingsBtn" class="btn alt">Configurar</button>', '<span id="presentationStatus" class="presentation-status"></span><button id="presentationBtn" class="btn alt">Apresentação</button><button id="refreshBtn" class="btn">Atualizar</button>', 'ações combinado');
@@ -91,6 +92,7 @@ function buildCombined() {
 
 function buildNokia() {
   let html = stripSnapshot(fs.readFileSync(path.join(sourceRoot, 'Painel_Executivo_NOKIA.html'), 'utf8'));
+  html = html.replaceAll('nokiaActiveTechs', 'portalNokiaActiveTechsV2');
   html = replaceOnce(html, '</style>\n</head>', presentationCss + '</style>\n</head>', 'CSS Nokia');
   html = replaceOnce(html, '<span id="sourceStatus" class="status-pill">Snapshot local</span><button class="btn secondary small" id="settingsBtn">Configurar</button><button class="btn small" id="refreshBtn">Atualizar informações</button>', '<span id="sourceStatus" class="status-pill">Conectando ao Portal</span><span id="presentationStatus" class="presentation-status"></span><button class="btn secondary small" id="presentationBtn">Apresentação</button><button class="btn small" id="refreshBtn">Atualizar informações</button>', 'ações Nokia');
   html = html.replace(/^<div class="modal" id="settingsModal">.*\r?\n/m, presentationModal('btn secondary') + '\n');
