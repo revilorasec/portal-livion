@@ -107,7 +107,7 @@ async function saveAccess(){const id=state.access.selected,clients=[...document.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!demo)refresh()});
 window.addEventListener('pagehide',()=>{state.rows=[];state.access=null;$('app').replaceChildren()});
 window.addEventListener('pageshow',e=>{if(e.persisted)refresh()});
-refresh();setInterval(()=>{if(!document.hidden&&!demo)refresh()},60000);
+refresh();setInterval(()=>{if(!document.hidden&&!demo)refresh()},300000);
 
 
 
