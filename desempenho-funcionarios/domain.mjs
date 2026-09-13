@@ -1,4 +1,4 @@
-export const VERSION = '2026-09-12.1';
+export const VERSION = '2026-09-13.1';
 export const CLIENTS = [
   { key: 'claro', name: 'Claro', color: '#df463c', column: 'AG', exclusions: ['21-CARBONIZAÇÃO', '23-OXIDAÇÃO', '24-REPAROS DE TERCEIROS', '22-DANO MECÂNICO'] },
   { key: 'nokia', name: 'Nokia', color: '#1760d5', column: 'AA', exclusions: ['CARBONIZAÇÃO', 'CARBONIZADO', 'DANO MECANICO', 'FORTE OXIDAÇÃO', 'OXIDAÇÃO FORTE', 'PCI CARBONIZADA', 'DEFEITO MECANICO', 'FLAT CABLE DO DISPLAY ROMPIDO', 'FLAT CABLE DANIFICADO', 'VANDALISMO', 'Retirada de componentes'] }
@@ -109,5 +109,4 @@ export function comparisonCSV(team,presentation=false) {
   const cell=value=>{let s=String(value??'');if(/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
   return '\ufeff'+[headers,...records].map(row=>row.map(cell).join(';')).join('\r\n');
 }
-
 
