@@ -56,15 +56,33 @@ if(typeof document!=='undefined') {
   function setup() {
     if($('agendaFilters'))return;
     $('agenda').innerHTML=`<div class="hero"><div><h2>Agenda de pagamentos</h2><p>Compras mais recentes primeiro. Clique nos títulos das colunas para alternar a ordem.</p></div></div>
-      <form id="agendaFilters" class="card" onsubmit="return false"><div class="form">
-      <div class="field full"><label for="af-search">Pesquisar compra, fornecedor, cartão ou pessoa</label><input id="af-search" type="search" placeholder="Digite uma ou mais palavras"></div>
+      <style>
+      #agendaFilters{padding:12px;margin-bottom:12px}
+      #agendaFilters .af-bar{display:flex;align-items:end;gap:10px}
+      #agendaFilters .af-search{flex:1;min-width:0}
+      #agendaFilters input:not([type=checkbox]),#agendaFilters select{padding:6px 9px;min-height:34px}
+      #agendaFilters .field{gap:3px;min-width:0}
+      #agendaFilters details{margin-top:8px}
+      #agendaFilters summary{cursor:pointer;color:var(--blue);font-weight:600;padding:4px 0;width:fit-content}
+      #agendaFilters .af-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 12px;margin-top:8px}
+      #agendaFilters .af-check label{display:flex;align-items:center;gap:6px}
+      #agendaFilters input[type=checkbox]{width:auto;margin:0}
+      #af-message{margin:6px 0 0;font-size:12px}
+      #af-message:empty{display:none}
+      @media(max-width:700px){#agendaFilters .af-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+      @media(max-width:380px){#agendaFilters .af-grid{grid-template-columns:1fr}}
+      </style>
+      <form id="agendaFilters" class="card" onsubmit="return false"><div class="af-bar">
+      <div class="field af-search"><label for="af-search">Pesquisar</label><input id="af-search" type="search" placeholder="Compra, fornecedor, cartão ou pessoa"></div>
+      <button type="button" class="btn" id="af-clear">Limpar</button></div>
+      <details><summary id="af-summary">Filtros avançados</summary><div class="af-grid">
       <div class="field"><label for="af-purchaseFrom">Compra de</label><input id="af-purchaseFrom" type="date"></div><div class="field"><label for="af-purchaseTo">Compra até</label><input id="af-purchaseTo" type="date"></div>
       <div class="field"><label for="af-dueFrom">Vencimento de</label><input id="af-dueFrom" type="date"></div><div class="field"><label for="af-dueTo">Vencimento até</label><input id="af-dueTo" type="date"></div>
       <div class="field"><label for="af-cardId">Cartão</label><select id="af-cardId"></select></div><div class="field"><label for="af-personId">Pessoa</label><select id="af-personId"></select></div>
       <div class="field"><label for="af-status">Situação</label><select id="af-status"></select></div>
       <div class="field"><label for="af-minimum">Valor mínimo da parcela</label><input id="af-minimum" type="number" min="0" step="0.01"></div><div class="field"><label for="af-maximum">Valor máximo da parcela</label><input id="af-maximum" type="number" min="0" step="0.01"></div>
-      <div class="field"><label><input id="af-undated" type="checkbox"> Somente sem vencimento definido</label></div>
-      </div><button type="button" class="btn" id="af-clear">Limpar filtros</button><p id="af-message" role="status" aria-live="polite"></p></form>
+      <div class="field af-check"><label><input id="af-undated" type="checkbox"> Sem vencimento definido</label></div>
+      </div></details><p id="af-message" role="status" aria-live="polite"></p></form>
       <div class="card"><h3>Parcelas do cartão</h3><p>Previsões da fatura. Reembolso não confirma pagamento do cartão. Confira as datas com o banco.</p><div id="agendaCardTable"></div></div>
       <div class="card"><h3>Agenda de reembolsos</h3><p>Valores a receber de volta, separados da fatura do cartão.</p><div id="agendaReimbursementTable"></div></div>`;
     $('agendaFilters').addEventListener('input',paint);
@@ -90,7 +108,9 @@ if(typeof document!=='undefined') {
   function paint() {
     const filters=Object.fromEntries(fields.map(key=>[key,$('af-'+key).value]));filters.undated=$('af-undated').checked;
     const invalid=(filters.purchaseFrom&&filters.purchaseTo&&filters.purchaseFrom>filters.purchaseTo)||(filters.dueFrom&&filters.dueTo&&filters.dueFrom>filters.dueTo)||(filters.minimum!==''&&filters.maximum!==''&&Number(filters.minimum)>Number(filters.maximum));
-    $('af-message').textContent=invalid?'Confira os intervalos: o início ou mínimo deve ser menor ou igual ao fim ou máximo.':filters.undated&&(filters.dueFrom||filters.dueTo)?'Limpe o período de vencimento para pesquisar parcelas sem data.':'Os filtros se aplicam às duas listas e à empresa selecionada no topo.';
+    const active=fields.filter(key=>key!=='search'&&filters[key]!=='').length+Number(filters.undated);
+    $('af-summary').textContent='Filtros avançados'+(active?' ('+active+' ativos)':'');
+    $('af-message').textContent=invalid?'Confira os intervalos: o início ou mínimo deve ser menor ou igual ao fim ou máximo.':filters.undated&&(filters.dueFrom||filters.dueTo)?'Limpe o período de vencimento para pesquisar parcelas sem data.':'';
     const rows=invalid?[]:data();
     for(const [kind,id] of [['card','agendaCardTable'],['reimbursement','agendaReimbursementTable']])$(''+id).innerHTML=table(AgendaQuery.select(rows.filter(r=>r.kind===kind),filters,order[kind].key,order[kind].direction),kind);
   }
