@@ -134,17 +134,211 @@ function bestExpenseDescription(d,cat){const items=Array.isArray(d?.items)?d.ite
 function applyFiscalToExpense(d){const cat=inferredCategory(d),vendor=[d.trade_name,d.legal_name,d.establishment].find(validFiscalVendor);if(vendor)scannerSet('eVendor',vendor);if(d.cnpj)scannerSet('eVendorDoc',formatDocument(d.cnpj));if(d.address)scannerSet('eAddress',d.address);if(fiscalItemState.length)syncFiscalItemsTextarea();else if(Array.isArray(d.items)&&d.items.length)scannerSet('eItems',d.items.join('\n'));if(d.consumer_document)scannerSet('eConsumerDoc',formatDocument(d.consumer_document));if(d.value!=null&&Number(d.value)>0)scannerSet('eAmount',Number(d.value));if(d.date_time&&!manualTouched.has('eDate')){const safe=receiptLocalInput(d.date_time,d);if(safe)$('eDate').value=safe}let categorySet=false;if(cat)categorySet=setCategoryByName(cat);if(!categorySet&&!manualTouched.has('eCategory')){const remembered=rememberedCategoryId(d);if(remembered)scannerSetSelect('eCategory',remembered)}if(d.payment_method&&!manualTouched.has('ePayment')){const p=B.paymentMethods.find(x=>String(d.payment_method).toLowerCase().includes('pix')?/pix/i.test(x.name):/cr[eé]dito/i.test(d.payment_method)?/cr[eé]dito/i.test(x.name):/d[eé]bito/i.test(d.payment_method)?/d[eé]bito/i.test(x.name):/dinheiro/i.test(d.payment_method)?/dinheiro/i.test(x.name):false);if(p&&scannerSetSelect('ePayment',p.payment_method_id))paymentChanged()}if(d.card_last4&&!manualTouched.has('eCard')&&$('eCard')){const matches=[...$('eCard').options].filter(o=>o.value&&String(by(cards,o.value,'card_id')?.last4||'')===String(d.card_last4));if(matches.length===1){$('eCard').value=matches[0].value;cardChanged()}}const count=fiscalInstallmentCount(d);if(count&&!manualTouched.has('installments')&&scannerSetSelect('installments',String(count)))installmentChanged();renderInstallmentPreview();maskTarget($('eVendorDoc'));maskTarget($('eConsumerDoc'));updateMapLinks();return cat}
 function fillFiscal(raw,sync=true){const d=sanitizeFiscalResult(raw);d.items=cleanFiscalItems(raw?.items||d.items);d.item_details=Array.isArray(raw?.item_details)?raw.item_details:(Array.isArray(d.item_details)?d.item_details:[]);d.discount_total=Number(raw?.discount_total??d.discount_total??0)||0;d.category_hint=raw?.category_hint||d.category_hint||'';d.legal_name=raw?.legal_name||d.legal_name||'';d.trade_name=raw?.trade_name||d.trade_name||'';d.cnae=raw?.cnae||d.cnae||'';d.cnae_description=raw?.cnae_description||d.cnae_description||'';d.consumer_document=digits(raw?.consumer_document||d.consumer_document||'').slice(0,14);d.installment_count=raw?.installment_count||d.installment_count||null;d.card_last4=raw?.card_last4||d.card_last4||'';d.document_type=raw?.document_type||d.document_type||'';d.ocr_text=raw?.ocr_text||d.ocr_text||'';fiscal={...fiscal,...d};setDetectedFiscalItems(fiscal,true);if(sync)applyFiscalToExpense(fiscal);updateMapLinks()}
 
-async function loadQrScanner(){if(window.Html5Qrcode)return window.Html5Qrcode;await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s)});return window.Html5Qrcode}
-async function stopQrScan(){qrScanDone=true;if(qrNativeTimer){clearTimeout(qrNativeTimer);qrNativeTimer=null}if(qrNativeVideo){try{qrNativeVideo.pause();qrNativeVideo.srcObject=null}catch{}qrNativeVideo=null}if(qrNativeStream){try{qrNativeStream.getTracks().forEach(t=>t.stop())}catch{}qrNativeStream=null}try{if(qrScanner){await qrScanner.stop().catch(()=>{});await qrScanner.clear().catch(()=>{});qrScanner=null}}finally{const r=$('qrReader');if(r)r.innerHTML='';$('qrModal').classList.add('hidden')}}
+async function loadQrScanner(){
+  if(window.Html5Qrcode)return window.Html5Qrcode;
+  if(window.__html5QrLoading)return window.__html5QrLoading;
+  window.__html5QrLoading=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    s.async=true;
+    s.onload=()=>window.Html5Qrcode?res(window.Html5Qrcode):rej(Error('HTML5_QR_NOT_LOADED'));
+    s.onerror=()=>rej(Error('HTML5_QR_LOAD_FAILED'));
+    document.head.appendChild(s);
+  }).finally(()=>{window.__html5QrLoading=null});
+  return window.__html5QrLoading;
+}
+async function loadJsQr(){
+  if(window.jsQR)return window.jsQR;
+  if(window.__jsQrLoading)return window.__jsQrLoading;
+  window.__jsQrLoading=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+    s.async=true;
+    s.onload=()=>window.jsQR?res(window.jsQR):rej(Error('JSQR_NOT_LOADED'));
+    s.onerror=()=>rej(Error('JSQR_LOAD_FAILED'));
+    document.head.appendChild(s);
+  }).finally(()=>{window.__jsQrLoading=null});
+  return window.__jsQrLoading;
+}
+async function stopQrScan(){
+  qrScanDone=true;
+  if(qrNativeTimer){clearTimeout(qrNativeTimer);qrNativeTimer=null}
+  if(qrNativeVideo){try{qrNativeVideo.pause();qrNativeVideo.srcObject=null}catch{}qrNativeVideo=null}
+  if(qrNativeStream){try{qrNativeStream.getTracks().forEach(t=>t.stop())}catch{}qrNativeStream=null}
+  try{
+    if(qrScanner){
+      try{const st=qrScanner.getState?.();if(st===2||st===3)await qrScanner.stop()}catch{}
+      try{await qrScanner.clear()}catch{}
+      qrScanner=null;
+    }
+  }finally{
+    const r=$('qrReader');if(r)r.innerHTML='';
+    $('qrModal')?.classList.add('hidden');
+  }
+}
 function localFiscalFromQr(raw){const k=parseKey(raw);return{...k,official_query_url:String(raw||''),qr_used:true}}
 async function resolveFiscalQr(raw,localData=null){$('scanStatus').textContent='QR Code lido. Consultando dados fiscais…';try{const r=await fiscalApi('/resolve',{method:'POST',body:JSON.stringify({qr:raw})});const remote=r?.fiscal||{};const merged={...(localData||localFiscalFromQr(raw)),...Object.fromEntries(Object.entries(remote).filter(([,v])=>v!==null&&v!==undefined&&v!=='')),qr_used:true,qr_source:r.source};fillFiscal(merged,true);const cat=inferredCategory(merged),parts=[merged.establishment,cat,merged.value?money(merged.value):''].filter(Boolean);$('scanStatus').textContent=parts.length?'Preenchido automaticamente: '+parts.join(' · '):'Nota fiscal reconhecida. Confira os campos preenchidos.';if(r.warning)console.warn('Consulta SEFAZ:',r.warning)}catch(e){console.error('Consulta fiscal do QR',e);const local=localData||localFiscalFromQr(raw);fillFiscal(local,true);$('scanStatus').textContent=local.access_key?'QR lido. Preenchi os dados da chave fiscal; a consulta complementar não respondeu.':'QR lido, mas a consulta fiscal não respondeu. O endereço do QR foi preservado para conferência.'}}
 function fiscalQrLooksValid(raw){const s=String(raw||'').trim();if(!s)return false;if(/\d{44}/.test(s))return true;try{const u=new URL(s);return /(?:nfce|nfe|fazenda|sefaz)/i.test(u.hostname+u.pathname+u.search)}catch{return s.length>12}}
 async function finishQrScan(raw){if(qrScanDone)return;const text=String(raw||'').trim();if(!fiscalQrLooksValid(text))return;qrScanDone=true;const local=localFiscalFromQr(text);fillFiscal(local,true);$('scanStatus').textContent='QR reconhecido. Buscando dados da nota…';await stopQrScan();setTimeout(()=>resolveFiscalQr(text,local),0)}
-async function startNativeQrScan(){if(!('BarcodeDetector'in window)||!navigator.mediaDevices?.getUserMedia)throw Error('NATIVE_QR_UNAVAILABLE');let formats=[];try{formats=await BarcodeDetector.getSupportedFormats?.()||[]}catch{}if(formats.length&&!formats.includes('qr_code'))throw Error('NATIVE_QR_UNAVAILABLE');const detector=new BarcodeDetector({formats:['qr_code']});const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});qrNativeStream=stream;const reader=$('qrReader');reader.innerHTML='';const video=document.createElement('video');video.setAttribute('playsinline','');video.setAttribute('autoplay','');video.muted=true;video.style.width='100%';video.style.height='min(70vh,520px)';video.style.objectFit='cover';video.style.borderRadius='12px';reader.appendChild(video);qrNativeVideo=video;video.srcObject=stream;await video.play();const track=stream.getVideoTracks()[0];try{const caps=track.getCapabilities?.()||{},advanced=[];if(Array.isArray(caps.focusMode)&&caps.focusMode.includes('continuous'))advanced.push({focusMode:'continuous'});if(advanced.length)await track.applyConstraints({advanced})}catch{}const tick=async()=>{if(qrScanDone||!qrNativeVideo)return;try{if(video.readyState>=2){const codes=await detector.detect(video);const code=codes?.find(x=>fiscalQrLooksValid(x.rawValue));if(code?.rawValue){await finishQrScan(code.rawValue);return}}}catch(e){console.debug('Leitura QR nativa',e)}qrNativeTimer=setTimeout(tick,55)};tick()}
-async function startHtml5QrScan(){await loadQrScanner();const cfg=window.Html5QrcodeSupportedFormats?{formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],verbose:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true}}:{verbose:false};qrScanner=new Html5Qrcode('qrReader',cfg);await qrScanner.start({facingMode:{ideal:'environment'}},{fps:24,qrbox:(w,h)=>{const side=Math.floor(Math.min(w,h)*.94);return{width:side,height:side}},disableFlip:true},text=>{finishQrScan(text).catch(console.error)},()=>{})}
-async function startQrScan(){try{await stopQrScan();qrScanDone=false;$('qrModal').classList.remove('hidden');$('scanStatus').textContent='Aponte para o QR Code…';try{await startNativeQrScan()}catch(nativeErr){console.info('Scanner QR nativo indisponível; usando compatibilidade.',nativeErr);if(qrNativeStream){try{qrNativeStream.getTracks().forEach(t=>t.stop())}catch{}qrNativeStream=null}const r=$('qrReader');if(r)r.innerHTML='';await startHtml5QrScan()}}catch(e){console.error(e);await stopQrScan();$('scanStatus').textContent='Não foi possível abrir o leitor de QR: '+e.message}}
-async function loadTesseract(){if(window.Tesseract)return window.Tesseract;await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s)});return window.Tesseract}
-function localConsumerFromText(text,issuer=''){const flat=String(text||'').replace(/\s+/g,' '),p=[/(?:CONSUMIDOR|DESTINAT[AÁ]RIO)[\s\S]{0,160}?(?:CPF|CNPJ)\s*[:\-]?\s*([0-9.\/\-]{11,20})/i,/(?:CPF|CNPJ)\s+(?:DO\s+)?(?:CONSUMIDOR|DESTINAT[AÁ]RIO)\s*[:\-]?\s*([0-9.\/\-]{11,20})/i];for(const r of p){const m=flat.match(r),d=digits(m?.[1]||'');if((d.length===11||d.length===14)&&d!==digits(issuer))return d}return''}
+async function getBackCameraStream(){
+  if(!navigator.mediaDevices?.getUserMedia)throw Error('CAMERA_API_UNAVAILABLE');
+  const attempts=[
+    {audio:false,video:{facingMode:{exact:'environment'},width:{ideal:1920},height:{ideal:1080}}},
+    {audio:false,video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}},
+    {audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}},
+    {audio:false,video:true}
+  ];
+  let last;
+  for(const constraints of attempts){
+    try{return await navigator.mediaDevices.getUserMedia(constraints)}
+    catch(e){last=e}
+  }
+  throw last||Error('CAMERA_UNAVAILABLE');
+}
+async function mountQrVideo(stream){
+  qrNativeStream=stream;
+  const reader=$('qrReader');reader.innerHTML='';
+  const video=document.createElement('video');
+  video.setAttribute('playsinline','');
+  video.setAttribute('autoplay','');
+  video.muted=true;
+  video.style.width='100%';
+  video.style.height='min(70vh,520px)';
+  video.style.objectFit='cover';
+  video.style.borderRadius='12px';
+  reader.appendChild(video);
+  qrNativeVideo=video;
+  video.srcObject=stream;
+  await video.play();
+  const track=stream.getVideoTracks()[0];
+  try{
+    const caps=track.getCapabilities?.()||{};
+    if(Array.isArray(caps.focusMode)&&caps.focusMode.includes('continuous')){
+      await track.applyConstraints({advanced:[{focusMode:'continuous'}]});
+    }
+  }catch{}
+  return video;
+}
+async function startNativeQrScan(){
+  if(!window.isSecureContext)throw Error('CAMERA_REQUIRES_HTTPS');
+  if(!('BarcodeDetector'in window))throw Error('NATIVE_QR_UNAVAILABLE');
+  let formats=[];try{formats=await BarcodeDetector.getSupportedFormats?.()||[]}catch{}
+  if(formats.length&&!formats.includes('qr_code'))throw Error('NATIVE_QR_UNAVAILABLE');
+  const detector=new BarcodeDetector({formats:['qr_code']});
+  const stream=await getBackCameraStream();
+  const video=await mountQrVideo(stream);
+  const tick=async()=>{
+    if(qrScanDone||!qrNativeVideo)return;
+    try{
+      if(video.readyState>=2){
+        const codes=await detector.detect(video);
+        const code=codes?.find(x=>fiscalQrLooksValid(x.rawValue));
+        if(code?.rawValue){await finishQrScan(code.rawValue);return}
+      }
+    }catch(e){console.debug('Leitura QR nativa',e)}
+    qrNativeTimer=setTimeout(tick,80);
+  };
+  tick();
+}
+async function startHtml5QrScan(){
+  await loadQrScanner();
+  const H=window.Html5Qrcode;
+  if(!H)throw Error('HTML5_QR_UNAVAILABLE');
+  const cfg=window.Html5QrcodeSupportedFormats
+    ?{formatsToSupport:[window.Html5QrcodeSupportedFormats.QR_CODE],verbose:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true}}
+    :{verbose:false};
+  qrScanner=new H('qrReader',cfg);
+  const scanCfg={fps:18,qrbox:(w,h)=>{const side=Math.max(180,Math.floor(Math.min(w,h)*.86));return{width:side,height:side}},disableFlip:false,aspectRatio:1};
+  let cameras=[];
+  try{cameras=await H.getCameras()}catch(e){console.info('Lista de câmeras indisponível',e)}
+  const back=cameras.find(c=>/back|rear|environment|traseir|extern/i.test(String(c.label||'')))||cameras[cameras.length-1];
+  const sources=[];
+  if(back?.id)sources.push(back.id);
+  sources.push({facingMode:'environment'},{facingMode:{ideal:'environment'}});
+  let last;
+  for(const source of sources){
+    try{
+      await qrScanner.start(source,scanCfg,text=>{finishQrScan(text).catch(console.error)},()=>{});
+      return;
+    }catch(e){
+      last=e;
+      try{await qrScanner.stop()}catch{}
+      try{await qrScanner.clear()}catch{}
+      qrScanner=new H('qrReader',cfg);
+    }
+  }
+  throw last||Error('HTML5_QR_START_FAILED');
+}
+async function startJsQrScan(){
+  await loadJsQr();
+  const stream=await getBackCameraStream();
+  const video=await mountQrVideo(stream);
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  if(!ctx)throw Error('CANVAS_UNAVAILABLE');
+  const tick=async()=>{
+    if(qrScanDone||!qrNativeVideo)return;
+    try{
+      if(video.readyState>=2&&video.videoWidth&&video.videoHeight){
+        const max=960,scale=Math.min(1,max/video.videoWidth);
+        canvas.width=Math.max(1,Math.round(video.videoWidth*scale));
+        canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+        const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+        if(code?.data&&fiscalQrLooksValid(code.data)){await finishQrScan(code.data);return}
+      }
+    }catch(e){console.debug('Leitura QR jsQR',e)}
+    qrNativeTimer=setTimeout(tick,110);
+  };
+  tick();
+}
+function qrCameraMessage(e){
+  const n=String(e?.name||''),m=String(e?.message||e||'');
+  if(/NotAllowed|PermissionDenied/i.test(n+' '+m))return'Permissão da câmera negada. Libere a câmera para o Portal Livion e tente novamente.';
+  if(/NotFound|DevicesNotFound|Overconstrained/i.test(n+' '+m))return'Não encontrei uma câmera disponível neste aparelho.';
+  if(/HTTPS|secure/i.test(m))return'O leitor de QR precisa ser aberto no Portal Livion por HTTPS.';
+  return'Não foi possível iniciar a câmera. Tente novamente ou use “Fotografar / escolher nota”.';
+}
+async function startQrScan(){
+  try{
+    await stopQrScan();
+    qrScanDone=false;
+    $('qrModal').classList.remove('hidden');
+    $('scanStatus').textContent='Abrindo câmera traseira…';
+    const errors=[];
+    try{
+      await startNativeQrScan();
+      $('scanStatus').textContent='Aponte para o QR Code…';
+      return;
+    }catch(e){errors.push(e);console.info('Scanner QR nativo indisponível; usando compatibilidade.',e);await stopQrCameraOnly()}
+    try{
+      $('qrModal').classList.remove('hidden');qrScanDone=false;
+      await startHtml5QrScan();
+      $('scanStatus').textContent='Aponte para o QR Code…';
+      return;
+    }catch(e){errors.push(e);console.info('html5-qrcode falhou; usando jsQR.',e);await stopQrCameraOnly()}
+    $('qrModal').classList.remove('hidden');qrScanDone=false;
+    await startJsQrScan();
+    $('scanStatus').textContent='Aponte para o QR Code…';
+  }catch(e){
+    console.error(e);
+    await stopQrScan();
+    $('scanStatus').textContent=qrCameraMessage(e);
+  }
+}
+async function stopQrCameraOnly(){
+  if(qrNativeTimer){clearTimeout(qrNativeTimer);qrNativeTimer=null}
+  if(qrNativeVideo){try{qrNativeVideo.pause();qrNativeVideo.srcObject=null}catch{}qrNativeVideo=null}
+  if(qrNativeStream){try{qrNativeStream.getTracks().forEach(t=>t.stop())}catch{}qrNativeStream=null}
+  if(qrScanner){
+    try{await qrScanner.stop()}catch{}
+    try{await qrScanner.clear()}catch{}
+    qrScanner=null;
+  }
+  const r=$('qrReader');if(r)r.innerHTML='';
+  qrScanDone=false;
+}
 function localItemsFromText(text){const lines=String(text||'').split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean),out=[];for(let i=0;i<lines.length;i++){const line=lines[i],near=[lines[i-1],lines[i+1],lines[i+2],lines[i+3]].filter(Boolean).join(' '),candidate=cleanFiscalItems([line])[0];if(!candidate)continue;const productContext=/QTD|QTDE|QUANTIDADE|VL\.?\s*UNIT|VALOR\s*UNIT|PRE[CÇ]O|LITRO|\bLT\b|\bKG\b|\bUN\b|UNIDADE|X\s*R\$|VALOR\s+(?:DO\s+)?ITEM/i.test(near);const strongProduct=/GASOLINA|ETANOL|ALCOOL|DIESEL|GNV|COMBUST|REFEI[CÇ][AÃ]O|LANCHE|CAF[EÉ]|PED[AÁ]GIO|ESTACIONAMENTO|HOSPEDAGEM|DI[AÁ]RIA|PASSAGEM|SERVI[CÇ]O|PE[CÇ]A|MATERIAL|PRODUTO/i.test(candidate);if((productContext||strongProduct)&&!out.some(x=>simpleNorm(x)===simpleNorm(candidate)))out.push(candidate)}return out.slice(0,40)}
 
 async function prepareOcrImage(file,strong=false){const bmp=await createImageBitmap(file),srcMax=Math.max(bmp.width,bmp.height),target=strong?2800:2400,scale=Math.max(1,Math.min(3,target/srcMax)),c=document.createElement('canvas');c.width=Math.round(bmp.width*scale);c.height=Math.round(bmp.height*scale);const ctx=c.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(bmp,0,0,c.width,c.height);const im=ctx.getImageData(0,0,c.width,c.height),p=im.data,hist=new Uint32Array(256);for(let i=0;i<p.length;i+=4){const y=Math.round(.299*p[i]+.587*p[i+1]+.114*p[i+2]);hist[y]++}const total=c.width*c.height;let acc=0,lo=0,hi=255;for(let i=0;i<256;i++){acc+=hist[i];if(acc>=total*.03){lo=i;break}}acc=0;for(let i=255;i>=0;i--){acc+=hist[i];if(acc>=total*.04){hi=i;break}}if(hi-lo<60){lo=Math.max(0,lo-30);hi=Math.min(255,hi+30)}for(let i=0;i<p.length;i+=4){let y=.299*p[i]+.587*p[i+1]+.114*p[i+2];y=Math.max(0,Math.min(255,(y-lo)*255/Math.max(1,hi-lo)));if(strong)y=y<150?Math.max(0,y*.72):Math.min(255,185+(y-150)*1.4);else y=Math.pow(y/255,.9)*255;p[i]=p[i+1]=p[i+2]=Math.round(y)}ctx.putImageData(im,0,0);return c}
