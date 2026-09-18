@@ -183,7 +183,7 @@ async function stopQrScan(){
   }
 }
 function localFiscalFromQr(raw){const k=parseKey(raw);return{...k,official_query_url:String(raw||''),qr_used:true}}
-async function resolveFiscalQr(raw,localData=null){$('scanStatus').textContent='QR Code lido. Consultando dados fiscais…';try{const r=await fiscalApi('/resolve',{method:'POST',body:JSON.stringify({qr:raw})});const remote=r?.fiscal||{};const merged={...(localData||localFiscalFromQr(raw)),...Object.fromEntries(Object.entries(remote).filter(([,v])=>v!==null&&v!==undefined&&v!=='')),qr_used:true,qr_source:r.source};fillFiscal(merged,true);const cat=inferredCategory(merged),parts=[merged.establishment,cat,merged.value?money(merged.value):''].filter(Boolean);$('scanStatus').textContent=parts.length?'Preenchido automaticamente: '+parts.join(' · '):'Nota fiscal reconhecida. Confira os campos preenchidos.';if(r.warning)console.warn('Consulta SEFAZ:',r.warning)}catch(e){console.error('Consulta fiscal do QR',e);const local=localData||localFiscalFromQr(raw);fillFiscal(local,true);$('scanStatus').textContent=local.access_key?'QR lido. Preenchi os dados da chave fiscal; a consulta complementar não respondeu.':'QR lido, mas a consulta fiscal não respondeu. O endereço do QR foi preservado para conferência.'}}
+async function resolveFiscalQr(raw,localData=null){$('scanStatus').textContent='QR Code lido. Consultando dados fiscais…';try{const r=await fiscalApi('/resolve',{method:'POST',body:JSON.stringify({qr:raw})});const remote=r?.fiscal||{};const merged={...(localData||localFiscalFromQr(raw)),...Object.fromEntries(Object.entries(remote).filter(([,v])=>v!==null&&v!==undefined&&v!=='')),qr_used:true,qr_source:r.source};fillFiscal(merged,true);const cat=inferredCategory(merged),parts=[merged.establishment,cat,merged.value?money(merged.value):''].filter(Boolean);$('scanStatus').textContent=parts.length?'Preenchido automaticamente: '+parts.join(' · '):'Nota fiscal reconhecida. Confira os campos preenchidos.';if(r.warning)console.warn('Consulta SEFAZ:',r.warning);return merged}catch(e){console.error('Consulta fiscal do QR',e);const local=localData||localFiscalFromQr(raw);fillFiscal(local,true);$('scanStatus').textContent=local.access_key?'QR lido. Preenchi os dados da chave fiscal; a consulta complementar não respondeu.':'Não consegui consultar os dados desta nota. Mantenha o QR no quadro e tente novamente.';return local}}
 function fiscalQrLooksValid(raw){
   const s=String(raw||'').trim();
   if(!s)return false;
@@ -200,9 +200,22 @@ async function finishQrScan(raw){
   qrScanDone=true;
   $('scanStatus').textContent='QR Code lido. Processando a nota…';
   const local=localFiscalFromQr(text);
-  await stopQrScan();
-  fillFiscal(local,true);
-  setTimeout(()=>resolveFiscalQr(text,local),0);
+  await stopQrCameraOnly();
+  qrScanDone=true;
+  $('qrModal').classList.remove('hidden');
+  try{
+    const data=await resolveFiscalQr(text,local);
+    const visible=Boolean($('eVendor')?.value||$('eVendorDoc')?.value||Number($('eAmount')?.value)>0||$('eItems')?.value||$('eDate')?.value);
+    if(!visible)throw Error('QR_WITHOUT_VISIBLE_DATA');
+    $('qrModal').classList.add('hidden');
+    flash('Dados da nota inseridos. Confira antes de salvar.');
+    return data;
+  }catch(e){
+    console.error('Preenchimento do QR',e);
+    qrScanDone=false;
+    $('scanStatus').textContent='O QR foi lido, mas os dados da nota não foram inseridos. Tente novamente ou use “Fotografar / escolher nota”.';
+    throw e;
+  }
 }
 async function getBackCameraStream(){
   if(!navigator.mediaDevices?.getUserMedia)throw Error('CAMERA_API_UNAVAILABLE');
