@@ -6,7 +6,7 @@ const CATALOG_API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/expense
 const FINALIZE_API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/expense-finalize-api';
 const CHANGE_API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/expense-change-api';
 const DRAFT_KEY='livion_expense_draft_v2';
-let token='',B=null,events=[],expenses=[],reimbursements=[],agenda=[],cards=[],banks=[],shareCandidates=[],geo=null,fiscal={},fiscalItemState=[],qrScanner=null,qrNativeStream=null,qrNativeTimer=null,qrNativeVideo=null,qrScanDone=false,scannedReceiptFile=null,pendingPhotoOcr=true,manualTouched=new Set(),editingExpenseId=null,editingGranted=false,sortKey='incurred_at',sortDir=-1,catalogTab='category'; // EXPENSE_SCANNER_V22
+let token='',B=null,events=[],expenses=[],reimbursements=[],agenda=[],cards=[],banks=[],shareCandidates=[],geo=null,fiscal={},fiscalItemState=[],qrScanner=null,qrNativeStream=null,qrNativeTimer=null,qrNativeVideo=null,qrScanDone=false,qrFallbackTimer=null,qrScanEngine='',scannedReceiptFile=null,pendingPhotoOcr=true,manualTouched=new Set(),editingExpenseId=null,editingGranted=false,sortKey='incurred_at',sortDir=-1,catalogTab='category'; // EXPENSE_SCANNER_V25
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0));
@@ -162,6 +162,8 @@ async function loadJsQr(){
 }
 async function stopQrScan(){
   qrScanDone=true;
+  if(qrFallbackTimer){clearTimeout(qrFallbackTimer);qrFallbackTimer=null}
+  qrScanEngine='';
   if(qrNativeTimer){clearTimeout(qrNativeTimer);qrNativeTimer=null}
   if(qrNativeVideo){try{qrNativeVideo.pause();qrNativeVideo.srcObject=null}catch{}qrNativeVideo=null}
   if(qrNativeStream){try{qrNativeStream.getTracks().forEach(t=>t.stop())}catch{}qrNativeStream=null}
@@ -178,14 +180,31 @@ async function stopQrScan(){
 }
 function localFiscalFromQr(raw){const k=parseKey(raw);return{...k,official_query_url:String(raw||''),qr_used:true}}
 async function resolveFiscalQr(raw,localData=null){$('scanStatus').textContent='QR Code lido. Consultando dados fiscais…';try{const r=await fiscalApi('/resolve',{method:'POST',body:JSON.stringify({qr:raw})});const remote=r?.fiscal||{};const merged={...(localData||localFiscalFromQr(raw)),...Object.fromEntries(Object.entries(remote).filter(([,v])=>v!==null&&v!==undefined&&v!=='')),qr_used:true,qr_source:r.source};fillFiscal(merged,true);const cat=inferredCategory(merged),parts=[merged.establishment,cat,merged.value?money(merged.value):''].filter(Boolean);$('scanStatus').textContent=parts.length?'Preenchido automaticamente: '+parts.join(' · '):'Nota fiscal reconhecida. Confira os campos preenchidos.';if(r.warning)console.warn('Consulta SEFAZ:',r.warning)}catch(e){console.error('Consulta fiscal do QR',e);const local=localData||localFiscalFromQr(raw);fillFiscal(local,true);$('scanStatus').textContent=local.access_key?'QR lido. Preenchi os dados da chave fiscal; a consulta complementar não respondeu.':'QR lido, mas a consulta fiscal não respondeu. O endereço do QR foi preservado para conferência.'}}
-function fiscalQrLooksValid(raw){const s=String(raw||'').trim();if(!s)return false;if(/\d{44}/.test(s))return true;try{const u=new URL(s);return /(?:nfce|nfe|fazenda|sefaz)/i.test(u.hostname+u.pathname+u.search)}catch{return s.length>12}}
-async function finishQrScan(raw){if(qrScanDone)return;const text=String(raw||'').trim();if(!fiscalQrLooksValid(text))return;qrScanDone=true;const local=localFiscalFromQr(text);fillFiscal(local,true);$('scanStatus').textContent='QR reconhecido. Buscando dados da nota…';await stopQrScan();setTimeout(()=>resolveFiscalQr(text,local),0)}
+function fiscalQrLooksValid(raw){
+  const s=String(raw||'').trim();
+  if(!s)return false;
+  if(/(?:^|\D)\d{44}(?:\D|$)/.test(s))return true;
+  if(/^https?:\/\//i.test(s)){
+    try{const u=new URL(s);return Boolean(u.hostname)}catch{}
+  }
+  return s.length>12&&/(?:qrcode|qr-code|nfce|nfe|sefaz|fazenda|\bsef\b|sat|chave|consulta|chNFe|\bp=)/i.test(s);
+}
+async function finishQrScan(raw){
+  if(qrScanDone)return;
+  const text=String(raw||'').trim();
+  if(!fiscalQrLooksValid(text))return;
+  qrScanDone=true;
+  $('scanStatus').textContent='QR Code lido. Processando a nota…';
+  const local=localFiscalFromQr(text);
+  fillFiscal(local,true);
+  await stopQrScan();
+  setTimeout(()=>resolveFiscalQr(text,local),0);
+}
 async function getBackCameraStream(){
   if(!navigator.mediaDevices?.getUserMedia)throw Error('CAMERA_API_UNAVAILABLE');
   const attempts=[
-    {audio:false,video:{facingMode:{exact:'environment'},width:{ideal:1920},height:{ideal:1080}}},
-    {audio:false,video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}},
-    {audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}},
+    {audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920,min:640},height:{ideal:1080,min:480}}},
+    {audio:false,video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}},
     {audio:false,video:true}
   ];
   let last;
@@ -200,65 +219,127 @@ async function mountQrVideo(stream){
   const reader=$('qrReader');reader.innerHTML='';
   const video=document.createElement('video');
   video.setAttribute('playsinline','');
+  video.setAttribute('webkit-playsinline','');
   video.setAttribute('autoplay','');
   video.muted=true;
+  video.autoplay=true;
+  video.playsInline=true;
   video.style.width='100%';
-  video.style.height='min(70vh,520px)';
+  video.style.height='min(70vh,560px)';
   video.style.objectFit='cover';
   video.style.borderRadius='12px';
   reader.appendChild(video);
   qrNativeVideo=video;
   video.srcObject=stream;
+  await new Promise((resolve,reject)=>{
+    const tm=setTimeout(()=>reject(Error('VIDEO_TIMEOUT')),5000);
+    const ready=()=>{clearTimeout(tm);resolve()};
+    if(video.readyState>=2)ready();
+    else video.onloadedmetadata=ready;
+  });
   await video.play();
   const track=stream.getVideoTracks()[0];
   try{
     const caps=track.getCapabilities?.()||{};
-    if(Array.isArray(caps.focusMode)&&caps.focusMode.includes('continuous')){
-      await track.applyConstraints({advanced:[{focusMode:'continuous'}]});
-    }
-  }catch{}
+    const advanced=[];
+    if(Array.isArray(caps.focusMode)&&caps.focusMode.includes('continuous'))advanced.push({focusMode:'continuous'});
+    if(caps.zoom&&Number.isFinite(Number(caps.zoom.min)))advanced.push({zoom:Math.max(Number(caps.zoom.min),Math.min(Number(caps.zoom.max||1),1.25))});
+    if(advanced.length)await track.applyConstraints({advanced});
+  }catch(e){console.debug('Ajuste de foco/zoom indisponível',e)}
   return video;
 }
-async function startNativeQrScan(){
+function qrCanvasDecode(video,canvas,ctx,crop=1){
+  if(!window.jsQR||!video.videoWidth||!video.videoHeight)return'';
+  const sourceW=video.videoWidth,sourceH=video.videoHeight;
+  const sw=Math.max(1,Math.floor(sourceW*crop)),sh=Math.max(1,Math.floor(sourceH*crop));
+  const sx=Math.floor((sourceW-sw)/2),sy=Math.floor((sourceH-sh)/2);
+  const max=1440,scale=Math.min(1,max/Math.max(sw,sh));
+  canvas.width=Math.max(1,Math.round(sw*scale));
+  canvas.height=Math.max(1,Math.round(sh*scale));
+  ctx.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+  return window.jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'})?.data||'';
+}
+async function startDirectQrScan(){
   if(!window.isSecureContext)throw Error('CAMERA_REQUIRES_HTTPS');
-  if(!('BarcodeDetector'in window))throw Error('NATIVE_QR_UNAVAILABLE');
-  let formats=[];try{formats=await BarcodeDetector.getSupportedFormats?.()||[]}catch{}
-  if(formats.length&&!formats.includes('qr_code'))throw Error('NATIVE_QR_UNAVAILABLE');
-  const detector=new BarcodeDetector({formats:['qr_code']});
   const stream=await getBackCameraStream();
   const video=await mountQrVideo(stream);
+  let detector=null;
+  try{
+    if('BarcodeDetector'in window){
+      const formats=await BarcodeDetector.getSupportedFormats?.()||[];
+      if(!formats.length||formats.includes('qr_code'))detector=new BarcodeDetector({formats:['qr_code']});
+    }
+  }catch(e){console.debug('BarcodeDetector indisponível',e)}
+  let jsqr=null;
+  try{jsqr=await loadJsQr()}catch(e){console.debug('jsQR indisponível',e)}
+  if(!detector&&!jsqr)throw Error('QR_ENGINE_UNAVAILABLE');
+  qrScanEngine='multi';
+  const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
+  let frame=0;
   const tick=async()=>{
     if(qrScanDone||!qrNativeVideo)return;
     try{
       if(video.readyState>=2){
-        const codes=await detector.detect(video);
-        const code=codes?.find(x=>fiscalQrLooksValid(x.rawValue));
-        if(code?.rawValue){await finishQrScan(code.rawValue);return}
+        if(detector){
+          try{
+            const codes=await detector.detect(video);
+            const code=(codes||[]).find(x=>fiscalQrLooksValid(x.rawValue))||(codes||[])[0];
+            if(code?.rawValue&&fiscalQrLooksValid(code.rawValue)){await finishQrScan(code.rawValue);return}
+          }catch(e){console.debug('BarcodeDetector',e)}
+        }
+        if(jsqr&&ctx&&frame%2===0){
+          let raw=qrCanvasDecode(video,canvas,ctx,1);
+          if(!raw&&frame%6===0)raw=qrCanvasDecode(video,canvas,ctx,.78);
+          if(raw&&fiscalQrLooksValid(raw)){await finishQrScan(raw);return}
+        }
       }
-    }catch(e){console.debug('Leitura QR nativa',e)}
-    qrNativeTimer=setTimeout(tick,80);
+    }catch(e){console.debug('Leitura QR combinada',e)}
+    frame++;
+    qrNativeTimer=setTimeout(tick,85);
   };
   tick();
+  qrFallbackTimer=setTimeout(async()=>{
+    if(qrScanDone||!qrNativeVideo)return;
+    try{
+      $('scanStatus').textContent='Ainda procurando o QR… ajustando o leitor automaticamente.';
+      await stopQrCameraOnly();
+      $('qrModal').classList.remove('hidden');
+      qrScanDone=false;
+      await startHtml5QrScan();
+      qrScanEngine='html5';
+      $('scanStatus').textContent='Aponte para o QR Code e mantenha-o dentro do quadro.';
+    }catch(e){console.debug('Fallback html5-qrcode',e)}
+  },9000);
 }
 async function startHtml5QrScan(){
   await loadQrScanner();
   const H=window.Html5Qrcode;
   if(!H)throw Error('HTML5_QR_UNAVAILABLE');
   const cfg=window.Html5QrcodeSupportedFormats
-    ?{formatsToSupport:[window.Html5QrcodeSupportedFormats.QR_CODE],verbose:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true}}
+    ?{formatsToSupport:[window.Html5QrcodeSupportedFormats.QR_CODE],verbose:false}
     :{verbose:false};
   qrScanner=new H('qrReader',cfg);
-  const scanCfg={fps:18,qrbox:(w,h)=>{const side=Math.max(180,Math.floor(Math.min(w,h)*.86));return{width:side,height:side}},disableFlip:false,aspectRatio:1};
+  const scanCfg={
+    fps:12,
+    qrbox:(w,h)=>{
+      const width=Math.max(220,Math.floor(w*.92)),height=Math.max(220,Math.floor(h*.82));
+      return{width:Math.min(width,w),height:Math.min(height,h)};
+    },
+    disableFlip:false
+  };
   let cameras=[];
   try{cameras=await H.getCameras()}catch(e){console.info('Lista de câmeras indisponível',e)}
-  const back=cameras.find(c=>/back|rear|environment|traseir|extern/i.test(String(c.label||'')))||cameras[cameras.length-1];
+  const preferred=cameras.find(c=>/back|rear|environment|traseir/i.test(String(c.label||''))&&!/ultra|wide|macro/i.test(String(c.label||'')))
+    ||cameras.find(c=>/back|rear|environment|traseir/i.test(String(c.label||'')))
+    ||cameras[cameras.length-1];
   const sources=[];
-  if(back?.id)sources.push(back.id);
-  sources.push({facingMode:'environment'},{facingMode:{ideal:'environment'}});
+  if(preferred?.id)sources.push(preferred.id);
+  sources.push({facingMode:{ideal:'environment'}},{facingMode:'environment'});
   let last;
   for(const source of sources){
     try{
-      await qrScanner.start(source,scanCfg,text=>{finishQrScan(text).catch(console.error)},()=>{});
+      await qrScanner.start(source,scanCfg,text=>{if(fiscalQrLooksValid(text))finishQrScan(text).catch(console.error)},()=>{});
       return;
     }catch(e){
       last=e;
@@ -280,16 +361,12 @@ async function startJsQrScan(){
     if(qrScanDone||!qrNativeVideo)return;
     try{
       if(video.readyState>=2&&video.videoWidth&&video.videoHeight){
-        const max=960,scale=Math.min(1,max/video.videoWidth);
-        canvas.width=Math.max(1,Math.round(video.videoWidth*scale));
-        canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
-        ctx.drawImage(video,0,0,canvas.width,canvas.height);
-        const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-        const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
-        if(code?.data&&fiscalQrLooksValid(code.data)){await finishQrScan(code.data);return}
+        let raw=qrCanvasDecode(video,canvas,ctx,1);
+        if(!raw)raw=qrCanvasDecode(video,canvas,ctx,.8);
+        if(raw&&fiscalQrLooksValid(raw)){await finishQrScan(raw);return}
       }
     }catch(e){console.debug('Leitura QR jsQR',e)}
-    qrNativeTimer=setTimeout(tick,110);
+    qrNativeTimer=setTimeout(tick,100);
   };
   tick();
 }
@@ -304,23 +381,18 @@ async function startQrScan(){
   try{
     await stopQrScan();
     qrScanDone=false;
+    qrScanEngine='';
     $('qrModal').classList.remove('hidden');
     $('scanStatus').textContent='Abrindo câmera traseira…';
-    const errors=[];
     try{
-      await startNativeQrScan();
-      $('scanStatus').textContent='Aponte para o QR Code…';
+      await startDirectQrScan();
+      $('scanStatus').textContent='Aponte para o QR Code. A leitura é automática.';
       return;
-    }catch(e){errors.push(e);console.info('Scanner QR nativo indisponível; usando compatibilidade.',e);await stopQrCameraOnly()}
-    try{
-      $('qrModal').classList.remove('hidden');qrScanDone=false;
-      await startHtml5QrScan();
-      $('scanStatus').textContent='Aponte para o QR Code…';
-      return;
-    }catch(e){errors.push(e);console.info('html5-qrcode falhou; usando jsQR.',e);await stopQrCameraOnly()}
+    }catch(e){console.info('Leitor combinado indisponível; usando leitor alternativo.',e);await stopQrCameraOnly()}
     $('qrModal').classList.remove('hidden');qrScanDone=false;
-    await startJsQrScan();
-    $('scanStatus').textContent='Aponte para o QR Code…';
+    await startHtml5QrScan();
+    qrScanEngine='html5';
+    $('scanStatus').textContent='Aponte para o QR Code. A leitura é automática.';
   }catch(e){
     console.error(e);
     await stopQrScan();
@@ -328,6 +400,7 @@ async function startQrScan(){
   }
 }
 async function stopQrCameraOnly(){
+  if(qrFallbackTimer){clearTimeout(qrFallbackTimer);qrFallbackTimer=null}
   if(qrNativeTimer){clearTimeout(qrNativeTimer);qrNativeTimer=null}
   if(qrNativeVideo){try{qrNativeVideo.pause();qrNativeVideo.srcObject=null}catch{}qrNativeVideo=null}
   if(qrNativeStream){try{qrNativeStream.getTracks().forEach(t=>t.stop())}catch{}qrNativeStream=null}
