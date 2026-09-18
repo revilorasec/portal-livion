@@ -229,8 +229,8 @@ async function mountQrVideo(stream){
   video.autoplay=true;
   video.playsInline=true;
   video.style.width='100%';
-  video.style.height='min(70vh,560px)';
-  video.style.objectFit='contain';
+  video.style.height='100%';
+  video.style.objectFit='cover';
   video.style.borderRadius='12px';
   reader.appendChild(video);
   qrNativeVideo=video;
@@ -327,6 +327,7 @@ async function startHtml5QrScan(session=qrSession){
   qrScanner=new H('qrReader',cfg);
   const scanCfg={
     fps:10,
+    qrbox:(w,h)=>{const side=Math.max(180,Math.floor(Math.min(w,h)*.82));return{width:Math.min(side,w),height:Math.min(side,h)}},
     disableFlip:false
   };
   let cameras=[];

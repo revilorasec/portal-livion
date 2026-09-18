@@ -16,9 +16,9 @@ function harness(startImpl){
  vm.runInContext(source.slice(source.indexOf('async function loadQrScanner()'),source.indexOf('function localItemsFromText(')),context);
  return {context,events,timers,nodes,run:s=>vm.runInContext(s,context),decode:raw=>success(raw)};
 }
-test('software decoder uses rear camera, full frame and mirrored decoding',async()=>{
+test('software decoder uses rear camera, compact square and mirrored decoding',async()=>{
  const h=harness();await h.run('startQrScan()');const cfg=h.events.find(e=>e[0]==='config')[1],start=h.events.find(e=>e[0]==='start');
- assert.equal(cfg.useBarCodeDetectorIfSupported,false);assert.equal(cfg.experimentalFeatures.useBarCodeDetectorIfSupported,false);assert.equal(start[1],'back');assert.equal(start[2].disableFlip,false);assert.equal(start[2].qrbox,undefined);
+ const box=start[2].qrbox(320,500);assert.equal(cfg.useBarCodeDetectorIfSupported,false);assert.equal(cfg.experimentalFeatures.useBarCodeDetectorIfSupported,false);assert.equal(start[1],'back');assert.equal(start[2].disableFlip,false);assert.equal(box.width,262);assert.equal(box.height,262);
 });
 test('decoded QR stops camera and processes only once',async()=>{
  const h=harness();await h.run('startQrScan()');h.decode('https://example.test/qr');h.decode('https://example.test/qr');await new Promise(setImmediate);
