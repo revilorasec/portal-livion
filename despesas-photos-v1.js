@@ -1,4 +1,5 @@
 (() => {
+  window.__EXPENSE_PHOTO_PICKER_VERSION__='4';
   const DELETE_API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/expense-attachment-delete-api';
 
   function buildPhotoPicker(input,idx){
@@ -77,7 +78,14 @@
     const current=(typeof expenses!=='undefined' && Array.isArray(expenses))
       ? expenses.find(e=>String(e.expense_id)===String(expense?.expense_id))
       : null;
-    const list=current?.attachments||expense?.attachments||[];
+    const merged=[...(Array.isArray(current?.attachments)?current.attachments:[]),...(Array.isArray(expense?.attachments)?expense.attachments:[])];
+    const seen=new Set();
+    const list=merged.filter(a=>{
+      const id=String(a?.attachment_id||'');
+      if(id&&seen.has(id))return false;
+      if(id)seen.add(id);
+      return true;
+    });
     return list.filter(a=>{
       const t=String(a?.attachment_type||'').toUpperCase();
       return t==='FOTO'||t.startsWith('FOTO_');
@@ -118,11 +126,11 @@
 
     const photos=photoAttachmentsFor(expense);
     if(!photos.length){
-      box.innerHTML='<label>Fotos já anexadas</label><div class="payment-note">Nenhuma foto anexada anteriormente.</div>';
+      box.innerHTML='<label>Fotos já anexadas</label><div class="payment-note">Nenhuma foto anexada anteriormente. Você pode tirar uma foto nova ou escolher uma imagem da galeria nos campos Foto 1 e Foto 2.</div>';
       return;
     }
 
-    box.innerHTML='<label>Fotos já anexadas</label><div class="existing-photo-list"></div>';
+    box.innerHTML='<label>Fotos já anexadas</label><div class="payment-note" style="margin-bottom:6px">Durante a edição, você pode abrir ou excluir fotos anexadas anteriormente.</div><div class="existing-photo-list"></div>';
     const list=box.querySelector('.existing-photo-list');
     photos.forEach((a,i)=>{
       const row=document.createElement('div');
