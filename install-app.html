@@ -60,7 +60,7 @@ $('installBtn').onclick=async()=>{
   deferredPrompt=null;
 };
 if(standalone){$('installBtn').textContent='Já instalado';$('installBtn').disabled=true;$('status').textContent='Este aplicativo já está instalado.';$('status').className='status on ok'}
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(()=>{});
 </script>
 </body>
 </html>
