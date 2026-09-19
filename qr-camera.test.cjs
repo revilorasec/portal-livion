@@ -17,18 +17,22 @@ function harness(startImpl){
  vm.runInContext(source.slice(source.indexOf('async function loadQrScanner()'),source.indexOf('function localItemsFromText(')),context);
  return {context,events,timers,nodes,run:s=>vm.runInContext(s,context),decode:raw=>success(raw)};
 }
-test('software decoder uses rear camera, compact square and mirrored decoding',async()=>{
- const h=harness();await h.run('startQrScan()');const cfg=h.events.find(e=>e[0]==='config')[1],start=h.events.find(e=>e[0]==='start');
+test('software fallback uses rear camera, compact square and mirrored decoding',async()=>{
+ const h=harness();await h.run('startHtml5QrScan()');const cfg=h.events.find(e=>e[0]==='config')[1],start=h.events.find(e=>e[0]==='start');
  const box=start[2].qrbox(320,500);assert.equal(cfg.useBarCodeDetectorIfSupported,false);assert.equal(cfg.experimentalFeatures.useBarCodeDetectorIfSupported,false);assert.equal(start[1],'back');assert.equal(start[2].disableFlip,false);assert.equal(box.width,262);assert.equal(box.height,262);
 });
 test('decoded QR stops camera, fills fields and processes only once',async()=>{
- const h=harness();await h.run('startQrScan()');h.decode('https://example.test/qr');h.decode('https://example.test/qr');await new Promise(setImmediate);
+ const h=harness();await h.run('startHtml5QrScan()');h.decode('https://example.test/qr');h.decode('https://example.test/qr');await new Promise(setImmediate);
  assert.equal(h.events.filter(e=>e[0]==='fill').length,2);assert.equal(h.events.filter(e=>e[0]==='stop').length,1);assert.equal(h.run('qrScanner'),null);assert.equal(h.nodes.eVendor.value,'Loja de teste');assert.equal(h.nodes.eVendorDoc.value,'12345678000199');assert.equal(h.nodes.eAmount.value,'42');assert.equal(h.events.filter(e=>e[0]==='flash').length,1);assert.equal(h.timers.length,0);
  assert.ok(h.events.some(e=>e[0]==='class-add'&&e[1]==='qrModal'&&e[2]==='hidden'));
 });
 test('closing while camera permission/start is pending prevents late reopening',async()=>{
- let release;const h=harness(()=>new Promise(r=>release=r));const pending=h.run('startQrScan()');await new Promise(setImmediate);assert.ok(release);await h.run('stopQrScan()');release();await pending;assert.ok(h.events.some(e=>e[0]==='stop'));assert.equal(h.run('qrScanDone'),true);
+ let release;const h=harness(()=>new Promise(r=>release=r));const pending=h.run('startHtml5QrScan()');await new Promise(setImmediate);assert.ok(release);await h.run('stopQrScan()');release();await pending;assert.ok(h.events.some(e=>e[0]==='stop'));assert.equal(h.run('qrScanDone'),true);
 });
 test('denied permission gives an actionable message without reopening camera',async()=>{
- const h=harness(()=>{const e=Error('Permission denied');e.name='NotAllowedError';throw e});await h.run('startQrScan()');assert.match(h.nodes.scanStatus.textContent,/Permissão da câmera negada/);assert.equal(h.run('qrScanDone'),true);
+ const h=harness(()=>{const e=Error('Permission denied');e.name='NotAllowedError';throw e});await assert.rejects(h.run('startHtml5QrScan()'),/Permission denied/);
+});
+test('main QR flow starts the combined decoder',()=>{
+ const start=source.slice(source.indexOf('async function startQrScan()'),source.indexOf('async function stopQrCameraOnly()'));
+ assert.match(start,/await startDirectQrScan\(session\)/);assert.doesNotMatch(start,/await startJsQrScan\(session\)/);
 });
