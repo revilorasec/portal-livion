@@ -183,7 +183,26 @@ async function stopQrScan(){
   }
 }
 function localFiscalFromQr(raw){const k=parseKey(raw);return{...k,official_query_url:String(raw||''),qr_used:true}}
-async function resolveFiscalQr(raw,localData=null){$('scanStatus').textContent='QR Code lido. Consultando dados fiscais…';try{const r=await fiscalApi('/resolve',{method:'POST',body:JSON.stringify({qr:raw})});const remote=r?.fiscal||{};const merged={...(localData||localFiscalFromQr(raw)),...Object.fromEntries(Object.entries(remote).filter(([,v])=>v!==null&&v!==undefined&&v!=='')),qr_used:true,qr_source:r.source};fillFiscal(merged,true);const cat=inferredCategory(merged),parts=[merged.establishment,cat,merged.value?money(merged.value):''].filter(Boolean);$('scanStatus').textContent=parts.length?'Preenchido automaticamente: '+parts.join(' · '):'Nota fiscal reconhecida. Confira os campos preenchidos.';if(r.warning)console.warn('Consulta SEFAZ:',r.warning);return merged}catch(e){console.error('Consulta fiscal do QR',e);const local=localData||localFiscalFromQr(raw);fillFiscal(local,true);$('scanStatus').textContent=local.access_key?'QR lido. Preenchi os dados da chave fiscal; a consulta complementar não respondeu.':'Não consegui consultar os dados desta nota. Mantenha o QR no quadro e tente novamente.';return local}}
+async function resolveFiscalQr(raw,localData=null){
+  $('scanStatus').textContent='QR lido. Buscando os dados da nota…';
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+  try{
+    const r=await fiscalApi('/resolve',{method:'POST',body:JSON.stringify({qr:raw}),signal:controller.signal});
+    const remote=r?.fiscal||{};
+    const merged={...(localData||localFiscalFromQr(raw)),...Object.fromEntries(Object.entries(remote).filter(([,v])=>v!==null&&v!==undefined&&v!=='')),qr_used:true,qr_source:r.source};
+    fillFiscal(merged,true);
+    const cat=inferredCategory(merged),parts=[merged.establishment,cat,merged.value?money(merged.value):''].filter(Boolean);
+    $('scanStatus').textContent=parts.length?'Nota preenchida: '+parts.join(' · '):'Nota fiscal reconhecida. Confira os campos preenchidos.';
+    if(r.warning)console.warn('Consulta SEFAZ:',r.warning);
+    return merged;
+  }catch(e){
+    console.error('Consulta fiscal do QR',e);
+    const local=localData||localFiscalFromQr(raw);
+    fillFiscal(local,true);
+    $('scanStatus').textContent=local.access_key?'QR lido e chave fiscal preenchida. A consulta dos demais dados não respondeu; fotografe a nota para completar.':'QR lido, mas a consulta fiscal não respondeu. Fotografe a nota para completar.';
+    return local;
+  }finally{clearTimeout(timeout)}
+}
 function fiscalQrLooksValid(raw){
   const s=String(raw||'').trim();
   if(!s)return false;
@@ -198,24 +217,16 @@ async function finishQrScan(raw){
   const text=String(raw||'').trim();
   if(!fiscalQrLooksValid(text))return;
   qrScanDone=true;
-  $('scanStatus').textContent='QR Code lido. Processando a nota…';
   const local=localFiscalFromQr(text);
+  fillFiscal(local,true);
+  $('scanStatus').textContent='QR lido. Buscando os dados da nota…';
+  $('qrModal').classList.add('hidden');
   await stopQrCameraOnly();
   qrScanDone=true;
-  $('qrModal').classList.remove('hidden');
-  try{
-    const data=await resolveFiscalQr(text,local);
-    const visible=Boolean($('eVendor')?.value||$('eVendorDoc')?.value||Number($('eAmount')?.value)>0||$('eItems')?.value||$('eDate')?.value);
-    if(!visible)throw Error('QR_WITHOUT_VISIBLE_DATA');
-    $('qrModal').classList.add('hidden');
-    flash('Dados da nota inseridos. Confira antes de salvar.');
-    return data;
-  }catch(e){
-    console.error('Preenchimento do QR',e);
-    qrScanDone=false;
-    $('scanStatus').textContent='O QR foi lido, mas os dados da nota não foram inseridos. Tente novamente ou use “Fotografar / escolher nota”.';
-    throw e;
-  }
+  const data=await resolveFiscalQr(text,local);
+  const visible=Boolean($('eVendor')?.value||$('eVendorDoc')?.value||Number($('eAmount')?.value)>0||$('eItems')?.value||$('eDate')?.value||local.access_key);
+  if(visible)flash('Dados da nota inseridos. Confira antes de salvar.');
+  return data;
 }
 async function getBackCameraStream(){
   if(!navigator.mediaDevices?.getUserMedia)throw Error('CAMERA_API_UNAVAILABLE');
@@ -446,7 +457,6 @@ async function stopQrCameraOnly(){
     qrScanner=null;
   }
   const r=$('qrReader');if(r)r.innerHTML='';
-  qrScanDone=false;
 }
 function localItemsFromText(text){const lines=String(text||'').split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean),out=[];for(let i=0;i<lines.length;i++){const line=lines[i],near=[lines[i-1],lines[i+1],lines[i+2],lines[i+3]].filter(Boolean).join(' '),candidate=cleanFiscalItems([line])[0];if(!candidate)continue;const productContext=/QTD|QTDE|QUANTIDADE|VL\.?\s*UNIT|VALOR\s*UNIT|PRE[CÇ]O|LITRO|\bLT\b|\bKG\b|\bUN\b|UNIDADE|X\s*R\$|VALOR\s+(?:DO\s+)?ITEM/i.test(near);const strongProduct=/GASOLINA|ETANOL|ALCOOL|DIESEL|GNV|COMBUST|REFEI[CÇ][AÃ]O|LANCHE|CAF[EÉ]|PED[AÁ]GIO|ESTACIONAMENTO|HOSPEDAGEM|DI[AÁ]RIA|PASSAGEM|SERVI[CÇ]O|PE[CÇ]A|MATERIAL|PRODUTO/i.test(candidate);if((productContext||strongProduct)&&!out.some(x=>simpleNorm(x)===simpleNorm(candidate)))out.push(candidate)}return out.slice(0,40)}
 

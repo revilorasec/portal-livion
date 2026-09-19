@@ -11,8 +11,8 @@ function harness(startImpl){
   clear(){events.push(['clear'])}
   async applyVideoConstraints(){events.push(['focus'])}
  }
- const node=id=>nodes[id]??=( {value:'',innerHTML:'',textContent:'',classList:{add(){},remove(){}}});
- const context=vm.createContext({window:{Html5Qrcode:Scanner,Html5QrcodeSupportedFormats:{QR_CODE:0}},URL,console:{info(){},error(){},debug(){},warn(){}},setTimeout:fn=>{timers.push(fn);return timers.length},clearTimeout(){},$:node,parseKey:()=>({}),fillFiscal:data=>{events.push(['fill']);node('eVendor').value=data.establishment||'';node('eVendorDoc').value=data.cnpj||'';node('eAmount').value=String(data.value||'')},fiscalApi:async()=>({fiscal:{establishment:'Loja de teste',cnpj:'12345678000199',value:42}}),inferredCategory:()=>'',money:String,flash:text=>events.push(['flash',text])});
+ const node=id=>nodes[id]??=( {value:'',innerHTML:'',textContent:'',classList:{add(name){events.push(['class-add',id,name])},remove(name){events.push(['class-remove',id,name])}}});
+ const context=vm.createContext({window:{Html5Qrcode:Scanner,Html5QrcodeSupportedFormats:{QR_CODE:0}},URL,AbortController,console:{info(){},error(){},debug(){},warn(){}},setTimeout:fn=>{timers.push(fn);return fn},clearTimeout:id=>{const i=timers.indexOf(id);if(i>=0)timers.splice(i,1)},$:node,parseKey:()=>({}),fillFiscal:data=>{events.push(['fill']);node('eVendor').value=data.establishment||'';node('eVendorDoc').value=data.cnpj||'';node('eAmount').value=String(data.value||'')},fiscalApi:async()=>({fiscal:{establishment:'Loja de teste',cnpj:'12345678000199',value:42}}),inferredCategory:()=>'',money:String,flash:text=>events.push(['flash',text])});
  vm.runInContext("let qrScanner=null,qrNativeStream=null,qrNativeTimer=null,qrNativeVideo=null,qrScanDone=false,qrFallbackTimer=null,qrScanEngine='';",context);
  vm.runInContext(source.slice(source.indexOf('async function loadQrScanner()'),source.indexOf('function localItemsFromText(')),context);
  return {context,events,timers,nodes,run:s=>vm.runInContext(s,context),decode:raw=>success(raw)};
@@ -23,7 +23,8 @@ test('software decoder uses rear camera, compact square and mirrored decoding',a
 });
 test('decoded QR stops camera, fills fields and processes only once',async()=>{
  const h=harness();await h.run('startQrScan()');h.decode('https://example.test/qr');h.decode('https://example.test/qr');await new Promise(setImmediate);
- assert.equal(h.events.filter(e=>e[0]==='fill').length,1);assert.equal(h.events.filter(e=>e[0]==='stop').length,1);assert.equal(h.run('qrScanner'),null);assert.equal(h.nodes.eVendor.value,'Loja de teste');assert.equal(h.nodes.eVendorDoc.value,'12345678000199');assert.equal(h.nodes.eAmount.value,'42');assert.equal(h.events.filter(e=>e[0]==='flash').length,1);assert.equal(h.timers.length,0);
+ assert.equal(h.events.filter(e=>e[0]==='fill').length,2);assert.equal(h.events.filter(e=>e[0]==='stop').length,1);assert.equal(h.run('qrScanner'),null);assert.equal(h.nodes.eVendor.value,'Loja de teste');assert.equal(h.nodes.eVendorDoc.value,'12345678000199');assert.equal(h.nodes.eAmount.value,'42');assert.equal(h.events.filter(e=>e[0]==='flash').length,1);assert.equal(h.timers.length,0);
+ assert.ok(h.events.some(e=>e[0]==='class-add'&&e[1]==='qrModal'&&e[2]==='hidden'));
 });
 test('closing while camera permission/start is pending prevents late reopening',async()=>{
  let release;const h=harness(()=>new Promise(r=>release=r));const pending=h.run('startQrScan()');await new Promise(setImmediate);assert.ok(release);await h.run('stopQrScan()');release();await pending;assert.ok(h.events.some(e=>e[0]==='stop'));assert.equal(h.run('qrScanDone'),true);
