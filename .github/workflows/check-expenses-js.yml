@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - despesas-reembolsos-v2.js
+      - expense-category-ai.js
+      - supabase/functions/expense-category-ai/**
+      - tests/expense-category-ai.test.mjs
       - .github/workflows/check-expenses-js.yml
 permissions:
   contents: read
@@ -17,3 +20,7 @@ jobs:
           node-version: '22'
       - name: Check syntax
         run: node --check despesas-reembolsos-v2.js
+      - name: Check category suggestions
+        run: |
+          node --check expense-category-ai.js
+          node --test tests/expense-category-ai.test.mjs
