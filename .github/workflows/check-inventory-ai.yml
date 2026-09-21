@@ -1,0 +1,26 @@
+name: Check inventory TypeSafe integration
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - estoque.html
+      - estoque-typesafe.js
+      - estoque-assets-v18.css
+      - supabase/functions/inventory-product-ai/**
+      - tests/inventory-product-ai.test.mjs
+      - .github/workflows/check-inventory-ai.yml
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check syntax and integration
+        run: |
+          node --check estoque-typesafe.js
+          node --check supabase/functions/inventory-product-ai/handler.mjs
+          node --test tests/inventory-product-ai.test.mjs
