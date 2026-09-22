@@ -12,5 +12,5 @@
       }
     }
   }).observe(document.documentElement,{childList:true,subtree:true});
-  document.write('<script src="estoque-assets-v18-core.js?v=4"><\/script>');
+  document.write('<script src="estoque-assets-v18-core.js?v=5"><\/script>');
 })();

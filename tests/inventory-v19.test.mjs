@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
-const frontend = readFileSync(new URL('../estoque-assets-v18.js', import.meta.url), 'utf8');
+const frontend = readFileSync(new URL('../estoque-assets-v18-core.js', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../estoque-assets-v18.css', import.meta.url), 'utf8');
 const api = readFileSync(new URL('../supabase/functions/inventory-api/index.ts', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/20260911180000_inventory_manual_invoices.sql', import.meta.url), 'utf8');

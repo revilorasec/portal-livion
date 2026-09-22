@@ -13,20 +13,20 @@ const versionCatalogSql = readFileSync(new URL('../Scripts/update-portal-app-ver
 test('carrega os recursos v17 depois do painel v16', () => {
   assert.ok(html.indexOf('estoque-dashboard-v16.js') < html.indexOf('estoque-assets-v17.js'));
   assert.match(html, /estoque-assets-v17\.css/);
-  assert.match(serviceWorker, /portal-livion-v14/);
+  assert.match(serviceWorker, /portal-livion-v41/);
   assert.match(html, /estoque-assets-v17\.js\?v=18/);
   assert.match(serviceWorker, /estoque-assets-v17\.js\?v=18/);
 });
 
 test('portal e aplicativo exibem versões identificáveis', () => {
-  assert.match(portal, /PORTAL_VERSION='2026\.09\.13\.1'/);
+  assert.match(portal, /PORTAL_VERSION='2026\.09\.19\.1'/);
   assert.match(portal, /id="portalVersion"/);
   assert.match(portal, /id="workspaceVersion"/);
   assert.match(portal, /class="app-card-version"/);
   assert.match(portal, /function stampFrameVersion/);
-  assert.match(html, /data-app-version="6"/);
-  assert.match(html, /class="app-release">v6/);
-  assert.match(versionCatalogSql, /estoque\.html\?v=6/);
+  assert.match(html, /data-app-version="7"/);
+  assert.match(html, /class="app-release">v7/);
+  assert.match(versionCatalogSql, /estoque\.html\?v=7/);
   assert.match(versionCatalogSql, /where key in/);
 });
 

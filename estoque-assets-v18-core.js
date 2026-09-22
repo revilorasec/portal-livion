@@ -14,6 +14,7 @@
   const closeModalBase = closeModal;
   closeModal = function () {
     stopQrCamera();
+    document.querySelectorAll('.invoice-pending,.invoice-product-picker-backdrop').forEach(element => element.remove());
     closeModalBase();
   };
 
@@ -55,10 +56,10 @@
     });
   }
 
-  async function associateProduct(detail, index) {
+  async function associateProduct(detail, index, selectedProductId = '') {
     const item = detail.items[index];
     const select = $('invProd' + index);
-    const productId = select?.value || item.product_id;
+    const productId = selectedProductId || select?.value || item.product_id;
     const product = (D.stock || []).find(row => row.product_id === productId);
     if (!product) return alert('Pesquise e selecione uma peça, componente ou insumo existente.');
     const action = normalize(product.description) === normalize(item.description) ? 'KEEP' : await decisionDialog({
@@ -83,6 +84,46 @@
     }
     if (note) note.textContent = action === 'RENAME' ? 'Ao confirmar: usar o nome da nota' : 'Ao confirmar: manter o nome atual';
     invoiceReadiness(detail);
+  }
+
+  function chooseInvoiceProduct(detail, index) {
+    const item = detail.items[index];
+    const overlay = document.createElement('div');
+    overlay.className = 'invoice-product-picker-backdrop';
+    overlay.innerHTML = `
+      <section class="invoice-product-picker" role="dialog" aria-modal="true" aria-labelledby="invoiceProductPickerTitle">
+        <div class="invoice-product-picker-head">
+          <div><h3 id="invoiceProductPickerTitle">Escolher produto no estoque</h3><small>Item da nota: ${esc(item.description)}</small></div>
+          <button type="button" class="btn" data-close>Fechar</button>
+        </div>
+        <input class="invoice-product-search" type="search" placeholder="Pesquisar por PN, descrição, código ou localização…" autofocus>
+        <div class="invoice-product-results"></div>
+      </section>`;
+    document.body.appendChild(overlay);
+    const search = overlay.querySelector('.invoice-product-search');
+    const results = overlay.querySelector('.invoice-product-results');
+    const close = () => overlay.remove();
+    const renderProducts = () => {
+      const query = normalize(search.value);
+      const products = (D.stock || []).filter(product => !query || normalize([
+        product.pn, product.description, product.internal_code, product.barcode, product.default_location
+      ].join(' ')).includes(query));
+      results.innerHTML = products.map(product => `
+        <button type="button" class="invoice-product-result" data-product-id="${esc(product.product_id)}">
+          <span><b>${esc(product.pn || product.description)}</b><small>${esc(product.description || '')}</small></span>
+          <span><small>Saldo atual</small><b>${fmt(product.balance)} ${esc(product.unit || '')}</b>${product.default_location ? `<small>${esc(product.default_location)}</small>` : ''}</span>
+        </button>`).join('') || '<div class="empty">Nenhum produto encontrado.</div>';
+      results.querySelectorAll('[data-product-id]').forEach(button => button.onclick = async () => {
+        const productId = button.dataset.productId;
+        close();
+        await associateProduct(detail, index, productId);
+      });
+    };
+    search.oninput = renderProducts;
+    overlay.querySelector('[data-close]').onclick = close;
+    overlay.onclick = event => { if (event.target === overlay) close(); };
+    renderProducts();
+    search.focus();
   }
 
   async function associateSupplier(detail) {
@@ -177,6 +218,7 @@
 
   const showInvoiceReviewBase = showInvoiceReview;
   showInvoiceReview = function (detail) {
+    document.querySelectorAll('.invoice-pending').forEach(button => button.remove());
     showInvoiceReviewBase(detail);
     addInvoiceDocuments(detail);
     if (detail.invoice.status === 'CONFIRMED') return;
@@ -186,8 +228,11 @@
     });
     detail.invoice.review_initial_supplier_id ??= detail.invoice.supplier_id || '';
     document.querySelectorAll('[data-link-invoice-item]').forEach(button => {
-      button.textContent = 'Associar e escolher nome';
-      button.onclick = () => associateProduct(detail, Number(button.dataset.linkInvoiceItem));
+      const index = Number(button.dataset.linkInvoiceItem);
+      button.textContent = 'Escolher produto no estoque';
+      button.onclick = () => chooseInvoiceProduct(detail, index);
+      const select = $('invProd' + index);
+      if (select?._comboInput) select._comboInput.closest('.smart-combo').classList.add('invoice-product-combo-hidden');
     });
     if ($('linkInvoiceSupplier')) {
       $('linkInvoiceSupplier').textContent = 'Associar e escolher nome';
@@ -213,6 +258,25 @@
         flash(`${changed} nome${changed === 1 ? '' : 's'} atualizado${changed === 1 ? '' : 's'} conforme a aprovação.`);
       }
     };
+    const pendingButton = document.createElement('button');
+    pendingButton.type = 'button';
+    pendingButton.className = 'btn invoice-pending';
+    pendingButton.textContent = 'Guardar nota sem lançar estoque';
+    pendingButton.onclick = async () => {
+      closeModal();
+      await loadInvoices();
+      flash('Nota guardada para vincular depois. Nenhum saldo foi alterado.');
+    };
+    $('modalCancel').before(pendingButton);
+  };
+
+  invoiceReadiness = function (detail) {
+    const supplier = $('invSupplier')?.value || '';
+    const linked = detail.items.filter((item, index) => confirmedProductValue(item, index)).length;
+    const ready = linked === detail.items.length;
+    if ($('invoiceReadiness')) $('invoiceReadiness').innerHTML = `<b>${supplier ? 'Fornecedor vinculado' : 'Fornecedor opcional'}</b> · <b>${linked} de ${detail.items.length} produtos vinculados</b>${ready ? '' : '<br><small>Você pode guardar a nota agora e concluir os vínculos depois.</small>'}`;
+    $('modalSave').disabled = !ready;
+    return ready;
   };
 
   async function importQrXml(file, expectedKey) {
@@ -417,5 +481,72 @@
     $('chooseManual').onclick = manualEntry;
     $('chooseXml').onclick = xmlEntry;
     $('chooseQr').onclick = qrEntry;
+  };
+
+  const catalogValuesBase = catalogValues;
+  catalogValues = function (type, current) {
+    const values = catalogValuesBase(type, current);
+    return type === 'TYPE' ? [...new Set(['Componente', 'Insumo', ...values])] : values;
+  };
+
+  function openStockAdjustment() {
+    const idempotencyKey = crypto.randomUUID();
+    modal('Ajustar estoque', `
+      <div class="form stock-adjustment-form">
+        ${movementDateFields('AJUSTE').replace('Data e Hora da Saída', 'Data e Hora do Ajuste')}
+        <div class="field"><label>Tipo de ajuste</label><select id="adjustmentType"><option value="AJUSTE_POSITIVO">Aumentar saldo (+)</option><option value="AJUSTE_NEGATIVO">Diminuir saldo (−)</option></select></div>
+        <div class="field"><label>Quantidade</label><input id="fQty" type="number" min="0.0001" step="any"></div>
+        <div class="field full"><label>Produto</label><select id="fProduct">${opts(D.stock || [], 'product_id', 'description', 'Pesquise o produto…')}</select></div>
+        <div id="fProductPreview" class="field full"><small class="muted">Selecione um produto para conferir o saldo atual.</small></div>
+        <div class="field full"><label>Motivo do ajuste</label><textarea id="fNotes" placeholder="Explique a diferença encontrada na contagem física"></textarea></div>
+      </div>`, async () => {
+        const product = (D.stock || []).find(item => item.product_id === $('fProduct').value);
+        const quantity = Number($('fQty').value);
+        const notes = $('fNotes').value.trim();
+        if (!product || !Number.isFinite(quantity) || quantity <= 0) throw new Error('Selecione o produto e informe uma quantidade válida.');
+        if (!notes) throw new Error('Informe o motivo do ajuste para manter o histórico auditável.');
+        await api('/movement', {method: 'POST', body: JSON.stringify({
+          movement_type: $('adjustmentType').value, product_id: product.product_id, quantity,
+          notes, occurred_at: selectedOccurredAt(), idempotency_key: idempotencyKey
+        })});
+        closeModal();
+        flash('Ajuste de estoque registrado.');
+        await reload();
+      });
+    $('modalSave').textContent = 'Registrar ajuste';
+    wireMovementDateFields();
+    $('fProduct').onchange = () => {
+      const product = (D.stock || []).find(item => item.product_id === $('fProduct').value);
+      $('fProductPreview').innerHTML = product ? `${gallery(product)}<small><b>${esc(product.pn || product.description)}</b> · Saldo atual: ${fmt(product.balance)} ${esc(product.unit || '')}</small>` : '<small class="muted">Selecione um produto.</small>';
+    };
+    makeSearchableDropdown('fProduct', () => $('fProduct').onchange());
+    makeSearchableDropdown('adjustmentType');
+  }
+
+  function installAdjustmentButtons() {
+    if (!$('quickAdjust')) {
+      const button = document.createElement('button');
+      button.id = 'quickAdjust';
+      button.className = 'btn';
+      button.textContent = '± Ajustar estoque';
+      $('quickExit').after(button);
+      button.onclick = openStockAdjustment;
+    }
+    if (!$('mAdjust')) {
+      const button = document.createElement('button');
+      button.id = 'mAdjust';
+      button.className = 'btn';
+      button.textContent = '± Ajustar estoque';
+      $('mExit').after(button);
+      button.onclick = openStockAdjustment;
+    }
+  }
+
+  installAdjustmentButtons();
+  const renderV20Base = render;
+  render = function () {
+    renderV20Base();
+    installAdjustmentButtons();
+    $('quickAdjust').disabled = $('mAdjust').disabled = !D.permissions.adjust;
   };
 })();
