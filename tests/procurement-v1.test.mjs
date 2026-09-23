@@ -8,6 +8,13 @@ const api=readFileSync(new URL('../supabase/functions/procurement-api/index.ts',
 const schema=readFileSync(new URL('../supabase/migrations/20260923120000_procurement_v1.sql',import.meta.url),'utf8');
 const legacy=readFileSync(new URL('../supabase/migrations/20260923123000_procurement_legacy_import.sql',import.meta.url),'utf8');
 
+test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
+  assert.match(js,/requestLimit=60/);
+  assert.match(js,/rows\.slice\(0,requestLimit\)/);
+  assert.match(js,/Mostrar mais/);
+  assert.match(html,/compras-cotacoes\.js\?v=2/);
+});
+
 test('app usa marca Livion e expõe o fluxo completo',()=>{
   assert.match(html,/Compras e Cotações/);
   assert.match(html,/Pedidos e recebimentos/);
