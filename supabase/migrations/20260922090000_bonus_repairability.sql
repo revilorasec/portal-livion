@@ -1,0 +1,6 @@
+create table if not exists public.bonus_repairability_rules (id text primary key check (id = 'current'), payload jsonb not null, revision integer not null check (revision >= 0), updated_at timestamptz not null default now(), updated_by text not null);
+create table if not exists public.bonus_repairability_calculations (id uuid primary key default gen_random_uuid(), employee_key text not null, employee_name text not null, period date not null check (date_trunc('month', period)::date = period), status text not null check (status in ('SIMULATION','APPROVED','PAID')), payload jsonb not null, rules_revision integer not null check (rules_revision >= 0), created_at timestamptz not null default now(), created_by text not null, updated_at timestamptz not null default now(), updated_by text not null, approved_at timestamptz, approved_by text, paid_at timestamptz, paid_by text, unique (employee_key, period));
+create index if not exists bonus_repairability_calculations_period_idx on public.bonus_repairability_calculations (period desc, employee_name);
+alter table public.bonus_repairability_rules enable row level security;
+alter table public.bonus_repairability_calculations enable row level security;
+revoke all on public.bonus_repairability_rules, public.bonus_repairability_calculations from anon, authenticated;
