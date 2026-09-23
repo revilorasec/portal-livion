@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1733"><title>Compras e Cotações · Livion</title>
+<link rel="icon" href="./assets/icons/livion-64.png" type="image/png">
+<link rel="stylesheet" href="./compras-cotacoes.css?v=1">
+</head>
+<body>
+<header class="top"><div><span class="eyebrow">Suprimentos & Operações</span><h1>Compras e Cotações</h1><p>Da necessidade ao recebimento no estoque</p></div><div class="top-right"><span class="version">v1</span><button id="reloadBtn" class="btn">Atualizar</button><button id="newRequestBtn" class="btn primary">+ Nova solicitação</button></div></header>
+<main>
+  <div id="flash" class="flash hidden"></div>
+  <section id="loading" class="loading">Carregando dados do Portal Livion…</section>
+  <section id="app" class="hidden">
+    <div class="metrics" id="metrics"></div>
+    <nav class="tabs"><button class="active" data-view="requests">Solicitações</button><button data-view="orders">Pedidos e recebimentos</button><button data-view="suppliers">Fornecedores</button><button data-view="lead">Prazos de reposição</button></nav>
+    <section id="requestsView" class="view">
+      <div class="toolbar"><input id="requestSearch" type="search" placeholder="Pesquisar número, item ou solicitante"><select id="requestStatus"><option value="">Todos os status</option></select></div>
+      <div id="requestList" class="cards"></div>
+    </section>
+    <section id="ordersView" class="view hidden"><div id="orderList" class="cards"></div></section>
+    <section id="suppliersView" class="view hidden"><div class="section-head"><div><h2>Fornecedores</h2><p>Cadastro único compartilhado com o Controle de Estoque.</p></div><button id="newSupplierBtn" class="btn primary">+ Fornecedor</button></div><div id="supplierList" class="supplier-grid"></div></section>
+    <section id="leadView" class="view hidden"><div class="section-head"><div><h2>Prazos reais de reposição</h2><p>Calculados entre a emissão do pedido e o recebimento. Com poucas amostras, a sugestão deve ser tratada como inicial.</p></div></div><div class="table-wrap"><table><thead><tr><th>Produto</th><th>Amostras</th><th>Mediana</th><th>P75</th><th>P90</th></tr></thead><tbody id="leadBody"></tbody></table></div></section>
+  </section>
+</main>
+<dialog id="modal"><form method="dialog" class="modal-card"><div class="modal-head"><div><span class="eyebrow" id="modalEyebrow"></span><h2 id="modalTitle"></h2></div><button value="cancel" class="icon-btn" aria-label="Fechar">×</button></div><div id="modalBody" class="modal-body"></div><div class="modal-actions"><button value="cancel" class="btn">Cancelar</button><button type="button" id="modalSave" class="btn primary">Salvar</button></div></form></dialog>
+<script src="./compras-cotacoes.js?v=1"></script>
+</body></html>
