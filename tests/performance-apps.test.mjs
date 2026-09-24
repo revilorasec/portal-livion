@@ -44,3 +44,18 @@ test('o Portal trata os dois painéis como aplicativos internos separados', () =
   assert.match(portal, /'painel-executivo-nokia'/);
   assert.match(portal, /\['reparos-claro','desempenho-funcionarios','painel-executivo-nokia'\]/);
 });
+
+test('o bônus usa devolução real, exclui fórmulas e permite editar todas as regras', () => {
+  assert.match(combined, /Claro coluna AN e Nokia coluna W/);
+  assert.match(combined, /Qualquer célula com fórmula nessa coluna fica fora/);
+  assert.match(combined, /A medição não participa deste filtro/);
+  assert.match(combined, /id="bonusStartPct"/);
+  assert.match(combined, /id="bonusHighPct"/);
+  assert.match(combined, /id="bonusAddBand"/);
+  assert.match(combined, /data-field="min"/);
+  assert.match(combined, /data-field="max"/);
+  assert.match(combined, /portalBonusConfigV2/);
+  assert.match(combined, /r\.devolvido&&!r\.dataFormula&&returnMonth\(r\.dataDevolucao\)===month/);
+  assert.match(combined, /Complexidade por Part Number/);
+  assert.match(combined, /x\.levels\[pnLevel\(r,c\)\]\+\+/);
+});
