@@ -1,0 +1,2746 @@
+{
+  "groups": [
+    {
+      "id": "repair",
+      "title": "Reparo completo e garantia",
+      "summary": "Execução técnica, testes, laudos, irreparabilidade e garantia de 90 dias."
+    },
+    {
+      "id": "portal",
+      "title": "Portal de gestão fim a fim",
+      "summary": "Sistema gratuito para rastreamento, evidências, aprovações e gestão de todo o fluxo."
+    },
+    {
+      "id": "sla",
+      "title": "SLA e indicadores",
+      "summary": "Prazos nacionais e internacionais, QRR mínimo de 97% e reincidência máxima de 3%."
+    },
+    {
+      "id": "emergency",
+      "title": "Sobreaviso e emergências",
+      "summary": "Atendimento fora do expediente, fins de semana e feriados, com escala e escalonamento."
+    },
+    {
+      "id": "structure",
+      "title": "Laboratório, equipe e insumos",
+      "summary": "Toda a estrutura, pessoas, jigas, materiais, TI e continuidade por conta da Livion."
+    },
+    {
+      "id": "fiscal",
+      "title": "Fiscal e logística",
+      "summary": "Notas fiscais, prazos por UF, embalagem, romaneio e transporte sob responsabilidade contratual."
+    },
+    {
+      "id": "partners",
+      "title": "Parceiros e exterior",
+      "summary": "Gestão integral e custos de subcontratados, fabricantes e reparos internacionais."
+    },
+    {
+      "id": "quality",
+      "title": "Qualidade, relatórios e melhoria",
+      "summary": "Evidências, relatórios recorrentes, auditorias e aperfeiçoamento operacional."
+    },
+    {
+      "id": "assets",
+      "title": "Responsabilidade patrimonial",
+      "summary": "Guarda dos ativos, reposições, perdas, danos, extravios e auditoria sem aviso."
+    },
+    {
+      "id": "commercial",
+      "title": "Comercial, medição e pagamento",
+      "summary": "Preço completo, medição, faturamento, prazo de 60 dias e ausência de volume mínimo."
+    },
+    {
+      "id": "proposal",
+      "title": "Proposta e homologação",
+      "summary": "Resposta técnica, atestados recentes, organograma, fluxos e Supplier Coach."
+    },
+    {
+      "id": "penalties",
+      "title": "Penalidades e encerramento",
+      "summary": "Multas, ressarcimentos, devolução de ativos e possibilidade de rescisão."
+    }
+  ],
+  "items": [
+    {
+      "id": "1",
+      "group": "repair",
+      "text": "Reparar os equipamentos das áreas técnicas assumidas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 1,
+      "archived": false
+    },
+    {
+      "id": "2",
+      "group": "repair",
+      "text": "Ter capacidade técnica para atender todos os Part Numbers da área técnica contratada.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 2,
+      "archived": false
+    },
+    {
+      "id": "3",
+      "group": "repair",
+      "text": "Atender a operação em âmbito nacional.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 3,
+      "archived": false
+    },
+    {
+      "id": "4",
+      "group": "repair",
+      "text": "Mobilizar a operação em até 30 dias.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 4,
+      "archived": false
+    },
+    {
+      "id": "5",
+      "group": "repair",
+      "text": "Receber fisicamente os equipamentos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 5,
+      "archived": false
+    },
+    {
+      "id": "6",
+      "group": "repair",
+      "text": "Conferir os equipamentos recebidos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 6,
+      "archived": false
+    },
+    {
+      "id": "7",
+      "group": "repair",
+      "text": "Registrar o Part Number de cada unidade.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 7,
+      "archived": false
+    },
+    {
+      "id": "8",
+      "group": "repair",
+      "text": "Registrar o número de série.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 8,
+      "archived": false
+    },
+    {
+      "id": "9",
+      "group": "repair",
+      "text": "Registrar o código de barras no padrão da V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 9,
+      "archived": false
+    },
+    {
+      "id": "10",
+      "group": "repair",
+      "text": "Registrar a descrição conforme o SAP da V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 10,
+      "archived": false
+    },
+    {
+      "id": "11",
+      "group": "repair",
+      "text": "Fazer a triagem funcional das unidades recebidas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 11,
+      "archived": false
+    },
+    {
+      "id": "12",
+      "group": "repair",
+      "text": "Identificar equipamentos realmente defeituosos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 12,
+      "archived": false
+    },
+    {
+      "id": "13",
+      "group": "repair",
+      "text": "Identificar equipamentos recebidos sem defeito.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 13,
+      "archived": false
+    },
+    {
+      "id": "14",
+      "group": "repair",
+      "text": "Identificar erros nos bilhetes ou relatos de defeito.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 14,
+      "archived": false
+    },
+    {
+      "id": "15",
+      "group": "repair",
+      "text": "Diagnosticar detalhadamente o defeito.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 15,
+      "archived": false
+    },
+    {
+      "id": "16",
+      "group": "repair",
+      "text": "Realizar reparos eletrônicos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 16,
+      "archived": false
+    },
+    {
+      "id": "17",
+      "group": "repair",
+      "text": "Realizar reparos elétricos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 17,
+      "archived": false
+    },
+    {
+      "id": "18",
+      "group": "repair",
+      "text": "Realizar reparos mecânicos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 18,
+      "archived": false
+    },
+    {
+      "id": "19",
+      "group": "repair",
+      "text": "Substituir componentes e módulos defeituosos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 19,
+      "archived": false
+    },
+    {
+      "id": "20",
+      "group": "repair",
+      "text": "Fazer ajustes nas unidades.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 20,
+      "archived": false
+    },
+    {
+      "id": "21",
+      "group": "repair",
+      "text": "Recuperar circuitos impressos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 21,
+      "archived": false
+    },
+    {
+      "id": "22",
+      "group": "repair",
+      "text": "Executar reparos por software.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 22,
+      "archived": false
+    },
+    {
+      "id": "23",
+      "group": "repair",
+      "text": "Atualizar software e firmware quando necessário.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 23,
+      "archived": false
+    },
+    {
+      "id": "24",
+      "group": "repair",
+      "text": "Preservar as características elétricas, eletrônicas e mecânicas originais.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 24,
+      "archived": false
+    },
+    {
+      "id": "25",
+      "group": "repair",
+      "text": "Executar os serviços conforme os manuais dos fabricantes.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 25,
+      "archived": false
+    },
+    {
+      "id": "26",
+      "group": "repair",
+      "text": "Solicitar autorização prévia para alterações de projeto.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 26,
+      "archived": false
+    },
+    {
+      "id": "27",
+      "group": "repair",
+      "text": "Apresentar relatório técnico antes de qualquer alteração de projeto.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 27,
+      "archived": false
+    },
+    {
+      "id": "28",
+      "group": "repair",
+      "text": "Informar motivo, alteração, componentes, impactos, resultados esperados e testes.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 28,
+      "archived": false
+    },
+    {
+      "id": "29",
+      "group": "repair",
+      "text": "Limpar e higienizar interna e externamente todos os equipamentos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 29,
+      "archived": false
+    },
+    {
+      "id": "30",
+      "group": "repair",
+      "text": "Testar os equipamentos após o reparo.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 30,
+      "archived": false
+    },
+    {
+      "id": "31",
+      "group": "repair",
+      "text": "Comprovar o funcionamento após o reparo.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 31,
+      "archived": false
+    },
+    {
+      "id": "32",
+      "group": "repair",
+      "text": "Elaborar laudo técnico individual para cada reparo ou avaliação.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 32,
+      "archived": false
+    },
+    {
+      "id": "33",
+      "group": "repair",
+      "text": "Informar no laudo o defeito encontrado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 33,
+      "archived": false
+    },
+    {
+      "id": "34",
+      "group": "repair",
+      "text": "Informar no laudo o reparo executado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 34,
+      "archived": false
+    },
+    {
+      "id": "35",
+      "group": "repair",
+      "text": "Informar no laudo os componentes substituídos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 35,
+      "archived": false
+    },
+    {
+      "id": "36",
+      "group": "repair",
+      "text": "Descrever detalhadamente os testes realizados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 36,
+      "archived": false
+    },
+    {
+      "id": "37",
+      "group": "repair",
+      "text": "Disponibilizar o laudo em formato digital.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 37,
+      "archived": false
+    },
+    {
+      "id": "38",
+      "group": "repair",
+      "text": "Imprimir o laudo.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 38,
+      "archived": false
+    },
+    {
+      "id": "39",
+      "group": "repair",
+      "text": "Anexar fisicamente o laudo ao equipamento devolvido.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 39,
+      "archived": false
+    },
+    {
+      "id": "40",
+      "group": "repair",
+      "text": "Produzir registro fotográfico quando necessário.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 40,
+      "archived": false
+    },
+    {
+      "id": "41",
+      "group": "repair",
+      "text": "Garantir os reparos por no mínimo 90 dias.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 41,
+      "archived": false
+    },
+    {
+      "id": "42",
+      "group": "repair",
+      "text": "Refazer sem custo os reparos que falharem durante a garantia.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 42,
+      "archived": false
+    },
+    {
+      "id": "43",
+      "group": "repair",
+      "text": "Colocar etiqueta de identificação em cada equipamento reparado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 43,
+      "archived": false
+    },
+    {
+      "id": "44",
+      "group": "repair",
+      "text": "Informar na etiqueta o nome da contratada.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 44,
+      "archived": false
+    },
+    {
+      "id": "45",
+      "group": "repair",
+      "text": "Informar na etiqueta a data do conserto.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 45,
+      "archived": false
+    },
+    {
+      "id": "46",
+      "group": "repair",
+      "text": "Informar na etiqueta a data final da garantia.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 46,
+      "archived": false
+    },
+    {
+      "id": "47",
+      "group": "repair",
+      "text": "Elaborar laudo e relatório fotográfico para item irreparável.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 47,
+      "archived": false
+    },
+    {
+      "id": "48",
+      "group": "repair",
+      "text": "Enviar o laudo de irreparabilidade para aprovação da V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 48,
+      "archived": false
+    },
+    {
+      "id": "49",
+      "group": "repair",
+      "text": "Não devolver como irreparável antes da aprovação.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 49,
+      "archived": false
+    },
+    {
+      "id": "50",
+      "group": "repair",
+      "text": "Reparar ou repor a unidade quando o laudo for reprovado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 50,
+      "archived": false
+    },
+    {
+      "id": "51",
+      "group": "repair",
+      "text": "Pagar reparo e transporte se outro reparador comprovar que era reparável.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 51,
+      "archived": false
+    },
+    {
+      "id": "52",
+      "group": "repair",
+      "text": "Buscar componentes equivalentes para equipamentos descontinuados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 52,
+      "archived": false
+    },
+    {
+      "id": "53",
+      "group": "repair",
+      "text": "Buscar componentes no mercado secundário.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 53,
+      "archived": false
+    },
+    {
+      "id": "54",
+      "group": "repair",
+      "text": "Comprar esses componentes sem custo adicional para a V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 54,
+      "archived": false
+    },
+    {
+      "id": "55",
+      "group": "repair",
+      "text": "Solicitar autorização antes de retirar componentes de sucata.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 55,
+      "archived": false
+    },
+    {
+      "id": "56",
+      "group": "repair",
+      "text": "Registrar formalmente o equipamento usado como doador.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 56,
+      "archived": false
+    },
+    {
+      "id": "57",
+      "group": "repair",
+      "text": "Manter a caracterização da unidade doadora como scrap.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 57,
+      "archived": false
+    },
+    {
+      "id": "58",
+      "group": "repair",
+      "text": "Devolver a unidade doadora à V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 58,
+      "archived": false
+    },
+    {
+      "id": "59",
+      "group": "repair",
+      "text": "Não utilizar sucata sem autorização.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 59,
+      "archived": false
+    },
+    {
+      "id": "60",
+      "group": "portal",
+      "text": "Disponibilizar um portal ou sistema de gestão de reparos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 60,
+      "archived": false
+    },
+    {
+      "id": "61",
+      "group": "portal",
+      "text": "Fornecer o sistema sem custo adicional para a V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 61,
+      "archived": false
+    },
+    {
+      "id": "62",
+      "group": "portal",
+      "text": "Permitir acesso e consulta da V.tal ao sistema.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 62,
+      "archived": false
+    },
+    {
+      "id": "63",
+      "group": "portal",
+      "text": "Carregar a LPU e todos os Part Numbers no sistema.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 63,
+      "archived": false
+    },
+    {
+      "id": "64",
+      "group": "portal",
+      "text": "Direcionar cada PN para o laboratório responsável.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 64,
+      "archived": false
+    },
+    {
+      "id": "65",
+      "group": "portal",
+      "text": "Informar mais de um endereço de reparo quando aplicável.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 65,
+      "archived": false
+    },
+    {
+      "id": "66",
+      "group": "portal",
+      "text": "Permitir abertura e encerramento de reparos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 66,
+      "archived": false
+    },
+    {
+      "id": "67",
+      "group": "portal",
+      "text": "Registrar recebimento e coleta.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 67,
+      "archived": false
+    },
+    {
+      "id": "68",
+      "group": "portal",
+      "text": "Registrar status e andamento dos reparos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 68,
+      "archived": false
+    },
+    {
+      "id": "69",
+      "group": "portal",
+      "text": "Registrar defeitos, diagnósticos e reparos realizados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 69,
+      "archived": false
+    },
+    {
+      "id": "70",
+      "group": "portal",
+      "text": "Permitir anexar laudos técnicos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 70,
+      "archived": false
+    },
+    {
+      "id": "71",
+      "group": "portal",
+      "text": "Permitir anexar fotos e evidências de teste.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 71,
+      "archived": false
+    },
+    {
+      "id": "72",
+      "group": "portal",
+      "text": "Permitir rastreamento completo do equipamento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 72,
+      "archived": false
+    },
+    {
+      "id": "73",
+      "group": "portal",
+      "text": "Permitir validação e liberação do reparo pela V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 73,
+      "archived": false
+    },
+    {
+      "id": "74",
+      "group": "portal",
+      "text": "Permitir aprovação ou reprovação de laudos de irreparabilidade.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 74,
+      "archived": false
+    },
+    {
+      "id": "75",
+      "group": "portal",
+      "text": "Corrigir pendências quando a V.tal reprovar um laudo.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 75,
+      "archived": false
+    },
+    {
+      "id": "76",
+      "group": "portal",
+      "text": "Controlar garantia e reincidência no sistema.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 76,
+      "archived": false
+    },
+    {
+      "id": "77",
+      "group": "portal",
+      "text": "Emitir relatórios gerenciais pelo sistema.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 77,
+      "archived": false
+    },
+    {
+      "id": "78",
+      "group": "portal",
+      "text": "Disponibilizar análise dos dados de reparo.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 78,
+      "archived": false
+    },
+    {
+      "id": "79",
+      "group": "portal",
+      "text": "Fazer melhorias solicitadas pela V.tal no sistema sem custo adicional.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 79,
+      "archived": false
+    },
+    {
+      "id": "80",
+      "group": "portal",
+      "text": "Atualizar movimentações nos sistemas da V.tal quando disponibilizados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 80,
+      "archived": false
+    },
+    {
+      "id": "81",
+      "group": "portal",
+      "text": "Manter usuários, matrículas e permissões atualizados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 81,
+      "archived": false
+    },
+    {
+      "id": "82",
+      "group": "portal",
+      "text": "Remover ou atualizar acessos quando houver mudança na equipe.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 82,
+      "archived": false
+    },
+    {
+      "id": "83",
+      "group": "portal",
+      "text": "Usar acessos individuais aos sistemas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 83,
+      "archived": false
+    },
+    {
+      "id": "84",
+      "group": "sla",
+      "text": "Manter reincidência de reparos em até 3%.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 84,
+      "archived": false
+    },
+    {
+      "id": "85",
+      "group": "sla",
+      "text": "Considerar reincidência qualquer novo bilhete em até 90 dias, mesmo com defeito diferente.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 85,
+      "archived": false
+    },
+    {
+      "id": "86",
+      "group": "sla",
+      "text": "Devolver pelo menos 97% dos reparos dentro do prazo.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 86,
+      "archived": false
+    },
+    {
+      "id": "87",
+      "group": "sla",
+      "text": "Cumprir SLA nacional de 35 dias para CMT.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 87,
+      "archived": false
+    },
+    {
+      "id": "88",
+      "group": "sla",
+      "text": "Cumprir SLA nacional de 35 dias para GEREQUIP.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 88,
+      "archived": false
+    },
+    {
+      "id": "89",
+      "group": "sla",
+      "text": "Cumprir SLA nacional de 35 dias para INFRA.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 89,
+      "archived": false
+    },
+    {
+      "id": "90",
+      "group": "sla",
+      "text": "Cumprir SLA nacional de 50 dias para instrumentos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 90,
+      "archived": false
+    },
+    {
+      "id": "91",
+      "group": "sla",
+      "text": "Cumprir SLA nacional de 45 dias para TRD.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 91,
+      "archived": false
+    },
+    {
+      "id": "92",
+      "group": "sla",
+      "text": "Cumprir SLA nacional de 40 dias para TRM.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 92,
+      "archived": false
+    },
+    {
+      "id": "93",
+      "group": "sla",
+      "text": "Cumprir SLA de 120 dias para reparos no exterior.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 93,
+      "archived": false
+    },
+    {
+      "id": "94",
+      "group": "sla",
+      "text": "Aceitar alterações de indicadores, metas, pesos, prazos e procedimentos com 30 dias de antecedência.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 94,
+      "archived": false
+    },
+    {
+      "id": "95",
+      "group": "sla",
+      "text": "Seguir procedimentos, planos de ação, atas e documentos operacionais futuros.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 95,
+      "archived": false
+    },
+    {
+      "id": "96",
+      "group": "sla",
+      "text": "Adequar-se às alterações regulatórias da Anatel aplicáveis ao contrato.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 96,
+      "archived": false
+    },
+    {
+      "id": "97",
+      "group": "emergency",
+      "text": "Manter serviço de atendimento emergencial em regime de sobreaviso.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 97,
+      "archived": false
+    },
+    {
+      "id": "98",
+      "group": "emergency",
+      "text": "Atender emergências fora do horário comercial.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 98,
+      "archived": false
+    },
+    {
+      "id": "99",
+      "group": "emergency",
+      "text": "Atender emergências aos sábados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 99,
+      "archived": false
+    },
+    {
+      "id": "100",
+      "group": "emergency",
+      "text": "Atender emergências aos domingos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 100,
+      "archived": false
+    },
+    {
+      "id": "101",
+      "group": "emergency",
+      "text": "Atender emergências nos feriados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 101,
+      "archived": false
+    },
+    {
+      "id": "102",
+      "group": "emergency",
+      "text": "Estar disponível a qualquer momento quando acionada em uma emergência.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 102,
+      "archived": false
+    },
+    {
+      "id": "103",
+      "group": "emergency",
+      "text": "Manter plantonista ou responsável pelo recebimento do chamado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 103,
+      "archived": false
+    },
+    {
+      "id": "104",
+      "group": "emergency",
+      "text": "Manter responsável técnico para avaliação e direcionamento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 104,
+      "archived": false
+    },
+    {
+      "id": "105",
+      "group": "emergency",
+      "text": "Manter substituto em caso de indisponibilidade do titular.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 105,
+      "archived": false
+    },
+    {
+      "id": "106",
+      "group": "emergency",
+      "text": "Manter gestor para escalonamento dos casos críticos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 106,
+      "archived": false
+    },
+    {
+      "id": "107",
+      "group": "emergency",
+      "text": "Entregar lista atualizada dos responsáveis pelo atendimento emergencial.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 107,
+      "archived": false
+    },
+    {
+      "id": "108",
+      "group": "emergency",
+      "text": "Informar nomes, endereços e telefones desses responsáveis.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 108,
+      "archived": false
+    },
+    {
+      "id": "109",
+      "group": "emergency",
+      "text": "Apresentar escala de acionamento e recorrência de contatos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 109,
+      "archived": false
+    },
+    {
+      "id": "110",
+      "group": "emergency",
+      "text": "Apresentar os canais de atendimento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 110,
+      "archived": false
+    },
+    {
+      "id": "111",
+      "group": "emergency",
+      "text": "Apresentar o fluxo de acionamento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 111,
+      "archived": false
+    },
+    {
+      "id": "112",
+      "group": "emergency",
+      "text": "Apresentar o fluxo de escalonamento quando alguém não responder.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 112,
+      "archived": false
+    },
+    {
+      "id": "113",
+      "group": "emergency",
+      "text": "Manter responsáveis e gestores disponíveis por telefone.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 113,
+      "archived": false
+    },
+    {
+      "id": "114",
+      "group": "emergency",
+      "text": "Possuir telefonia móvel para responsáveis e gestores operacionais.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 114,
+      "archived": false
+    },
+    {
+      "id": "115",
+      "group": "structure",
+      "text": "Possuir laboratório próprio ou estrutura de reparo sob sua responsabilidade.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 115,
+      "archived": false
+    },
+    {
+      "id": "116",
+      "group": "structure",
+      "text": "Permitir homologação e auditoria dos laboratórios.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 116,
+      "archived": false
+    },
+    {
+      "id": "117",
+      "group": "structure",
+      "text": "Disponibilizar bancadas adequadas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 117,
+      "archived": false
+    },
+    {
+      "id": "118",
+      "group": "structure",
+      "text": "Disponibilizar jigas de teste compatíveis.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 118,
+      "archived": false
+    },
+    {
+      "id": "119",
+      "group": "structure",
+      "text": "Disponibilizar instrumentos de medição.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 119,
+      "archived": false
+    },
+    {
+      "id": "120",
+      "group": "structure",
+      "text": "Disponibilizar ferramentas e equipamentos necessários.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 120,
+      "archived": false
+    },
+    {
+      "id": "121",
+      "group": "structure",
+      "text": "Substituir jigas, instrumentos, ferramentas e computadores inoperantes em até 48 horas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 121,
+      "archived": false
+    },
+    {
+      "id": "122",
+      "group": "structure",
+      "text": "Fornecer todos os componentes eletrônicos necessários.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 122,
+      "archived": false
+    },
+    {
+      "id": "123",
+      "group": "structure",
+      "text": "Fornecer módulos e peças de reposição.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 123,
+      "archived": false
+    },
+    {
+      "id": "124",
+      "group": "structure",
+      "text": "Fornecer materiais de escritório e operação.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 124,
+      "archived": false
+    },
+    {
+      "id": "125",
+      "group": "structure",
+      "text": "Fornecer caixas de armazenamento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 125,
+      "archived": false
+    },
+    {
+      "id": "126",
+      "group": "structure",
+      "text": "Fornecer plástico-bolha e materiais de proteção.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 126,
+      "archived": false
+    },
+    {
+      "id": "127",
+      "group": "structure",
+      "text": "Fornecer embalagens antiestáticas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 127,
+      "archived": false
+    },
+    {
+      "id": "128",
+      "group": "structure",
+      "text": "Fornecer EPIs aos colaboradores.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 128,
+      "archived": false
+    },
+    {
+      "id": "129",
+      "group": "structure",
+      "text": "Possuir softwares devidamente licenciados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 129,
+      "archived": false
+    },
+    {
+      "id": "130",
+      "group": "structure",
+      "text": "Possuir antivírus e recursos de segurança da informação.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 130,
+      "archived": false
+    },
+    {
+      "id": "131",
+      "group": "structure",
+      "text": "Possuir computadores e equipamentos de informática próprios.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 131,
+      "archived": false
+    },
+    {
+      "id": "132",
+      "group": "structure",
+      "text": "Possuir suporte próprio de TI, interno ou contratado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 132,
+      "archived": false
+    },
+    {
+      "id": "133",
+      "group": "structure",
+      "text": "Possuir link de internet principal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 133,
+      "archived": false
+    },
+    {
+      "id": "134",
+      "group": "structure",
+      "text": "Possuir link de internet de backup.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 134,
+      "archived": false
+    },
+    {
+      "id": "135",
+      "group": "structure",
+      "text": "Manter equipe técnica devidamente qualificada.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 135,
+      "archived": false
+    },
+    {
+      "id": "136",
+      "group": "structure",
+      "text": "Manter profissionais habilitados nos conselhos aplicáveis.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 136,
+      "archived": false
+    },
+    {
+      "id": "137",
+      "group": "structure",
+      "text": "Treinar todos os profissionais envolvidos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 137,
+      "archived": false
+    },
+    {
+      "id": "138",
+      "group": "structure",
+      "text": "Manter força de trabalho suficiente para volume, qualidade e SLA.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 138,
+      "archived": false
+    },
+    {
+      "id": "139",
+      "group": "structure",
+      "text": "Disponibilizar documentos dos colaboradores quando solicitados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 139,
+      "archived": false
+    },
+    {
+      "id": "140",
+      "group": "structure",
+      "text": "Entregar documentação solicitada em até 30 dias corridos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 140,
+      "archived": false
+    },
+    {
+      "id": "141",
+      "group": "structure",
+      "text": "Divulgar normas gerais da V.tal às equipes em até 30 dias.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 141,
+      "archived": false
+    },
+    {
+      "id": "142",
+      "group": "structure",
+      "text": "Divulgar ações pontuais ou locais em até 15 dias.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 142,
+      "archived": false
+    },
+    {
+      "id": "143",
+      "group": "structure",
+      "text": "Manter organograma atualizado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 143,
+      "archived": false
+    },
+    {
+      "id": "144",
+      "group": "structure",
+      "text": "Informar os colaboradores envolvidos no contrato.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 144,
+      "archived": false
+    },
+    {
+      "id": "145",
+      "group": "fiscal",
+      "text": "Fazer o recebimento fiscal das remessas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 145,
+      "archived": false
+    },
+    {
+      "id": "146",
+      "group": "fiscal",
+      "text": "Conferir as notas fiscais de remessa.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 146,
+      "archived": false
+    },
+    {
+      "id": "147",
+      "group": "fiscal",
+      "text": "Informar divergências fiscais e operacionais.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 147,
+      "archived": false
+    },
+    {
+      "id": "148",
+      "group": "fiscal",
+      "text": "Informar divergências nas devoluções em até um dia útil.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 148,
+      "archived": false
+    },
+    {
+      "id": "149",
+      "group": "fiscal",
+      "text": "Registrar a nota fiscal de remessa vinculada ao equipamento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 149,
+      "archived": false
+    },
+    {
+      "id": "150",
+      "group": "fiscal",
+      "text": "Emitir nota fiscal de retorno de conserto.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 150,
+      "archived": false
+    },
+    {
+      "id": "151",
+      "group": "fiscal",
+      "text": "Referenciar na nota de retorno a nota fiscal de entrada.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 151,
+      "archived": false
+    },
+    {
+      "id": "152",
+      "group": "fiscal",
+      "text": "Controlar prazos fiscais das notas de remessa conforme a UF.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 152,
+      "archived": false
+    },
+    {
+      "id": "153",
+      "group": "fiscal",
+      "text": "Avisar a V.tal quando for necessária postergação fiscal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 153,
+      "archived": false
+    },
+    {
+      "id": "154",
+      "group": "fiscal",
+      "text": "Ressarcir multas fiscais causadas por falha da Livion.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 154,
+      "archived": false
+    },
+    {
+      "id": "155",
+      "group": "fiscal",
+      "text": "Emitir NF de devolução para equipamentos em comodato.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 155,
+      "archived": false
+    },
+    {
+      "id": "156",
+      "group": "fiscal",
+      "text": "Pagar impostos, taxas e seguros relacionados à atividade.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 156,
+      "archived": false
+    },
+    {
+      "id": "157",
+      "group": "fiscal",
+      "text": "Preparar os equipamentos para coleta.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 157,
+      "archived": false
+    },
+    {
+      "id": "158",
+      "group": "fiscal",
+      "text": "Utilizar embalagem adequada e proteção antiestática.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 158,
+      "archived": false
+    },
+    {
+      "id": "159",
+      "group": "fiscal",
+      "text": "Identificar externamente cada caixa.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 159,
+      "archived": false
+    },
+    {
+      "id": "160",
+      "group": "fiscal",
+      "text": "Informar na caixa o nome do reparador.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 160,
+      "archived": false
+    },
+    {
+      "id": "161",
+      "group": "fiscal",
+      "text": "Informar na caixa o número da nota fiscal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 161,
+      "archived": false
+    },
+    {
+      "id": "162",
+      "group": "fiscal",
+      "text": "Informar na caixa o CD e a UF de destino.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 162,
+      "archived": false
+    },
+    {
+      "id": "163",
+      "group": "fiscal",
+      "text": "Informar todos os códigos de barras contidos na caixa.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 163,
+      "archived": false
+    },
+    {
+      "id": "164",
+      "group": "fiscal",
+      "text": "Anexar romaneio.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 164,
+      "archived": false
+    },
+    {
+      "id": "165",
+      "group": "partners",
+      "text": "Gerenciar reparos executados por laboratórios parceiros.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 165,
+      "archived": false
+    },
+    {
+      "id": "166",
+      "group": "partners",
+      "text": "Gerenciar reparos executados por fabricantes.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 166,
+      "archived": false
+    },
+    {
+      "id": "167",
+      "group": "partners",
+      "text": "Gerenciar reparos realizados no Brasil e no exterior.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 167,
+      "archived": false
+    },
+    {
+      "id": "168",
+      "group": "partners",
+      "text": "Assumir integralmente os prazos e a qualidade dos parceiros.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 168,
+      "archived": false
+    },
+    {
+      "id": "169",
+      "group": "partners",
+      "text": "Assumir o transporte entre a Livion e os parceiros.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 169,
+      "archived": false
+    },
+    {
+      "id": "170",
+      "group": "partners",
+      "text": "Assumir o transporte entre a Livion e os fabricantes.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 170,
+      "archived": false
+    },
+    {
+      "id": "171",
+      "group": "partners",
+      "text": "Assumir os fretes de reparos internacionais.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 171,
+      "archived": false
+    },
+    {
+      "id": "172",
+      "group": "partners",
+      "text": "Assumir custos de remessa e retorno internacional.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 172,
+      "archived": false
+    },
+    {
+      "id": "173",
+      "group": "partners",
+      "text": "Assumir custos dos reparos realizados pelo fabricante.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 173,
+      "archived": false
+    },
+    {
+      "id": "174",
+      "group": "partners",
+      "text": "Apresentar documentação de representação quando o fabricante for representado por outra empresa.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 174,
+      "archived": false
+    },
+    {
+      "id": "175",
+      "group": "partners",
+      "text": "Garantir confidencialidade também por parceiros e subcontratados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 175,
+      "archived": false
+    },
+    {
+      "id": "176",
+      "group": "quality",
+      "text": "Produzir vídeos dos testes e funcionamento por amostragem.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 176,
+      "archived": false
+    },
+    {
+      "id": "177",
+      "group": "quality",
+      "text": "Manter evidências completas de pelo menos 10% do volume mensal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 177,
+      "archived": false
+    },
+    {
+      "id": "178",
+      "group": "quality",
+      "text": "Manter checklist dos reparos da amostragem.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 178,
+      "archived": false
+    },
+    {
+      "id": "179",
+      "group": "quality",
+      "text": "Manter histórico completo dos reparos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 179,
+      "archived": false
+    },
+    {
+      "id": "180",
+      "group": "quality",
+      "text": "Manter normas e especificações técnicas arquivadas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 180,
+      "archived": false
+    },
+    {
+      "id": "181",
+      "group": "quality",
+      "text": "Disponibilizar histórico e documentos para consulta da V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 181,
+      "archived": false
+    },
+    {
+      "id": "182",
+      "group": "quality",
+      "text": "Emitir relatórios diários, semanais, quinzenais, mensais ou sob demanda.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 182,
+      "archived": false
+    },
+    {
+      "id": "183",
+      "group": "quality",
+      "text": "Emitir semanalmente relatório de unidades reparadas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 183,
+      "archived": false
+    },
+    {
+      "id": "184",
+      "group": "quality",
+      "text": "Emitir semanalmente relatório de unidades irreparáveis e motivos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 184,
+      "archived": false
+    },
+    {
+      "id": "185",
+      "group": "quality",
+      "text": "Emitir semanalmente relatório de equipamentos sem defeito.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 185,
+      "archived": false
+    },
+    {
+      "id": "186",
+      "group": "quality",
+      "text": "Emitir semanalmente relatório de equipamentos em garantia.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 186,
+      "archived": false
+    },
+    {
+      "id": "187",
+      "group": "quality",
+      "text": "Emitir semanalmente relatório de reincidências e causas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 187,
+      "archived": false
+    },
+    {
+      "id": "188",
+      "group": "quality",
+      "text": "Emitir mensalmente relatório de defeitos por origem ofensora.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 188,
+      "archived": false
+    },
+    {
+      "id": "189",
+      "group": "quality",
+      "text": "Emitir mensalmente relatório por estação, filial e região.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 189,
+      "archived": false
+    },
+    {
+      "id": "190",
+      "group": "quality",
+      "text": "Emitir mensalmente relatório de equipamentos que falharam em reteste.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 190,
+      "archived": false
+    },
+    {
+      "id": "191",
+      "group": "quality",
+      "text": "Emitir mensalmente relatório dos prazos fiscais das notas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 191,
+      "archived": false
+    },
+    {
+      "id": "192",
+      "group": "quality",
+      "text": "Emitir mensalmente os indicadores de qualidade.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 192,
+      "archived": false
+    },
+    {
+      "id": "193",
+      "group": "quality",
+      "text": "Apresentar melhoria ou contingência para ofensores de garantia.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 193,
+      "archived": false
+    },
+    {
+      "id": "194",
+      "group": "quality",
+      "text": "Entregar relatórios extraordinários normalmente em até 24 horas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 194,
+      "archived": false
+    },
+    {
+      "id": "195",
+      "group": "quality",
+      "text": "Informar continuamente andamento, prazos e problemas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 195,
+      "archived": false
+    },
+    {
+      "id": "196",
+      "group": "quality",
+      "text": "Realizar reuniões internas para identificar melhorias.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 196,
+      "archived": false
+    },
+    {
+      "id": "197",
+      "group": "quality",
+      "text": "Apresentar semestralmente evidências dessas reuniões.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 197,
+      "archived": false
+    },
+    {
+      "id": "198",
+      "group": "quality",
+      "text": "Disponibilizar equipe para projetos e mapeamentos da V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 198,
+      "archived": false
+    },
+    {
+      "id": "199",
+      "group": "quality",
+      "text": "Testar novos processos e melhorias solicitadas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 199,
+      "archived": false
+    },
+    {
+      "id": "200",
+      "group": "quality",
+      "text": "Implementar melhorias operacionais indicadas pela V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 200,
+      "archived": false
+    },
+    {
+      "id": "201",
+      "group": "quality",
+      "text": "Participar de ações para redução de custos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 201,
+      "archived": false
+    },
+    {
+      "id": "202",
+      "group": "quality",
+      "text": "Aceitar discussão de revisão das tarifas quando houver redução de custos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 202,
+      "archived": false
+    },
+    {
+      "id": "203",
+      "group": "quality",
+      "text": "Apresentar documentação de qualidade e procedência dos componentes.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 203,
+      "archived": false
+    },
+    {
+      "id": "204",
+      "group": "quality",
+      "text": "Fornecer amostras para testes de conformidade sem custo.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 204,
+      "archived": false
+    },
+    {
+      "id": "205",
+      "group": "quality",
+      "text": "Substituir imediatamente materiais sem qualidade ou procedência comprovada.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 205,
+      "archived": false
+    },
+    {
+      "id": "206",
+      "group": "assets",
+      "text": "Responsabilizar-se pela guarda dos equipamentos da V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 206,
+      "archived": false
+    },
+    {
+      "id": "207",
+      "group": "assets",
+      "text": "Ressarcir danos, perdas e extravios.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 207,
+      "archived": false
+    },
+    {
+      "id": "208",
+      "group": "assets",
+      "text": "Repor equipamentos danificados por falha da Livion em até 30 dias.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 208,
+      "archived": false
+    },
+    {
+      "id": "209",
+      "group": "assets",
+      "text": "Fazer reposição por equipamento idêntico e com origem comprovada.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 209,
+      "archived": false
+    },
+    {
+      "id": "210",
+      "group": "assets",
+      "text": "Quando necessário, ressarcir pelo valor de mercado de unidade nova.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 210,
+      "archived": false
+    },
+    {
+      "id": "211",
+      "group": "assets",
+      "text": "Informar os dados das unidades fornecidas em reposição.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 211,
+      "archived": false
+    },
+    {
+      "id": "212",
+      "group": "assets",
+      "text": "Manter relação de todos os ativos da V.tal sob sua guarda.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 212,
+      "archived": false
+    },
+    {
+      "id": "213",
+      "group": "assets",
+      "text": "Informar modelo, serial e código de barras de cada ativo quando solicitado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 213,
+      "archived": false
+    },
+    {
+      "id": "214",
+      "group": "assets",
+      "text": "Responsabilizar-se pelos equipamentos e jigas em comodato.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 214,
+      "archived": false
+    },
+    {
+      "id": "215",
+      "group": "assets",
+      "text": "Usar ativos cedidos exclusivamente no contrato.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 215,
+      "archived": false
+    },
+    {
+      "id": "216",
+      "group": "assets",
+      "text": "Permitir auditorias a qualquer momento e sem aviso prévio.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 216,
+      "archived": false
+    },
+    {
+      "id": "217",
+      "group": "assets",
+      "text": "Permitir auditoria nos laboratórios.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 217,
+      "archived": false
+    },
+    {
+      "id": "218",
+      "group": "assets",
+      "text": "Permitir auditoria nos processos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 218,
+      "archived": false
+    },
+    {
+      "id": "219",
+      "group": "assets",
+      "text": "Permitir auditoria nos equipamentos e jigas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 219,
+      "archived": false
+    },
+    {
+      "id": "220",
+      "group": "assets",
+      "text": "Permitir auditoria no sistema de gestão.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 220,
+      "archived": false
+    },
+    {
+      "id": "221",
+      "group": "assets",
+      "text": "Permitir auditoria nos controles e documentos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 221,
+      "archived": false
+    },
+    {
+      "id": "222",
+      "group": "assets",
+      "text": "Manter confidencialidade sobre todas as informações da V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 222,
+      "archived": false
+    },
+    {
+      "id": "223",
+      "group": "commercial",
+      "text": "Apresentar medição mensal no modelo definido pela V.tal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 223,
+      "archived": false
+    },
+    {
+      "id": "224",
+      "group": "commercial",
+      "text": "Organizar a medição por área, PN, descrição SAP e código de barras.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 224,
+      "archived": false
+    },
+    {
+      "id": "225",
+      "group": "commercial",
+      "text": "Enviar a medição acompanhada de NFs de retorno e laudos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 225,
+      "archived": false
+    },
+    {
+      "id": "226",
+      "group": "commercial",
+      "text": "Apresentar o consolidado por volta do dia 20 de cada mês.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 226,
+      "archived": false
+    },
+    {
+      "id": "227",
+      "group": "commercial",
+      "text": "Faturar somente reparos efetivamente realizados e aceitos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 227,
+      "archived": false
+    },
+    {
+      "id": "228",
+      "group": "commercial",
+      "text": "Não cobrar por equipamentos não reparados.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 228,
+      "archived": false
+    },
+    {
+      "id": "229",
+      "group": "commercial",
+      "text": "Não cobrar pelos equipamentos classificados como irreparáveis.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 229,
+      "archived": false
+    },
+    {
+      "id": "230",
+      "group": "commercial",
+      "text": "Considerar pagamento mínimo de 60 dias após aceite da NF e documentação.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 230,
+      "archived": false
+    },
+    {
+      "id": "231",
+      "group": "commercial",
+      "text": "Incluir no preço tributos, encargos, embalagens, componentes, insumos e despesas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 231,
+      "archived": false
+    },
+    {
+      "id": "232",
+      "group": "commercial",
+      "text": "Apresentar preço unitário por área técnica.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 232,
+      "archived": false
+    },
+    {
+      "id": "233",
+      "group": "commercial",
+      "text": "Apresentar valor total considerando o volume estimado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 233,
+      "archived": false
+    },
+    {
+      "id": "234",
+      "group": "commercial",
+      "text": "Apresentar orçamento mensal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 234,
+      "archived": false
+    },
+    {
+      "id": "235",
+      "group": "commercial",
+      "text": "Apresentar orçamento para 24 meses.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 235,
+      "archived": false
+    },
+    {
+      "id": "236",
+      "group": "commercial",
+      "text": "Informar prazo de validade da proposta.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 236,
+      "archived": false
+    },
+    {
+      "id": "237",
+      "group": "commercial",
+      "text": "Informar prazos de mobilização, execução e entrega.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 237,
+      "archived": false
+    },
+    {
+      "id": "238",
+      "group": "commercial",
+      "text": "Informar eventuais lotes mínimos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 238,
+      "archived": false
+    },
+    {
+      "id": "239",
+      "group": "commercial",
+      "text": "Informar restrições logísticas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 239,
+      "archived": false
+    },
+    {
+      "id": "240",
+      "group": "commercial",
+      "text": "Informar localidades não atendidas.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 240,
+      "archived": false
+    },
+    {
+      "id": "241",
+      "group": "commercial",
+      "text": "Informar índice, periodicidade e data-base de reajuste.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 241,
+      "archived": false
+    },
+    {
+      "id": "242",
+      "group": "commercial",
+      "text": "Detalhar garantia, SLA, canais de atendimento e refazimento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 242,
+      "archived": false
+    },
+    {
+      "id": "243",
+      "group": "commercial",
+      "text": "Aceitar ausência de garantia de volume mínimo.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 243,
+      "archived": false
+    },
+    {
+      "id": "244",
+      "group": "commercial",
+      "text": "Considerar que a V.tal pode dividir áreas entre fornecedores.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 244,
+      "archived": false
+    },
+    {
+      "id": "245",
+      "group": "commercial",
+      "text": "Considerar novos PNs e tecnologias incluídos pela tarifa da área.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 245,
+      "archived": false
+    },
+    {
+      "id": "246",
+      "group": "proposal",
+      "text": "Apresentar resposta ponto a ponto de toda a ETC.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 246,
+      "archived": false
+    },
+    {
+      "id": "247",
+      "group": "proposal",
+      "text": "Apresentar dois atestados de capacidade técnica.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 247,
+      "archived": false
+    },
+    {
+      "id": "248",
+      "group": "proposal",
+      "text": "Usar atestados emitidos há no máximo dois anos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 248,
+      "archived": false
+    },
+    {
+      "id": "249",
+      "group": "proposal",
+      "text": "Comprovar experiência no escopo contratado.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 249,
+      "archived": false
+    },
+    {
+      "id": "250",
+      "group": "proposal",
+      "text": "Apresentar os recursos oferecidos para execução.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 250,
+      "archived": false
+    },
+    {
+      "id": "251",
+      "group": "proposal",
+      "text": "Apresentar organograma de atendimento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 251,
+      "archived": false
+    },
+    {
+      "id": "252",
+      "group": "proposal",
+      "text": "Apresentar fluxograma de acionamento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 252,
+      "archived": false
+    },
+    {
+      "id": "253",
+      "group": "proposal",
+      "text": "Demonstrar experiência anterior nas atividades da ETC.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 253,
+      "archived": false
+    },
+    {
+      "id": "254",
+      "group": "proposal",
+      "text": "Aderir obrigatoriamente ao Supplier Coach.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 254,
+      "archived": false
+    },
+    {
+      "id": "255",
+      "group": "proposal",
+      "text": "Pagar a mensalidade do Supplier Coach conforme a faixa de faturamento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 255,
+      "archived": false
+    },
+    {
+      "id": "256",
+      "group": "proposal",
+      "text": "Utilizar acessos pessoais e intransferíveis no Supplier Coach.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 256,
+      "archived": false
+    },
+    {
+      "id": "257",
+      "group": "proposal",
+      "text": "Concluir os módulos obrigatórios nos prazos.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 257,
+      "archived": false
+    },
+    {
+      "id": "258",
+      "group": "proposal",
+      "text": "Não compartilhar ou reproduzir conteúdos do programa.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 258,
+      "archived": false
+    },
+    {
+      "id": "259",
+      "group": "proposal",
+      "text": "Cumprir regras de conduta, sigilo e confidencialidade do programa.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 259,
+      "archived": false
+    },
+    {
+      "id": "260",
+      "group": "penalties",
+      "text": "Responder notificações de descumprimento em até cinco dias úteis.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 260,
+      "archived": false
+    },
+    {
+      "id": "261",
+      "group": "penalties",
+      "text": "Sujeitar-se a descontos e multas por descumprimento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 261,
+      "archived": false
+    },
+    {
+      "id": "262",
+      "group": "penalties",
+      "text": "Sujeitar-se a até 12% do faturamento mensal por indicadores.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 262,
+      "archived": false
+    },
+    {
+      "id": "263",
+      "group": "penalties",
+      "text": "Sujeitar-se a 5% por RNC.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 263,
+      "archived": false
+    },
+    {
+      "id": "264",
+      "group": "penalties",
+      "text": "Sujeitar-se a até 3% por IQF-RH.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 264,
+      "archived": false
+    },
+    {
+      "id": "265",
+      "group": "penalties",
+      "text": "Sujeitar-se ao total potencial de até 20% do faturamento mensal.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 265,
+      "archived": false
+    },
+    {
+      "id": "266",
+      "group": "penalties",
+      "text": "Ressarcir penalizações causadas por falhas operacionais da Livion.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 266,
+      "archived": false
+    },
+    {
+      "id": "267",
+      "group": "penalties",
+      "text": "Devolver todos os equipamentos sem custo se o serviço for encerrado por descumprimento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 267,
+      "archived": false
+    },
+    {
+      "id": "268",
+      "group": "penalties",
+      "text": "Aceitar possível rescisão a partir da segunda reincidência de descumprimento.",
+      "status": null,
+      "notes": "",
+      "owner": "",
+      "order": 268,
+      "archived": false
+    }
+  ]
+}

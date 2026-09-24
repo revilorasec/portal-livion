@@ -12,7 +12,8 @@ const APP_INSTALLERS={
   'reparos-claro':{name:'Status Reparos Claro',short:'Reparos Claro',manifest:'./manifest-reparos-claro.webmanifest',key:'reparos-claro',icon:'./assets/app-icons/reparos-claro-192.png',touch:'./assets/app-icons/reparos-claro-180.png'},
   estoque:{name:'Controle de Estoque',short:'Estoque Livion',manifest:'./manifest-estoque.webmanifest',key:'estoque',icon:'./assets/app-icons/estoque-192.png',touch:'./assets/app-icons/estoque-180.png'},
   'compras-cotacoes':{name:'Compras e Cotações',short:'Compras Livion',manifest:'./manifest-compras-cotacoes.webmanifest',key:'compras-cotacoes',icon:'./assets/app-icons/compras-cotacoes-192.png',touch:'./assets/app-icons/compras-cotacoes-180.png'},
-  'despesas-reembolsos':{name:'Despesas e Reembolsos',short:'Despesas Livion',manifest:'./manifest-despesas-reembolsos.webmanifest',key:'despesas-reembolsos',icon:'./assets/app-icons/despesas-reembolsos-192.png',touch:'./assets/app-icons/despesas-reembolsos-180.png'}
+  'despesas-reembolsos':{name:'Despesas e Reembolsos',short:'Despesas Livion',manifest:'./manifest-despesas-reembolsos.webmanifest',key:'despesas-reembolsos',icon:'./assets/app-icons/despesas-reembolsos-192.png',touch:'./assets/app-icons/despesas-reembolsos-180.png'},
+  vtal:{name:'V.Tal',short:'V.Tal Livion',manifest:'./manifest-vtal.webmanifest',key:'vtal',icon:'./assets/icons/livion-192.png',touch:'./assets/icons/livion-180.png'}
 };
 const requested=new URLSearchParams(location.search).get('app')||'';
 const selected=APP_INSTALLERS[requested]||APP_INSTALLERS.rh;

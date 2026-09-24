@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1733">
+<title>V.Tal · Portal Livion</title>
+<link rel="stylesheet" href="./vtal.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div><span class="eyebrow">PROPOSTAS &amp; REQUISITOS</span><h1>Checklist V.Tal</h1><p>RFP de reparo de sobressalentes e instrumentais de telecomunicações</p></div>
+  <div class="top-actions"><button id="exportBtn" class="btn">Exportar CSV</button><button id="reloadBtn" class="btn">Atualizar</button></div>
+</header>
+<main>
+  <section id="loading" class="panel loading">Carregando os requisitos…</section>
+  <div id="app" class="hidden">
+    <section id="metrics" class="metrics" aria-label="Resumo do checklist"></section>
+    <section class="panel filters">
+      <label>Pesquisar<input id="search" type="search" placeholder="ID, requisito, responsável ou observação"></label>
+      <label>Categoria<select id="groupFilter"></select></label>
+      <label>Classificação<select id="statusFilter"></select></label>
+      <label class="check"><input id="archivedFilter" type="checkbox"> Mostrar arquivados</label>
+    </section>
+    <section class="list-head"><div><b id="resultCount"></b><span id="updatedAt"></span></div><button id="newBtn" class="btn primary">Novo requisito</button></section>
+    <section id="list" class="requirements"></section>
+  </div>
+</main>
+<div id="flash" class="flash hidden"></div>
+<dialog id="editor">
+  <form class="editor-card" id="editorForm">
+    <header><div><span class="eyebrow">REQUISITO</span><h2 id="editorTitle">Editar requisito</h2></div><button id="closeEditor" type="button" class="close" aria-label="Fechar">×</button></header>
+    <label>Categoria<select id="editGroup" required></select></label>
+    <label>Descrição<textarea id="editText" rows="5" maxlength="4000" required></textarea></label>
+    <div class="two"><label>Classificação<select id="editStatus"></select></label><label>Responsável<input id="editOwner" maxlength="160"></label></div>
+    <label>Observações<textarea id="editNotes" rows="5" maxlength="8000"></textarea></label>
+    <label class="check"><input id="editArchived" type="checkbox"> Arquivar este requisito</label>
+    <footer><button id="cancelEditor" type="button" class="btn">Cancelar</button><button id="saveBtn" type="submit" class="btn primary">Salvar</button></footer>
+  </form>
+</dialog>
+<script src="./vtal.js?v=1"></script>
+</body>
+</html>
