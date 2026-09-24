@@ -13,7 +13,7 @@ test('publica os dois HTMLs sem incorporar dados internos', () => {
   assert.doesNotMatch(combined, /AKfy/);
   assert.doesNotMatch(nokia, /AKfy/);
   assert.match(combined, /Desempenho técnico consolidado/);
-  assert.match(nokia, /Painel Executivo Nokia/);
+  assert.match(nokia, /Desempenho Técnico Nokia/);
 });
 
 test('consulta o serviço autenticado ao abrir e a cada 30 segundos', () => {

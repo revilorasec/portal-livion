@@ -92,6 +92,7 @@ function buildCombined() {
 
 function buildNokia() {
   let html = stripSnapshot(fs.readFileSync(path.join(sourceRoot, 'Painel_Executivo_NOKIA.html'), 'utf8'));
+  html = html.replaceAll('Painel Executivo Nokia', 'Desempenho Técnico Nokia');
   html = html.replaceAll('nokiaActiveTechs', 'portalNokiaActiveTechsV2');
   html = replaceOnce(html, '</style>\n</head>', presentationCss + '</style>\n</head>', 'CSS Nokia');
   html = replaceOnce(html, '<span id="sourceStatus" class="status-pill">Snapshot local</span><button class="btn secondary small" id="settingsBtn">Configurar</button><button class="btn small" id="refreshBtn">Atualizar informações</button>', '<span id="sourceStatus" class="status-pill">Conectando ao Portal</span><span id="presentationStatus" class="presentation-status"></span><button class="btn secondary small" id="presentationBtn">Apresentação</button><button class="btn small" id="refreshBtn">Atualizar informações</button>', 'ações Nokia');
