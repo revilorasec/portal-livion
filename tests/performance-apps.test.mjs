@@ -32,10 +32,12 @@ test('os dois painéis oferecem apresentação seletiva com proteção financeir
     assert.match(html, /id="presentationBtn"/);
     assert.match(html, /id="presentationNames"/);
     assert.match(html, /id="presentationHideAll"/);
-    assert.match(html, /Todos os valores em reais serão ocultados/);
-    assert.match(html, /presentationMode\?'Valor oculto'/);
     assert.match(html, /function presentationName\(name\)/);
   }
+  assert.match(combined, /os valores da aba Bônus por devolução continuarão visíveis/);
+  assert.match(combined, /presentationMode&&!document\.querySelector\('#tab-bonus\.active'\)\?'Valor oculto'/);
+  assert.match(nokia, /Todos os valores em reais serão ocultados/);
+  assert.match(nokia, /presentationMode\?'Valor oculto'/);
   assert.match(nokia, /safe\[key\]='Oculto'/);
 });
 
@@ -58,4 +60,9 @@ test('o bônus usa devolução real, exclui fórmulas e permite editar todas as 
   assert.match(combined, /r\.devolvido&&!r\.dataFormula&&returnMonth\(r\.dataDevolucao\)===month/);
   assert.match(combined, /Complexidade por Part Number/);
   assert.match(combined, /x\.levels\[pnLevel\(r,c\)\]\+\+/);
+});
+
+test('o modo apresentação mantém os valores do bônus visíveis', () => {
+  assert.match(combined, /presentationMode&&!document\.querySelector\('#tab-bonus\.active'\)\?'Valor oculto'/);
+  assert.match(combined, /next=parent\.closest\('#tab-bonus'\)\?value:value\.replace/);
 });
