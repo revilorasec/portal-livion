@@ -16,7 +16,7 @@ test('publica a versão 8 do estoque com recursos v18 atualizados', () => {
   assert.match(html, /estoque-assets-v18\.css\?v=5/);
   assert.match(html, /estoque-assets-v18\.js\?v=4/);
   assert.match(html, /estoque-invoice-receipt\.js\?v=1/);
-  assert.match(serviceWorker, /portal-livion-v46/);
+  assert.match(serviceWorker, /portal-livion-v47/);
   assert.match(serviceWorker, /estoque-assets-v18-core\.js\?v=5/);
   assert.match(serviceWorker, /estoque-invoice-receipt\.js\?v=1/);
   assert.match(versions, /estoque\.html\?v=8/);
