@@ -66,3 +66,10 @@ test('o modo apresentação mantém os valores do bônus visíveis', () => {
   assert.match(combined, /presentationMode&&!document\.querySelector\('#tab-bonus\.active'\)\?'Valor oculto'/);
   assert.match(combined, /next=parent\.closest\('#tab-bonus'\)\?value:value\.replace/);
 });
+
+test('zero desativa percentuais e complexidade sem zerar o bônus', () => {
+  assert.match(combined, /function bonusTier\(c,repairability\).*c\.startPct>0.*c\.highPct>0.*return'standard'/);
+  assert.match(combined, /function bonusMultiplier\(c,level\).*return value>0\?value:1/);
+  assert.match(combined, /band\[tier\]\*bonusMultiplier\(c,pnLevel\(r,c\)\)/);
+  assert.match(combined, /deixe-os em 0: o app usará o valor padrão da faixa e multiplicador 1,00/);
+});
