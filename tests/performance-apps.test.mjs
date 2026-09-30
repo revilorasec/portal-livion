@@ -73,3 +73,20 @@ test('zero desativa percentuais e complexidade sem zerar o bônus', () => {
   assert.match(combined, /band\[tier\]\*bonusMultiplier\(c,pnLevel\(r,c\)\)/);
   assert.match(combined, /deixe-os em 0: o app usará o valor padrão da faixa e multiplicador 1,00/);
 });
+
+test('comparativo mensal permite escolher técnicos, período e métrica', () => {
+  assert.match(combined, /id="bonusTrendTechs"/);
+  assert.match(combined, /id="bonusTrendMonths"[^>]+value="10"/);
+  assert.match(combined, /id="bonusTrendMetric"/);
+  assert.match(combined, /value="repairability">Reparabilidade/);
+  assert.match(combined, /value="bonus">Valor recebido/);
+  assert.match(combined, /value="repaired">Peças reparadas/);
+  assert.match(combined, /function bonusMonthSequence\(end,count\)/);
+  assert.match(combined, /function calculateBonusMonth\(month/);
+  assert.match(combined, /chart\('bonusTrendChart'/);
+  assert.match(combined, /Médias do período/);
+  assert.match(combined, /Média mensal recebida/);
+  assert.match(combined, /Média mensal reparadas/);
+  assert.match(combined, /Média da reparabilidade/);
+  assert.match(combined, /id="bonusTrendTable"/);
+});
