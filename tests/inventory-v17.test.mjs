@@ -13,7 +13,7 @@ const versionCatalogSql = readFileSync(new URL('../Scripts/update-portal-app-ver
 test('carrega os recursos v17 depois do painel v16', () => {
   assert.ok(html.indexOf('estoque-dashboard-v16.js') < html.indexOf('estoque-assets-v17.js'));
   assert.match(html, /estoque-assets-v17\.css/);
-  assert.match(serviceWorker, /portal-livion-v47/);
+  assert.match(serviceWorker, /portal-livion-v48/);
   assert.match(html, /estoque-assets-v17\.js\?v=18/);
   assert.match(serviceWorker, /estoque-assets-v17\.js\?v=18/);
 });
@@ -24,9 +24,9 @@ test('portal e aplicativo exibem versões identificáveis', () => {
   assert.match(portal, /id="workspaceVersion"/);
   assert.match(portal, /class="app-card-version"/);
   assert.match(portal, /function stampFrameVersion/);
-  assert.match(html, /data-app-version="8"/);
-  assert.match(html, /class="app-release">v8/);
-  assert.match(versionCatalogSql, /estoque\.html\?v=8/);
+  assert.match(html, /data-app-version="9"/);
+  assert.match(html, /class="app-release">v9/);
+  assert.match(versionCatalogSql, /estoque\.html\?v=9/);
   assert.match(versionCatalogSql, /where key in/);
 });
 
@@ -64,8 +64,8 @@ test('migração protege tabelas novas com RLS e preserva relações históricas
   assert.match(migration, /on conflict \(product_id, supplier_id\) do update/);
 });
 
-test('API v20 expõe peças no bootstrap e mantém fotos privadas assinadas', () => {
-  assert.match(api, /version:20/);
+test('API v21 expõe peças no bootstrap e mantém fotos privadas assinadas', () => {
+  assert.match(api, /version:21/);
   assert.match(api, /data\.parts=parts/);
   assert.match(api, /mediaMap\('PART'/);
   assert.match(api, /createSignedUrl/);
