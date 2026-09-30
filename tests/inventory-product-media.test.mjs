@@ -17,6 +17,16 @@ test('as quatro fotos têm finalidade identificada e oferecem câmera ou galeria
   assert.match(css, /product-current-photo-grid/);
 });
 
+test('câmera funciona dentro do portal e reduz a foto antes do envio', () => {
+  assert.match(frontend, /navigator\.mediaDevices\?\.getUserMedia/);
+  assert.match(frontend, /facingMode: \{ideal: 'environment'\}/);
+  assert.match(frontend, /videoWidth/);
+  assert.match(frontend, /canvas\.toBlob\(resolve, 'image\/jpeg', \.82\)/);
+  assert.match(frontend, /compressPhoto\(selected\)/);
+  assert.match(frontend, /product-photo-preview/);
+  assert.doesNotMatch(frontend, /OneDrive/i);
+});
+
 test('produto aceita vários documentos e permite remover cada arquivo pelo x', () => {
   assert.match(frontend, /type="file" multiple/);
   assert.match(frontend, /datasheets, manuais, certificados/);
@@ -37,6 +47,6 @@ test('arquivos ficam em armazenamento privado com metadados e auditoria', () => 
 });
 
 test('a versão publicada carrega o novo recurso', () => {
-  assert.match(html, /estoque-product-media\.js\?v=1/);
-  assert.match(html, /data-app-version="9"/);
+  assert.match(html, /estoque-product-media\.js\?v=2/);
+  assert.match(html, /data-app-version="10"/);
 });

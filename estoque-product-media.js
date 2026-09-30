@@ -7,6 +7,89 @@
     ['Detalhes — conexões e acabamento', 'Foto aproximada de conectores, pinos, terminais, encaixes, furos ou textura do material.']
   ];
   let productMediaState = null;
+  let activeCamera = null;
+
+  function stopCamera() {
+    activeCamera?.getTracks?.().forEach(track => track.stop());
+    activeCamera = null;
+    document.querySelector('.product-camera-backdrop')?.remove();
+  }
+
+  function photoFile(input) {
+    return input?._capturedFile || input?.files?.[0] || null;
+  }
+
+  async function compressPhoto(file) {
+    if (!file || !String(file.type || '').startsWith('image/')) throw new Error('Selecione uma imagem válida.');
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file, {resizeWidth: 1600, resizeQuality: 'high'});
+    } catch {
+      return file;
+    }
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext('2d', {alpha: false}).drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .82));
+    if (!blob) return file;
+    const base = String(file.name || 'foto').replace(/\.[^.]+$/, '').slice(0, 90) || 'foto';
+    return new File([blob], `${base}.jpg`, {type: 'image/jpeg', lastModified: Date.now()});
+  }
+
+  function showSelectedPhoto(input, file) {
+    const number = String(input.id || '').replace(/\D/g, '');
+    const status = $('productPhotoStatus' + number), preview = $('productPhotoPreview' + number);
+    if (status) status.textContent = file ? `${file.name} · pronta para salvar` : 'Nenhuma foto selecionada';
+    if (!preview) return;
+    if (preview.dataset.objectUrl) URL.revokeObjectURL(preview.dataset.objectUrl);
+    if (!file) { preview.removeAttribute('src'); preview.classList.add('hidden'); return; }
+    const url = URL.createObjectURL(file);
+    preview.dataset.objectUrl = url;
+    preview.src = url;
+    preview.classList.remove('hidden');
+  }
+
+  async function openCamera(input, title) {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      input.setAttribute('capture', 'environment');
+      input.click();
+      return;
+    }
+    stopCamera();
+    const backdrop = document.createElement('div');
+    backdrop.className = 'product-camera-backdrop';
+    backdrop.innerHTML = `<section class="product-camera"><header><div><b>${esc(title)}</b><small>Centralize o item e mantenha a câmera firme.</small></div><button type="button" data-camera-close aria-label="Fechar">×</button></header><video autoplay playsinline muted></video><div class="product-camera-actions"><button type="button" class="btn" data-camera-cancel>Cancelar</button><button type="button" class="btn primary" data-camera-shot>📷 Capturar foto</button></div></section>`;
+    document.body.appendChild(backdrop);
+    const close = () => stopCamera();
+    backdrop.querySelector('[data-camera-close]').onclick = close;
+    backdrop.querySelector('[data-camera-cancel]').onclick = close;
+    backdrop.onclick = event => { if (event.target === backdrop) close(); };
+    try {
+      activeCamera = await navigator.mediaDevices.getUserMedia({audio: false, video: {facingMode: {ideal: 'environment'}, width: {ideal: 1280, max: 1920}, height: {ideal: 720, max: 1080}}});
+      const video = backdrop.querySelector('video');
+      video.srcObject = activeCamera;
+      await video.play();
+      backdrop.querySelector('[data-camera-shot]').onclick = async () => {
+        const maxSide = 1600, scale = Math.min(1, maxSide / Math.max(video.videoWidth, video.videoHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+        canvas.getContext('2d', {alpha: false}).drawImage(video, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .82));
+        if (!blob) return alert('Não foi possível gerar a foto. Tente novamente.');
+        input._capturedFile = new File([blob], `foto-${Date.now()}.jpg`, {type: 'image/jpeg', lastModified: Date.now()});
+        input.value = '';
+        showSelectedPhoto(input, input._capturedFile);
+        close();
+      };
+    } catch {
+      close();
+      alert('Não foi possível abrir a câmera. Verifique a permissão do navegador ou use “Escolher da galeria”.');
+    }
+  }
 
   function formatBytes(bytes) {
     const value = Number(bytes || 0);
@@ -62,14 +145,14 @@
       if (label) label.innerHTML = `<b>${index + 1}. ${esc(title)}</b><small>${esc(description)}</small>`;
       const actions = document.createElement('div');
       actions.className = 'product-photo-actions';
-      actions.innerHTML = `<button type="button" class="btn" data-photo-camera="${index + 1}">📷 Tirar foto</button><button type="button" class="btn" data-photo-gallery="${index + 1}">▧ Escolher da galeria</button><span id="productPhotoStatus${index + 1}">${product['photo_url' + (index ? '_' + (index + 1) : '')] ? 'Foto atual cadastrada' : 'Nenhuma foto selecionada'}</span>`;
+      actions.innerHTML = `<button type="button" class="btn" data-photo-camera="${index + 1}">📷 Tirar foto</button><button type="button" class="btn" data-photo-gallery="${index + 1}">▧ Escolher da galeria</button><span id="productPhotoStatus${index + 1}">${product['photo_url' + (index ? '_' + (index + 1) : '')] ? 'Foto atual cadastrada' : 'Nenhuma foto selecionada'}</span><img id="productPhotoPreview${index + 1}" class="product-photo-preview hidden" alt="Prévia da foto ${index + 1}">`;
       input.after(actions);
-      actions.querySelector('[data-photo-camera]').onclick = () => { input.setAttribute('capture', 'environment'); input.click(); };
-      actions.querySelector('[data-photo-gallery]').onclick = () => { input.removeAttribute('capture'); input.click(); };
+      actions.querySelector('[data-photo-camera]').onclick = () => openCamera(input, `${index + 1}. ${title}`);
+      actions.querySelector('[data-photo-gallery]').onclick = () => { input._capturedFile = null; input.removeAttribute('capture'); input.click(); };
       input.onchange = () => {
         input.removeAttribute('capture');
-        const status = $('productPhotoStatus' + (index + 1));
-        if (status) status.textContent = input.files?.[0]?.name || 'Nenhuma foto selecionada';
+        input._capturedFile = null;
+        showSelectedPhoto(input, input.files?.[0] || null);
       };
     });
 
@@ -123,8 +206,25 @@
     return result;
   };
 
+  uploadPhotos = async function (type, id, prefix, count) {
+    for (let index = 1; index <= count; index++) {
+      const input = $(prefix + index), selected = photoFile(input);
+      if (!selected) continue;
+      const file = await compressPhoto(selected);
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error('Não foi possível preparar a foto. Use JPG, PNG ou WebP.');
+      const form = new FormData();
+      form.append('file', file);
+      await api(`/media?entity_type=${type}&entity_id=${encodeURIComponent(id)}&position=${index}`, {method: 'POST', body: form});
+    }
+  };
+
   const closeModalBase = closeModal;
-  closeModal = function () { productMediaState = null; closeModalBase(); };
+  closeModal = function () {
+    stopCamera();
+    document.querySelectorAll('.product-photo-preview[data-object-url]').forEach(image => URL.revokeObjectURL(image.dataset.objectUrl));
+    productMediaState = null;
+    closeModalBase();
+  };
 
   const openProductBase = openProduct;
   openProduct = function (product = {}) {
