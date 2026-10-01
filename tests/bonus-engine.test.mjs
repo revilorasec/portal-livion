@@ -15,7 +15,21 @@ const config=()=>Engine.migrateConfig({
 test('migra multiplicadores e classificações existentes sem perder os PNs',()=>{
   const migrated=Engine.migrateConfig({startPct:70,highPct:80,multipliers:[1,1.25,1.5],bands:[{min:0,max:60,standard:0,high:0},{min:61,max:null,standard:2.5,high:3}],pnLevels:{'Claro|ABC':2}});
   assert.equal(migrated.mediumPct,25);assert.equal(migrated.highComplexityPct,50);
-  assert.deepEqual(migrated.pnLevels,{'Claro|ABC':2});assert.equal(migrated.bands[1].baseLow,2.5);assert.equal(migrated.version,4);
+  assert.deepEqual(migrated.pnLevels,{ABC:2});assert.equal(migrated.bands[1].baseLow,2.5);assert.equal(migrated.version,5);
+});
+
+test('normaliza o PN e usa uma classificação única para Claro e Nokia',()=>{
+  assert.equal(Engine.canonicalPn('241.119.105'),'241119105');
+  assert.equal(Engine.canonicalPn('241119.105'),'241119105');
+  const c=config();c.pnLevels['241119105']=2;
+  const rows=[row('ANA','REPARADO','241.119.105','Claro'),row('ANA','REPARADO','241119105','Nokia')];
+  const [result]=Engine.calculateMonth(rows,'2026-05',c,{returnMonth:month});
+  assert.deepEqual(result.levels,[0,0,2]);assert.equal(result.partNumbers.length,1);assert.deepEqual(result.partNumbers[0].clientes.sort(),['Claro','Nokia']);assert.equal(result.bonus,8);
+});
+
+test('conflito antigo entre clientes volta para não classificado',()=>{
+  const migrated=Engine.migrateConfig({pnLevels:{'Claro|241.119.105':0,'Nokia|241119105':2}});
+  assert.equal(migrated.pnLevels['241119105'],undefined);
 });
 
 test('calcula Baixa Média e Alta a partir de uma única base por faixa',()=>{

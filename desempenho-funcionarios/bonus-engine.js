@@ -9,10 +9,11 @@
   const roundMoney=value=>Math.round((Number(value)||0)*100+Number.EPSILON)/100;
   const finite=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
   const clone=value=>JSON.parse(JSON.stringify(value));
+  const canonicalPn=value=>String(value??'').normalize('NFKC').toUpperCase().replace(/[^A-Z0-9]/g,'');
 
   function defaults(){
     return {
-      version:4,
+      version:5,
       mediumPct:25,
       highComplexityPct:50,
       bands:[
@@ -39,12 +40,19 @@
       baseLow:Math.max(0,finite(band.baseLow??band.baseStandard??band.standard??band.base??band.baseHigh??band.high,0))
     })).sort((a,b)=>a.min-b.min);
     if(bands.length)bands[0].baseLow=0;
+    const pnLevels={},pnConflicts=new Set();
+    for(const [storedKey,storedLevel] of Object.entries(source.pnLevels&&typeof source.pnLevels==='object'&&!Array.isArray(source.pnLevels)?source.pnLevels:{})){
+      const key=canonicalPn(String(storedKey).includes('|')?String(storedKey).split('|').at(-1):storedKey),level=Number(storedLevel);
+      if(!key||![0,1,2].includes(level)||pnConflicts.has(key))continue;
+      if(Object.prototype.hasOwnProperty.call(pnLevels,key)&&pnLevels[key]!==level){delete pnLevels[key];pnConflicts.add(key)}
+      else pnLevels[key]=level;
+    }
     return {
-      version:4,
+      version:5,
       mediumPct:Math.max(0,finite(mediumPct,base.mediumPct)),
       highComplexityPct:Math.max(0,finite(highComplexityPct,base.highComplexityPct)),
       bands,
-      pnLevels:source.pnLevels&&typeof source.pnLevels==='object'&&!Array.isArray(source.pnLevels)?source.pnLevels:{},
+      pnLevels,
       technicians:source.technicians&&typeof source.technicians==='object'&&!Array.isArray(source.technicians)?source.technicians:{}
     };
   }
@@ -70,7 +78,7 @@
 
   const techIsActive=(config,name)=>config.technicians?.[name]!=='inactive';
   function levelFor(row,config){
-    const key=`${row.cliente}|${row.partNumber}`;
+    const key=canonicalPn(row.partNumber);
     const value=config.pnLevels?.[key];
     return [0,1,2].includes(Number(value))?Number(value):null;
   }
@@ -108,8 +116,10 @@
       const active=techIsActive(config,group.name);
       const pnMap=new Map();
       for(const row of group.repairedRows){
-        const key=`${row.cliente}|${row.partNumber}`,level=levelFor(row,config),entry=pnMap.get(key)||{key,partNumber:row.partNumber,cliente:row.cliente,descricao:row.descricao||'',quantity:0,level,unitRate:0,subtotal:0};
+        const key=canonicalPn(row.partNumber),level=levelFor(row,config),entry=pnMap.get(key)||{key,partNumber:key,clientes:[],descricao:row.descricao||'',quantity:0,level,unitRate:0,subtotal:0};
         entry.quantity++;
+        if(row.cliente&&!entry.clientes.includes(row.cliente))entry.clientes.push(row.cliente);
+        if(!entry.descricao&&row.descricao)entry.descricao=row.descricao;
         pnMap.set(key,entry);
       }
       const reasons=[];
@@ -134,5 +144,5 @@
     });
   }
 
-  return {LEVELS,LEVEL_LABELS,roundMoney,defaults,migrateConfig,validateConfig,techIsActive,levelFor,unitRate,calculateMonth};
+  return {LEVELS,LEVEL_LABELS,roundMoney,canonicalPn,defaults,migrateConfig,validateConfig,techIsActive,levelFor,unitRate,calculateMonth};
 });

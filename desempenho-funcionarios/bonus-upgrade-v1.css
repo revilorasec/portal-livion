@@ -13,6 +13,7 @@
 .bonus-link{border:0;background:none;color:#174f91;font:inherit;font-weight:800;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:3px}
 .bonus-link:hover{color:#0b6bc7}
 .bonus-filter-grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;align-items:end;margin:12px 0}
+.bonus-filter-grid-pn{grid-template-columns:minmax(280px,1.5fr) minmax(180px,.7fr) minmax(210px,.8fr)}
 .bonus-filter-grid .checkline{display:flex;align-items:center;gap:7px;min-height:40px}
 .bonus-pn-admin table{min-width:920px}.bonus-pn-admin .tablewrap{max-height:none;overflow:auto}
 .status-pill{display:inline-flex;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:800}.status-pill.active{background:#def7ec;color:#076b4d}.status-pill.inactive{background:#f2f4f7;color:#667085}.status-pill.missing{background:#fff1d6;color:#8a4b00}

@@ -128,5 +128,8 @@ test('configuração compartilhada usa endpoint administrativo e revisão otimis
   assert.match(desempenhoService, /Somente administradores alteram as regras do bônus/);
   assert.match(desempenhoService, /saveBonusSettings/);
   assert.match(bonusUpgrade, /settingsRevision/);
-  assert.match(bonusUpgrade, /portalBonusConfigV4/);
+  assert.match(bonusUpgrade, /portalBonusConfigV5/);
+  assert.match(bonusEngine, /canonicalPn/);
+  assert.match(bonusUpgrade, /Part Number normalizado/);
+  assert.doesNotMatch(bonusUpgrade, /id="complexityClient"/);
 });
