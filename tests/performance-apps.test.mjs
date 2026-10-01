@@ -6,6 +6,9 @@ import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..');
 const combined = readFileSync(path.join(root, 'desempenho-funcionarios', 'index.html'), 'utf8');
 const nokia = readFileSync(path.join(root, 'painel-executivo-nokia', 'index.html'), 'utf8');
+const bonusUpgrade = readFileSync(path.join(root, 'desempenho-funcionarios', 'bonus-upgrade-v1.js'), 'utf8');
+const bonusEngine = readFileSync(path.join(root, 'desempenho-funcionarios', 'bonus-engine.js'), 'utf8');
+const desempenhoService = readFileSync(path.join(root, 'supabase', 'functions', 'desempenho-api', 'service.mjs'), 'utf8');
 
 test('publica os dois HTMLs sem incorporar dados internos', () => {
   assert.match(combined, /const SNAPSHOT=\[\]/);
@@ -50,7 +53,7 @@ test('o Portal trata os dois painéis como aplicativos internos separados', () =
 test('o bônus usa devolução real, exclui fórmulas e permite editar todas as regras', () => {
   assert.match(combined, /Claro coluna AN e Nokia coluna W/);
   assert.match(combined, /Qualquer célula com fórmula nessa coluna fica fora/);
-  assert.match(combined, /A medição não participa deste filtro/);
+  assert.doesNotMatch(combined, /A medição não participa deste filtro/);
   assert.match(combined, /id="bonusStartPct"/);
   assert.match(combined, /id="bonusHighPct"/);
   assert.match(combined, /id="bonusAddBand"/);
@@ -60,6 +63,16 @@ test('o bônus usa devolução real, exclui fórmulas e permite editar todas as 
   assert.match(combined, /r\.devolvido&&!r\.dataFormula&&returnMonth\(r\.dataDevolucao\)===month/);
   assert.match(combined, /Complexidade por Part Number/);
   assert.match(combined, /x\.levels\[pnLevel\(r,c\)\]\+\+/);
+});
+
+test('o painel consolidado filtra somente devoluções reais pelo mês de devolução', () => {
+  assert.match(combined, /id="fReturnMonth"/);
+  assert.match(combined, /Todos os meses de devolução/);
+  assert.doesNotMatch(combined, /id="fMeasurement"/);
+  assert.doesNotMatch(combined, /Todas as medições/);
+  assert.match(combined, /function isReturned\(r\)\{return r\.devolvido&&!r\.dataFormula&&Boolean\(returnMonth\(r\.dataDevolucao\)\)\}/);
+  assert.match(combined, /returnMonth\(r\.dataDevolucao\)===v\.returnMonth/);
+  assert.match(combined, /F=RAW\.filter\(r=>match\(r,v\)\)/);
 });
 
 test('o modo apresentação mantém os valores do bônus visíveis', () => {
@@ -89,4 +102,27 @@ test('comparativo mensal permite escolher técnicos, período e métrica', () =>
   assert.match(combined, /Média mensal reparadas/);
   assert.match(combined, /Média da reparabilidade/);
   assert.match(combined, /id="bonusTrendTable"/);
+});
+
+test('upgrade financeiro centraliza cálculo, auditoria, filtros e múltiplas métricas', () => {
+  assert.match(combined, /bonus-engine\.js/);
+  assert.match(combined, /bonus-upgrade-v1\.js/);
+  assert.match(bonusEngine, /function calculateMonth\(/);
+  assert.match(bonusEngine, /Part Number sem classificação/);
+  assert.match(bonusUpgrade, /Complexidade por PN/);
+  assert.match(bonusUpgrade, /data-bonus-detail/);
+  assert.match(bonusUpgrade, /Auditoria do bônus/);
+  assert.match(bonusUpgrade, /selectedTechs:activeTechs/);
+  assert.match(bonusUpgrade, /bonusTrendMetrics/);
+  assert.match(bonusUpgrade, /bonusTrendMetric-/);
+  assert.match(bonusUpgrade, /Incluir inativos no histórico/);
+  assert.match(bonusUpgrade, /Faixa 0 — Sem pagamento de bônus/);
+});
+
+test('configuração compartilhada usa endpoint administrativo e revisão otimista', () => {
+  assert.match(desempenhoService, /\/bonus-settings/);
+  assert.match(desempenhoService, /Somente administradores alteram as regras do bônus/);
+  assert.match(desempenhoService, /saveBonusSettings/);
+  assert.match(bonusUpgrade, /settingsRevision/);
+  assert.match(bonusUpgrade, /portalBonusConfigV3/);
 });

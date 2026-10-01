@@ -30,7 +30,7 @@ export function createService(deps){
   if(origin&&!ORIGINS.has(origin))throw new ApiError(403,'Origem não autorizada.');
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers:headers(origin)});
   const path=new URL(req.url).pathname.replace(/^.*\/desempenho-api/,'');
-  if(!['/data','/access','/panel-data'].includes(path)||!['GET','PUT'].includes(req.method)||((path==='/data'||path==='/panel-data')&&req.method!=='GET'))throw new ApiError(405,'Operação não permitida.');
+  if(!['/data','/access','/panel-data','/bonus-settings'].includes(path)||!['GET','PUT'].includes(req.method)||((path==='/data'||path==='/panel-data')&&req.method!=='GET'))throw new ApiError(405,'Operação não permitida.');
   const raw=req.headers.get('authorization')||'';if(!raw.startsWith('Bearer '))throw new ApiError(401,'Sessão necessária.');
   const token=raw.slice(7);validateClaims(decodeClaims(token));
   // Microsoft Graph validates the token cryptographically; decoded claims are only additional constraints.
@@ -46,6 +46,24 @@ export function createService(deps){
    const current=await db.userByEmail(identity.email.toLowerCase());
    if(!current||current.id!==user.id||(current.microsoft_id&&current.microsoft_id!==identity.id)||!current.active||(current.profile!=='ADMINISTRADOR'&&!(current.apps||[]).includes(appKey))||!(await db.app(appKey))?.active)throw new ApiError(403,'Acesso alterado. Atualize a sessão.');
    return out(200,{panel,rows:source.rows,updatedAt:source.updatedAt,stale:source.stale===true});
+  }
+  if(path==='/bonus-settings'){
+   const appKey='desempenho-funcionarios';
+   if(!user?.active||user.user_type!=='INTERNO'||(user.profile!=='ADMINISTRADOR'&&!(user.apps||[]).includes(appKey)))throw new ApiError(403,'Aplicativo não liberado para este usuário.');
+   if(!(await db.app(appKey))?.active)throw new ApiError(403,'Aplicativo não liberado.');
+   const canManage=user.profile==='ADMINISTRADOR';
+   if(req.method==='GET'){
+    const settings=await db.bonusSettings();
+    return out(200,{config:settings?.config||{},revision:Number(settings?.revision)||0,updatedAt:settings?.updated_at||null,updatedBy:settings?.updated_by||null,canManage});
+   }
+   if(!canManage)throw new ApiError(403,'Somente administradores alteram as regras do bônus.');
+   if(Number(req.headers.get('content-length')||0)>500000)throw new ApiError(400,'Configuração inválida.');
+   const body=await req.json();
+   if(!body?.config||typeof body.config!=='object'||Array.isArray(body.config)||!Number.isInteger(body.revision)||body.revision<0)throw new ApiError(400,'Configuração inválida.');
+   const serialized=JSON.stringify(body.config);
+   if(serialized.length>400000||!Array.isArray(body.config.bands)||body.config.bands.length>100||typeof body.config.pnLevels!=='object'||typeof body.config.technicians!=='object')throw new ApiError(400,'Configuração inválida.');
+   const saved=await db.saveBonusSettings({config:body.config,revision:body.revision,actor:user.email});
+   return out(200,{config:saved.config,revision:Number(saved.revision),updatedAt:saved.updated_at,updatedBy:saved.updated_by,canManage:true});
   }
   const app=await db.app();if(!app?.active)throw new ApiError(403,'Aplicativo não liberado.');
   const grant=user?await db.grant(user.id):null;
@@ -106,6 +124,12 @@ export function runtimeDependencies(env,fetcher=fetch){
    grants:()=>readAll('desempenho_access?select=user_id,clients,revision&order=user_id'),
    eligibleUsers:()=>readAll('portal_users?select=id,name,email&active=eq.true&user_type=eq.INTERNO&profile=in.(SOCIO,ADMINISTRADOR)&order=id'),
    saveGrant:g=>rest('rpc/desempenho_save_access',{method:'POST',body:JSON.stringify({p_user_id:g.user_id,p_clients:g.clients,p_revision:g.revision,p_actor:g.actor})})
+   ,bonusSettings:()=>first('desempenho_bonus_settings?select=config,revision,updated_at,updated_by&id=eq.1')
+   ,saveBonusSettings:async g=>{
+    const rows=await rest('rpc/desempenho_save_bonus_settings',{method:'POST',body:JSON.stringify({p_config:g.config,p_revision:g.revision,p_actor:g.actor})});
+    if(!Array.isArray(rows)||!rows[0])throw new ApiError(409,'As regras foram alteradas por outra pessoa. Atualize antes de salvar.');
+    return rows[0];
+   }
   },
   fetchPanelSource:async(panel,options={})=>{
    const cached=panelCache.get(panel);if(!options.force&&cached&&Date.now()-cached.at<sourceTtl)return {rows:cached.rows,updatedAt:cached.updatedAt,stale:false};
