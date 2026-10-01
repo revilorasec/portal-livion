@@ -54,12 +54,13 @@ test('o bônus usa devolução real, exclui fórmulas e permite editar todas as 
   assert.match(combined, /Claro coluna AN e Nokia coluna W/);
   assert.match(combined, /Qualquer célula com fórmula nessa coluna fica fora/);
   assert.doesNotMatch(combined, /A medição não participa deste filtro/);
-  assert.match(combined, /id="bonusStartPct"/);
-  assert.match(combined, /id="bonusHighPct"/);
-  assert.match(combined, /id="bonusAddBand"/);
-  assert.match(combined, /data-field="min"/);
-  assert.match(combined, /data-field="max"/);
-  assert.match(combined, /portalBonusConfigV2/);
+  assert.doesNotMatch(combined, /id="bonusStartPct"/);
+  assert.doesNotMatch(combined, /id="bonusHighPct"/);
+  assert.match(combined, /id="bonusMediumPct"/);
+  assert.match(combined, /id="bonusComplexHighPct"/);
+  assert.match(bonusUpgrade, /id="bonusAddBand"/);
+  assert.match(bonusUpgrade, /data-field="min"/);
+  assert.match(bonusUpgrade, /data-field="max"/);
   assert.match(combined, /r\.devolvido&&!r\.dataFormula&&returnMonth\(r\.dataDevolucao\)===month/);
   assert.match(combined, /Complexidade por Part Number/);
   assert.match(combined, /x\.levels\[pnLevel\(r,c\)\]\+\+/);
@@ -80,11 +81,14 @@ test('o modo apresentação mantém os valores do bônus visíveis', () => {
   assert.match(combined, /next=parent\.closest\('#tab-bonus'\)\?value:value\.replace/);
 });
 
-test('zero desativa percentuais e complexidade sem zerar o bônus', () => {
-  assert.match(combined, /function bonusTier\(c,repairability\).*c\.startPct>0.*c\.highPct>0.*return'standard'/);
-  assert.match(combined, /function bonusMultiplier\(c,level\).*return value>0\?value:1/);
-  assert.match(combined, /band\[tier\]\*bonusMultiplier\(c,pnLevel\(r,c\)\)/);
-  assert.match(combined, /deixe-os em 0: o app usará o valor padrão da faixa e multiplicador 1,00/);
+test('a quantidade escolhe a faixa e somente Média e Alta recebem acréscimos', () => {
+  assert.match(combined, /id="bonusParameters"/);
+  assert.doesNotMatch(bonusUpgrade, /Começa a receber em/);
+  assert.doesNotMatch(bonusUpgrade, /Faixa alta a partir de/);
+  assert.match(bonusUpgrade, /Complexidade Média — acréscimo sobre a Baixa/);
+  assert.match(bonusUpgrade, /data-field="baseLow"/);
+  assert.match(bonusEngine, /const base=finite\(band\.baseLow,0\)/);
+  assert.doesNotMatch(bonusEngine, /Reparabilidade abaixo do mínimo/);
 });
 
 test('comparativo mensal permite escolher técnicos, período e métrica', () => {
@@ -124,5 +128,5 @@ test('configuração compartilhada usa endpoint administrativo e revisão otimis
   assert.match(desempenhoService, /Somente administradores alteram as regras do bônus/);
   assert.match(desempenhoService, /saveBonusSettings/);
   assert.match(bonusUpgrade, /settingsRevision/);
-  assert.match(bonusUpgrade, /portalBonusConfigV3/);
+  assert.match(bonusUpgrade, /portalBonusConfigV4/);
 });

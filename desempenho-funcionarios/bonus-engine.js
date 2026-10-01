@@ -12,17 +12,15 @@
 
   function defaults(){
     return {
-      version:3,
-      startPct:70,
-      highPct:80,
+      version:4,
       mediumPct:25,
       highComplexityPct:50,
       bands:[
-        {min:0,max:60,baseStandard:0,baseHigh:0},
-        {min:61,max:75,baseStandard:2.5,baseHigh:3},
-        {min:76,max:90,baseStandard:3,baseHigh:3.5},
-        {min:91,max:105,baseStandard:3.5,baseHigh:4},
-        {min:106,max:null,baseStandard:4,baseHigh:4.5}
+        {min:0,max:60,baseLow:0},
+        {min:61,max:75,baseLow:2.5},
+        {min:76,max:90,baseLow:3},
+        {min:91,max:105,baseLow:3.5},
+        {min:106,max:null,baseLow:4}
       ],
       pnLevels:{},
       technicians:{}
@@ -38,14 +36,11 @@
     const bands=oldBands.map((band,index)=>({
       min:Math.max(0,Math.trunc(finite(band.min,index?0:0))),
       max:band.max===null||band.max===''?null:Math.max(0,Math.trunc(finite(band.max,0))),
-      baseStandard:Math.max(0,finite(band.baseStandard??band.standard??band.base,0)),
-      baseHigh:Math.max(0,finite(band.baseHigh??band.high??band.baseStandard??band.standard??band.base,0))
+      baseLow:Math.max(0,finite(band.baseLow??band.baseStandard??band.standard??band.base??band.baseHigh??band.high,0))
     })).sort((a,b)=>a.min-b.min);
-    if(bands.length){bands[0].baseStandard=0;bands[0].baseHigh=0;}
+    if(bands.length)bands[0].baseLow=0;
     return {
-      version:3,
-      startPct:Math.max(0,Math.min(100,finite(source.startPct,base.startPct))),
-      highPct:Math.max(0,Math.min(100,finite(source.highPct,base.highPct))),
+      version:4,
       mediumPct:Math.max(0,finite(mediumPct,base.mediumPct)),
       highComplexityPct:Math.max(0,finite(highComplexityPct,base.highComplexityPct)),
       bands,
@@ -56,10 +51,9 @@
 
   function validateConfig(raw){
     const config=migrateConfig(raw),warnings=[],bands=[...config.bands].sort((a,b)=>a.min-b.min);
-    if(config.highPct<config.startPct)warnings.push('A faixa alta não pode começar antes do percentual mínimo.');
     if(!bands.length)warnings.push('Cadastre pelo menos a Faixa 0.');
     if(bands.length&&bands[0].min!==0)warnings.push('A Faixa 0 deve começar em 0.');
-    if(bands.length&&(bands[0].baseStandard!==0||bands[0].baseHigh!==0))warnings.push('A Faixa 0 deve permanecer com valor zero.');
+    if(bands.length&&bands[0].baseLow!==0)warnings.push('A Faixa 0 deve permanecer com valor zero.');
     for(let index=0;index<bands.length;index++){
       const band=bands[index];
       if(band.max!==null&&band.max<band.min)warnings.push(`Faixa ${index}: o máximo é menor que o mínimo.`);
@@ -80,12 +74,8 @@
     const value=config.pnLevels?.[key];
     return [0,1,2].includes(Number(value))?Number(value):null;
   }
-  function tierFor(config,repairability){
-    if(config.startPct>0&&repairability<config.startPct)return null;
-    return config.highPct>0&&repairability>=config.highPct?'high':'standard';
-  }
-  function unitRate(config,band,tier,level){
-    const base=finite(tier==='high'?band.baseHigh:band.baseStandard,0);
+  function unitRate(config,band,level){
+    const base=finite(band.baseLow,0);
     const increase=level===1?config.mediumPct:level===2?config.highComplexityPct:0;
     return roundMoney(base*(1+increase/100));
   }
@@ -115,7 +105,6 @@
       const repairability=total?group.repaired/total*100:null;
       const band=config.bands.find(item=>group.repaired>=item.min&&(item.max===null||group.repaired<=item.max))||null;
       const bandIndex=band?config.bands.indexOf(band):-1;
-      const tier=repairability===null?null:tierFor(config,repairability);
       const active=techIsActive(config,group.name);
       const pnMap=new Map();
       for(const row of group.repairedRows){
@@ -129,22 +118,21 @@
       if(!group.repaired)reasons.push('Não há peças reparadas elegíveis no período.');
       if(!band)reasons.push('A quantidade não está coberta por uma faixa válida.');
       if(bandIndex===0)reasons.push('Faixa 0 — Sem pagamento de bônus.');
-      if(tier===null&&repairability!==null)reasons.push(`Reparabilidade abaixo do mínimo de ${config.startPct.toFixed(2).replace('.',',')}%.`);
       if(group.unclassified)reasons.push(`${group.unclassified} equipamento(s) possuem Part Number sem classificação de complexidade.`);
-      const payable=!warnings.length&&active&&group.repaired>0&&band&&bandIndex>0&&tier!==null&&group.unclassified===0;
+      const payable=!warnings.length&&active&&group.repaired>0&&band&&bandIndex>0&&group.unclassified===0;
       const complexity=LEVELS.map((key,level)=>{
-        const quantity=group.levels[level],rate=payable?unitRate(config,band,tier,level):0;
+        const quantity=group.levels[level],rate=payable?unitRate(config,band,level):0;
         return {key,label:LEVEL_LABELS[level],level,quantity,unitRate:rate,subtotal:roundMoney(quantity*rate)};
       });
       for(const entry of pnMap.values()){
-        entry.unitRate=payable&&entry.level!==null?unitRate(config,band,tier,entry.level):0;
+        entry.unitRate=payable&&entry.level!==null?unitRate(config,band,entry.level):0;
         entry.subtotal=roundMoney(entry.quantity*entry.unitRate);
       }
       const bonus=payable?roundMoney(complexity.reduce((sum,item)=>sum+item.subtotal,0)):0;
       const rate=group.repaired?roundMoney(bonus/group.repaired):0;
-      return {...group,repairability,band,bandIndex,tier,active,payable,complexity,partNumbers:[...pnMap.values()].sort((a,b)=>b.quantity-a.quantity||a.partNumber.localeCompare(b.partNumber,'pt-BR')),reasons,rate,bonus,configWarnings:warnings};
+      return {...group,repairability,band,bandIndex,active,payable,complexity,partNumbers:[...pnMap.values()].sort((a,b)=>b.quantity-a.quantity||a.partNumber.localeCompare(b.partNumber,'pt-BR')),reasons,rate,bonus,configWarnings:warnings};
     });
   }
 
-  return {LEVELS,LEVEL_LABELS,roundMoney,defaults,migrateConfig,validateConfig,techIsActive,levelFor,tierFor,unitRate,calculateMonth};
+  return {LEVELS,LEVEL_LABELS,roundMoney,defaults,migrateConfig,validateConfig,techIsActive,levelFor,unitRate,calculateMonth};
 });

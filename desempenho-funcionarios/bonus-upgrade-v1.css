@@ -1,10 +1,12 @@
 .wrap{max-width:min(1780px,calc(100vw - 48px))!important}
 .bonus-admin-grid{display:grid;grid-template-columns:repeat(4,minmax(170px,1fr));gap:12px;align-items:end}
+.bonus-admin-grid-simple{grid-template-columns:repeat(2,minmax(240px,1fr))}
 .bonus-admin-grid label,.bonus-filter-grid label{display:grid;gap:5px;font-size:12px;font-weight:700;color:#334155}
 .bonus-settings-status{margin-left:auto;font-size:12px;color:#64748b}
 .bonus-settings-status.error{color:#b42318}.bonus-settings-status.saved{color:#087443}
 .bonus-rates-grid{display:grid;gap:10px}
 .bonus-band-v3{display:grid;grid-template-columns:80px repeat(2,minmax(100px,.7fr)) repeat(6,minmax(118px,1fr)) 82px;gap:8px;align-items:end;padding:12px;border:1px solid #dce4ef;border-radius:12px;background:#fbfdff}
+.bonus-band-simple{grid-template-columns:80px repeat(2,minmax(110px,.8fr)) repeat(3,minmax(130px,1fr)) 82px}
 .bonus-band-v3>strong{align-self:center;color:#102a56}.bonus-band-v3 label{display:grid;gap:4px;font-size:11px;font-weight:700;color:#52627a}.bonus-band-v3 .calculated{background:#eef5ff;color:#24466f}
 .bonus-band-v3 input:disabled{opacity:1;background:#f0f2f5;color:#667085}
 .bonus-table-wide{min-width:1120px}
