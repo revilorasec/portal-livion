@@ -1,5 +1,5 @@
 (() => {
-  window.__EXPENSE_PHOTO_PICKER_VERSION__='4';
+  window.__EXPENSE_PHOTO_PICKER_VERSION__='5';
   const DELETE_API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/expense-attachment-delete-api';
 
   function buildPhotoPicker(input,idx){
@@ -44,12 +44,12 @@
     const status=document.createElement('small');
     status.className='photo-source-hint';
     status.style.color='var(--muted)';
-    status.textContent='Nenhuma foto nova selecionada.';
+    status.textContent=`Foto ${idx+1}: use a câmera ou escolha uma imagem da galeria.`;
 
     clear.onclick=()=>{
       input.value='';
       input.removeAttribute('capture');
-      status.textContent='Nenhuma foto nova selecionada.';
+      status.textContent=`Foto ${idx+1}: use a câmera ou escolha uma imagem da galeria.`;
       clear.style.display='none';
     };
 
@@ -57,10 +57,10 @@
       input.removeAttribute('capture');
       const file=input.files?.[0];
       if(file){
-        status.textContent=`Foto ${idx+1}: ${file.name}`;
+        status.textContent=`Foto ${idx+1} selecionada: ${file.name}`;
         clear.style.display='inline-flex';
       }else{
-        status.textContent='Nenhuma foto nova selecionada.';
+        status.textContent=`Foto ${idx+1}: use a câmera ou escolha uma imagem da galeria.`;
         clear.style.display='none';
       }
     });
@@ -162,12 +162,16 @@
     clearForm=function(){
       document.getElementById('existingExpensePhotos')?.remove();
       const result=originalClearForm();
-      ['ePhoto1','ePhoto2'].forEach(id=>{
+      ['ePhoto1','ePhoto2'].forEach((id,idx)=>{
         const input=document.getElementById(id);
         if(input){input.value='';input.removeAttribute('capture')}
+        const hint=document.querySelectorAll('.photo-source-hint')[idx];
+        if(hint)hint.textContent=`Foto ${idx+1}: use a câmera ou escolha uma imagem da galeria.`;
       });
-      document.querySelectorAll('.photo-source-hint').forEach(x=>x.textContent='Nenhuma foto nova selecionada.');
-      document.querySelectorAll('.photo-picker-actions .btn').forEach((b,i)=>{if(i%3===2)b.style.display='none'});
+      document.querySelectorAll('.photo-picker-actions').forEach(actions=>{
+        const buttons=actions.querySelectorAll('.btn');
+        if(buttons[2])buttons[2].style.display='none';
+      });
       enhancePhotoInputs();
       return result;
     };
