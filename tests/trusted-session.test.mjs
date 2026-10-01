@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 
 const root=new URL('../',import.meta.url);
 const html=readFileSync(new URL('index.html',root),'utf8');
@@ -13,9 +14,24 @@ test('login oferece confiança explícita e mantém o modo compartilhado como pa
 });
 
 test('login recorrente não força a escolha de conta',()=>{
-  assert.match(html,/msalApp\.loginRedirect\(\{scopes:\['User\.Read'\]\}\)/);
-  assert.doesNotMatch(html,/prompt:'select_account'/);
+  const source=html.match(/^function loginRequest\(\)\{.*\}$/m)?.[0];
+  assert.ok(source);
+  const ordinary=runInNewContext(`${source};loginRequest()`,{portalAuthError:''});
+  assert.equal(ordinary.scopes[0],'User.Read');
+  assert.equal(ordinary.prompt,undefined);
+  const rejected=runInNewContext(`${source};loginRequest()`,{portalAuthError:'UNAUTHENTICATED'});
+  assert.equal(rejected.prompt,'select_account');
   assert.match(html,/acquireTokenSilent\(\{scopes:\['User\.Read'\],account\}\)/);
+});
+
+test('401 na consulta renova o token e tenta novamente uma única vez',async()=>{
+  const source=html.match(/^const api=async\(path,opt=\{\}\)=>\{.*\};$/m)?.[0];
+  assert.ok(source);
+  const headers=[];
+  const runtime={API:'https://example.test',token:'antigo',refreshPortalToken:async force=>{assert.equal(force,true);runtime.token='novo'},fetch:async(_url,opt)=>{headers.push(opt.headers.Authorization);return headers.length===1?{status:401,ok:false,json:async()=>({error:'UNAUTHENTICATED'})}:{status:200,ok:true,json:async()=>({ok:true})}}};
+  const result=await runInNewContext(`${source};api('/context')`,runtime);
+  assert.equal(result.ok,true);
+  assert.deepEqual(headers,['Bearer antigo','Bearer novo']);
 });
 
 test('tokens continuam sob controle do MSAL e não são gravados manualmente',()=>{
