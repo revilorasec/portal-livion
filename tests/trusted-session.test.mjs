@@ -28,10 +28,22 @@ test('401 na consulta renova o token e tenta novamente uma única vez',async()=>
   const source=html.match(/^const api=async\(path,opt=\{\}\)=>\{.*\};$/m)?.[0];
   assert.ok(source);
   const headers=[];
-  const runtime={API:'https://example.test',token:'antigo',refreshPortalToken:async force=>{assert.equal(force,true);runtime.token='novo'},fetch:async(_url,opt)=>{headers.push(opt.headers.Authorization);return headers.length===1?{status:401,ok:false,json:async()=>({error:'UNAUTHENTICATED'})}:{status:200,ok:true,json:async()=>({ok:true})}}};
+  const runtime={API:'https://example.test',token:'antigo',AbortSignal,refreshPortalToken:async force=>{assert.equal(force,true);runtime.token='novo'},fetch:async(_url,opt)=>{headers.push(opt.headers.Authorization);return headers.length===1?{status:401,ok:false,json:async()=>({error:'UNAUTHENTICATED'})}:{status:200,ok:true,json:async()=>({ok:true})}}};
   const result=await runInNewContext(`${source};api('/context')`,runtime);
   assert.equal(result.ok,true);
   assert.deepEqual(headers,['Bearer antigo','Bearer novo']);
+});
+
+test('falha de conexão ou de pool encerra a validação com opção de reconexão',async()=>{
+  const source=html.match(/^const api=async\(path,opt=\{\}\)=>\{.*\};$/m)?.[0];
+  assert.ok(source);
+  const unavailable={API:'https://example.test',token:'teste',AbortSignal,fetch:async()=>({status:500,ok:false,json:async()=>({error:'PGRST003'})})};
+  await assert.rejects(runInNewContext(`${source};api('/context')`,unavailable),/SERVICE_UNAVAILABLE/);
+  const timeout={API:'https://example.test',token:'teste',AbortSignal:{timeout:()=>AbortSignal.timeout(5)},fetch:async(_url,opt)=>new Promise((_,reject)=>opt.signal.addEventListener('abort',()=>reject(new Error('aborted'))))};
+  await assert.rejects(runInNewContext(`${source};api('/context')`,timeout),/SERVICE_UNAVAILABLE/);
+  assert.match(html,/Portal temporariamente indisponível/);
+  assert.match(html,/Tentar novamente/);
+  assert.match(html,/portalAuthError==='SERVICE_UNAVAILABLE'\)\{location\.reload\(\);return\}/);
 });
 
 test('tokens continuam sob controle do MSAL e não são gravados manualmente',()=>{
