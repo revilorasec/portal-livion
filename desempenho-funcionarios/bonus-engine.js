@@ -6,6 +6,7 @@
   'use strict';
   const LEVELS=['low','medium','high'];
   const LEVEL_LABELS=['Baixa','Média','Alta'];
+  const HIGH_REPAIRABILITY_THRESHOLD=80;
   const roundMoney=value=>Math.round((Number(value)||0)*100+Number.EPSILON)/100;
   const finite=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
   const clone=value=>JSON.parse(JSON.stringify(value));
@@ -13,9 +14,10 @@
 
   function defaults(){
     return {
-      version:5,
+      version:6,
       mediumPct:25,
       highComplexityPct:50,
+      highRepairabilityPct:0,
       bands:[
         {min:0,max:60,baseLow:0},
         {min:61,max:75,baseLow:2.5},
@@ -33,6 +35,7 @@
     const multipliers=Array.isArray(source.multipliers)?source.multipliers:base.multipliers;
     const mediumPct=source.mediumPct??((finite(multipliers?.[1],1)-1)*100);
     const highComplexityPct=source.highComplexityPct??((finite(multipliers?.[2],1)-1)*100);
+    const highRepairabilityPct=source.highRepairabilityPct??0;
     const oldBands=Array.isArray(source.bands)&&source.bands.length?source.bands:base.bands;
     const bands=oldBands.map((band,index)=>({
       min:Math.max(0,Math.trunc(finite(band.min,index?0:0))),
@@ -48,9 +51,10 @@
       else pnLevels[key]=level;
     }
     return {
-      version:5,
+      version:6,
       mediumPct:Math.max(0,finite(mediumPct,base.mediumPct)),
       highComplexityPct:Math.max(0,finite(highComplexityPct,base.highComplexityPct)),
+      highRepairabilityPct:Math.max(0,finite(highRepairabilityPct,base.highRepairabilityPct)),
       bands,
       pnLevels,
       technicians:source.technicians&&typeof source.technicians==='object'&&!Array.isArray(source.technicians)?source.technicians:{}
@@ -82,10 +86,11 @@
     const value=config.pnLevels?.[key];
     return [0,1,2].includes(Number(value))?Number(value):null;
   }
-  function unitRate(config,band,level){
+  function unitRate(config,band,level,repairability=null){
     const base=finite(band.baseLow,0);
     const increase=level===1?config.mediumPct:level===2?config.highComplexityPct:0;
-    return roundMoney(base*(1+increase/100));
+    const repairabilityIncrease=repairability!==null&&repairability>=HIGH_REPAIRABILITY_THRESHOLD?config.highRepairabilityPct:0;
+    return roundMoney(base*(1+increase/100)*(1+repairabilityIncrease/100));
   }
   function rowIsEligible(row,month,client,returnMonth){
     return row&&row.devolvido&&!row.dataFormula&&returnMonth(row.dataDevolucao)===month&&(!client||row.cliente===client)&&['REPARADO','IRREPARÁVEL'].includes(row.status)&&row.tecnico;
@@ -128,21 +133,23 @@
       if(!group.repaired)reasons.push('Não há peças reparadas elegíveis no período.');
       if(!band)reasons.push('A quantidade não está coberta por uma faixa válida.');
       if(bandIndex===0)reasons.push('Faixa 0 — Sem pagamento de bônus.');
-      if(group.unclassified)reasons.push(`${group.unclassified} equipamento(s) possuem Part Number sem classificação de complexidade.`);
-      const payable=!warnings.length&&active&&group.repaired>0&&band&&bandIndex>0&&group.unclassified===0;
+      if(group.unclassified)reasons.push(`${group.unclassified} equipamento(s) sem classificação de complexidade foram calculados pelo valor da Baixa.`);
+      const highRepairabilityApplied=repairability!==null&&repairability>=HIGH_REPAIRABILITY_THRESHOLD&&config.highRepairabilityPct>0;
+      if(highRepairabilityApplied)reasons.push(`Acréscimo de ${config.highRepairabilityPct.toFixed(2).replace('.',',')}% aplicado por reparabilidade igual ou superior a ${HIGH_REPAIRABILITY_THRESHOLD}%.`);
+      const payable=!warnings.length&&active&&group.repaired>0&&band&&bandIndex>0;
       const complexity=LEVELS.map((key,level)=>{
-        const quantity=group.levels[level],rate=payable?unitRate(config,band,level):0;
+        const quantity=group.levels[level]+(level===0?group.unclassified:0),rate=payable?unitRate(config,band,level,repairability):0;
         return {key,label:LEVEL_LABELS[level],level,quantity,unitRate:rate,subtotal:roundMoney(quantity*rate)};
       });
       for(const entry of pnMap.values()){
-        entry.unitRate=payable&&entry.level!==null?unitRate(config,band,entry.level):0;
+        entry.unitRate=payable?unitRate(config,band,entry.level===null?0:entry.level,repairability):0;
         entry.subtotal=roundMoney(entry.quantity*entry.unitRate);
       }
       const bonus=payable?roundMoney(complexity.reduce((sum,item)=>sum+item.subtotal,0)):0;
       const rate=group.repaired?roundMoney(bonus/group.repaired):0;
-      return {...group,repairability,band,bandIndex,active,payable,complexity,partNumbers:[...pnMap.values()].sort((a,b)=>b.quantity-a.quantity||a.partNumber.localeCompare(b.partNumber,'pt-BR')),reasons,rate,bonus,configWarnings:warnings};
+      return {...group,repairability,highRepairabilityApplied,highRepairabilityThreshold:HIGH_REPAIRABILITY_THRESHOLD,band,bandIndex,active,payable,complexity,partNumbers:[...pnMap.values()].sort((a,b)=>b.quantity-a.quantity||a.partNumber.localeCompare(b.partNumber,'pt-BR')),reasons,rate,bonus,configWarnings:warnings};
     });
   }
 
-  return {LEVELS,LEVEL_LABELS,roundMoney,canonicalPn,defaults,migrateConfig,validateConfig,techIsActive,levelFor,unitRate,calculateMonth};
+  return {LEVELS,LEVEL_LABELS,HIGH_REPAIRABILITY_THRESHOLD,roundMoney,canonicalPn,defaults,migrateConfig,validateConfig,techIsActive,levelFor,unitRate,calculateMonth};
 });

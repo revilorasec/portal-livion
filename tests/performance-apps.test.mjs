@@ -112,7 +112,10 @@ test('upgrade financeiro centraliza cálculo, auditoria, filtros e múltiplas m�
   assert.match(combined, /bonus-engine\.js/);
   assert.match(combined, /bonus-upgrade-v1\.js/);
   assert.match(bonusEngine, /function calculateMonth\(/);
-  assert.match(bonusEngine, /Part Number sem classificação/);
+  assert.match(bonusEngine, /sem classificação de complexidade foram calculados pelo valor da Baixa/);
+  assert.match(bonusEngine, /HIGH_REPAIRABILITY_THRESHOLD=80/);
+  assert.match(bonusUpgrade, /bonusHighRepairPct/);
+  assert.match(bonusUpgrade, /Acréscimo ≥80%/);
   assert.match(bonusUpgrade, /Complexidade por PN/);
   assert.match(bonusUpgrade, /data-bonus-detail/);
   assert.match(bonusUpgrade, /Auditoria do bônus/);
