@@ -10,16 +10,16 @@ const versions = readFileSync(new URL('../Scripts/update-portal-app-versions.sql
 const api = readFileSync(new URL('../supabase/functions/inventory-api/index.ts', import.meta.url), 'utf8');
 const qrSourceMigration = readFileSync(new URL('../supabase/migrations/20260910170000_inventory_qr_invoice_source.sql', import.meta.url), 'utf8');
 
-test('publica a versão 11 do estoque com recursos v18 atualizados', () => {
-  assert.match(html, /data-app-version="11"/);
-  assert.match(html, /class="app-release">v11/);
+test('publica a versão 12 do estoque com recursos v18 atualizados', () => {
+  assert.match(html, /data-app-version="12"/);
+  assert.match(html, /class="app-release">v12/);
   assert.match(html, /estoque-assets-v18\.css\?v=8/);
   assert.match(html, /estoque-assets-v18\.js\?v=4/);
   assert.match(html, /estoque-invoice-receipt\.js\?v=1/);
-  assert.match(serviceWorker, /portal-livion-v52/);
+  assert.match(serviceWorker, /portal-livion-v53/);
   assert.match(serviceWorker, /estoque-assets-v18-core\.js\?v=5/);
   assert.match(serviceWorker, /estoque-invoice-receipt\.js\?v=1/);
-  assert.match(versions, /estoque\.html\?v=11/);
+  assert.match(versions, /estoque\.html\?v=12/);
 });
 
 test('entrada oferece QR com câmera, foto, chave e validação do XML', () => {
@@ -37,7 +37,7 @@ test('entrada oferece QR com câmera, foto, chave e validação do XML', () => {
   assert.match(frontend, /XML da mesma nota \(alternativa\)/);
   assert.match(api, /async function invoiceImportQr/);
   assert.match(api, /source:'QR_NFE'/);
-  assert.match(api, /version:21/);
+  assert.match(api, /version:22/);
   assert.match(qrSourceMigration, /'XML_NFE','QR_NFE','LEGACY_IMPORT'/);
   assert.match(css, /qr-camera-box/);
 });
@@ -52,3 +52,4 @@ test('associação exige escolha antes de renomear item ou fornecedor', () => {
   assert.match(frontend, /D\.permissions\.product/);
   assert.match(frontend, /D\.permissions\.supplier/);
 });
+
