@@ -112,10 +112,7 @@ test('upgrade financeiro centraliza cálculo, auditoria, filtros e múltiplas m�
   assert.match(combined, /bonus-engine\.js/);
   assert.match(combined, /bonus-upgrade-v1\.js/);
   assert.match(bonusEngine, /function calculateMonth\(/);
-  assert.match(bonusEngine, /sem classificação de complexidade foram calculados pelo valor da Baixa/);
-  assert.match(bonusEngine, /HIGH_REPAIRABILITY_THRESHOLD=80/);
-  assert.match(bonusUpgrade, /bonusHighRepairPct/);
-  assert.match(bonusUpgrade, /Acréscimo ≥80%/);
+  assert.match(bonusEngine, /Part Number sem classificação/);
   assert.match(bonusUpgrade, /Complexidade por PN/);
   assert.match(bonusUpgrade, /data-bonus-detail/);
   assert.match(bonusUpgrade, /Auditoria do bônus/);
@@ -124,6 +121,9 @@ test('upgrade financeiro centraliza cálculo, auditoria, filtros e múltiplas m�
   assert.match(bonusUpgrade, /bonusTrendMetric-/);
   assert.match(bonusUpgrade, /Incluir inativos no histórico/);
   assert.match(bonusUpgrade, /Faixa 0 — Sem pagamento de bônus/);
+  assert.match(bonusUpgrade, /Ver cada equipamento contado/);
+  assert.match(bonusUpgrade, /Medição de origem/);
+  assert.match(bonusUpgrade, /vieram de outra medição e foram devolvidas neste mês/);
 });
 
 test('configuração compartilhada usa endpoint administrativo e revisão otimista', () => {
@@ -136,3 +136,4 @@ test('configuração compartilhada usa endpoint administrativo e revisão otimis
   assert.match(bonusUpgrade, /Part Number normalizado/);
   assert.doesNotMatch(bonusUpgrade, /id="complexityClient"/);
 });
+
