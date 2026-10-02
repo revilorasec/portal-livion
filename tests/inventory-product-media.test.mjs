@@ -27,6 +27,16 @@ test('câmera funciona dentro do portal e reduz a foto antes do envio', () => {
   assert.doesNotMatch(frontend, /OneDrive/i);
 });
 
+test('PN já cadastrado atualiza o produto existente e preserva o histórico', () => {
+  assert.match(frontend, /configureExistingProductResolution/);
+  assert.match(frontend, /replaceProductId = existing\?\.product_id/);
+  assert.match(frontend, /body\.product_id = productMediaState\.replaceProductId/);
+  assert.match(frontend, /manterá o saldo, o histórico e as notas vinculadas/);
+  assert.match(frontend, /Para criar outro item separado, informe um PN diferente/);
+  assert.match(frontend, /Informe o PN do produto/);
+  assert.match(frontend, /Selecione o tipo do produto/);
+});
+
 test('produto aceita vários documentos e permite remover cada arquivo pelo x', () => {
   assert.match(frontend, /type="file" multiple/);
   assert.match(frontend, /datasheets, manuais, certificados/);
@@ -47,6 +57,6 @@ test('arquivos ficam em armazenamento privado com metadados e auditoria', () => 
 });
 
 test('a versão publicada carrega o novo recurso', () => {
-  assert.match(html, /estoque-product-media\.js\?v=2/);
-  assert.match(html, /data-app-version="10"/);
+  assert.match(html, /estoque-product-media\.js\?v=3/);
+  assert.match(html, /data-app-version="11"/);
 });

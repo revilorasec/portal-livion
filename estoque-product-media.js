@@ -188,9 +188,44 @@
     if (product.product_id) api(`/product-file?product_id=${encodeURIComponent(product.product_id)}`).then(result => renderStoredFiles(result.files || [])).catch(error => { $('productStoredFiles').innerHTML = `<small class="bad-text">${esc(error.message)}</small>`; });
   }
 
+  function normalizedProductText(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
+  }
+
+  function configureExistingProductResolution(product) {
+    if (product.product_id) return;
+    const pnInput = $('pPN'), warning = $('duplicateWarning');
+    if (!pnInput || !warning) return;
+    const refresh = () => {
+      const typedPn = normalizedProductText(pnInput.value);
+      const existing = typedPn ? (D.stock || []).find(item => normalizedProductText(item.pn) === typedPn) : null;
+      productMediaState.replaceProductId = existing?.product_id || null;
+      if (!existing) { warning.classList.remove('existing-product-resolution'); return; }
+      warning.style.display = 'block';
+      warning.classList.add('existing-product-resolution');
+      warning.innerHTML = `<b>Este PN já está cadastrado</b><span>${esc(existing.pn)} — ${esc(existing.description)}</span><strong>Ao salvar, o sistema atualizará esse cadastro e manterá o saldo, o histórico e as notas vinculadas.</strong><small>Para criar outro item separado, informe um PN diferente.</small>`;
+    };
+    pnInput.addEventListener('input', refresh);
+    refresh();
+  }
+
   const apiBase = api;
   api = async function (path, options = {}) {
-    const result = await apiBase(path, options);
+    if (path === '/product' && options.method === 'POST' && typeof options.body === 'string') {
+      const body = JSON.parse(options.body);
+      if (!String(body.pn || '').trim()) throw new Error('Informe o PN do produto.');
+      if (!String(body.description || '').trim()) throw new Error('Informe a descrição do produto.');
+      if (!String(body.item_type || '').trim()) throw new Error('Selecione o tipo do produto.');
+      if (productMediaState?.replaceProductId && !body.product_id) body.product_id = productMediaState.replaceProductId;
+      options = {...options, body: JSON.stringify(body)};
+    }
+    let result;
+    try {
+      result = await apiBase(path, options);
+    } catch (error) {
+      if (path === '/product' && String(error?.message || error).includes('INVALID_PRODUCT')) throw new Error('Não foi possível salvar: confira PN, descrição e tipo do produto.');
+      throw error;
+    }
     if (path === '/product' && options.method === 'POST' && productMediaState?.pending?.length) {
       const productId = result.product_id, files = [...productMediaState.pending];
       productMediaState.pending = [];
@@ -229,8 +264,9 @@
   const openProductBase = openProduct;
   openProduct = function (product = {}) {
     openProductBase(product);
-    productMediaState = {productId: product.product_id || null, pending: [], storedCount: 0};
+    productMediaState = {productId: product.product_id || null, pending: [], storedCount: 0, replaceProductId: null};
     configurePhotoFields(product);
     addProductFilesPanel(product);
+    configureExistingProductResolution(product);
   };
 })();
