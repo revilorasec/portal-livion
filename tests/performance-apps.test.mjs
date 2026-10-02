@@ -10,6 +10,26 @@ const bonusUpgrade = readFileSync(path.join(root, 'desempenho-funcionarios', 'bo
 const bonusEngine = readFileSync(path.join(root, 'desempenho-funcionarios', 'bonus-engine.js'), 'utf8');
 const desempenhoService = readFileSync(path.join(root, 'supabase', 'functions', 'desempenho-api', 'service.mjs'), 'utf8');
 
+test('reparabilidade exclui Sem defeito e Sem reparo do divisor', () => {
+  const source = combined.slice(combined.indexOf('function calcStats('), combined.indexOf('function techStats(')).trim();
+  const calculate = new Function('isRankingRow', 'isCompleted', `return (${source})`)(
+    row => row.status !== 'SEM REPARO',
+    row => ['REPARADO', 'IRREPARÁVEL', 'SEM DEFEITO'].includes(row.status)
+  );
+  const rows = [
+    {status:'REPARADO', cliente:'Claro', dias:1, faturavel:0, externo:false},
+    {status:'REPARADO', cliente:'Nokia', dias:1, faturavel:0, externo:false},
+    {status:'IRREPARÁVEL', cliente:'Nokia', dias:1, faturavel:0, externo:true},
+    {status:'SEM DEFEITO', cliente:'Nokia', dias:1, faturavel:0, externo:false},
+    {status:'SEM REPARO', cliente:'Nokia', dias:1, faturavel:0, externo:false}
+  ];
+  const result = calculate(rows, 'Técnico');
+  assert.equal(result.general, 2 / 3);
+  assert.equal(result.real, 1);
+  assert.equal(result.completed, 4);
+  assert.equal(result.semDefeito, 1);
+});
+
 test('publica os dois HTMLs sem incorporar dados internos', () => {
   assert.match(combined, /const SNAPSHOT=\[\]/);
   assert.match(nokia, /const SNAPSHOT=\[\]/);
@@ -112,7 +132,7 @@ test('upgrade financeiro centraliza cálculo, auditoria, filtros e múltiplas m�
   assert.match(combined, /bonus-engine\.js/);
   assert.match(combined, /bonus-upgrade-v1\.js/);
   assert.match(bonusEngine, /function calculateMonth\(/);
-  assert.match(bonusEngine, /Part Number sem classificação/);
+  assert.match(bonusEngine, /equipamento\(s\) sem classificação de complexidade/);
   assert.match(bonusUpgrade, /Complexidade por PN/);
   assert.match(bonusUpgrade, /data-bonus-detail/);
   assert.match(bonusUpgrade, /Auditoria do bônus/);
