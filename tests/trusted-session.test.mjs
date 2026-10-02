@@ -34,16 +34,29 @@ test('401 na consulta renova o token e tenta novamente uma única vez',async()=>
   assert.deepEqual(headers,['Bearer antigo','Bearer novo']);
 });
 
-test('falha de conexão ou de pool encerra a validação com opção de reconexão',async()=>{
+test('falha transitória na validação é repetida uma vez antes da opção de reconexão',async()=>{
   const source=html.match(/^const api=async\(path,opt=\{\}\)=>\{.*\};$/m)?.[0];
   assert.ok(source);
-  const unavailable={API:'https://example.test',token:'teste',AbortSignal,fetch:async()=>({status:500,ok:false,json:async()=>({error:'PGRST003'})})};
+  let unavailableCalls=0;
+  const unavailable={API:'https://example.test',token:'teste',AbortSignal,setTimeout:(fn)=>fn(),fetch:async()=>{unavailableCalls++;return{status:500,ok:false,json:async()=>({error:'PGRST003'})}}};
   await assert.rejects(runInNewContext(`${source};api('/context')`,unavailable),/SERVICE_UNAVAILABLE/);
-  const timeout={API:'https://example.test',token:'teste',AbortSignal:{timeout:()=>AbortSignal.timeout(5)},fetch:async(_url,opt)=>new Promise((_,reject)=>opt.signal.addEventListener('abort',()=>reject(new Error('aborted'))))};
+  assert.equal(unavailableCalls,2);
+  let timeoutCalls=0;
+  const timeout={API:'https://example.test',token:'teste',setTimeout:(fn)=>fn(),AbortSignal:{timeout:()=>AbortSignal.timeout(5)},fetch:async(_url,opt)=>{timeoutCalls++;return new Promise((_,reject)=>opt.signal.addEventListener('abort',()=>reject(new Error('aborted'))))}};
   await assert.rejects(runInNewContext(`${source};api('/context')`,timeout),/SERVICE_UNAVAILABLE/);
+  assert.equal(timeoutCalls,2);
   assert.match(html,/Portal temporariamente indisponível/);
   assert.match(html,/Tentar novamente/);
   assert.match(html,/portalAuthError==='SERVICE_UNAVAILABLE'\)\{location\.reload\(\);return\}/);
+});
+
+test('segunda tentativa recupera o portal após uma falha transitória',async()=>{
+  const source=html.match(/^const api=async\(path,opt=\{\}\)=>\{.*\};$/m)?.[0];
+  let calls=0;
+  const runtime={API:'https://example.test',token:'teste',AbortSignal,setTimeout:(fn)=>fn(),fetch:async()=>{calls++;return calls===1?{status:503,ok:false,json:async()=>({error:'temporário'})}:{status:200,ok:true,json:async()=>({authenticated:true})}}};
+  const result=await runInNewContext(`${source};api('/context')`,runtime);
+  assert.equal(result.authenticated,true);
+  assert.equal(calls,2);
 });
 
 test('tokens continuam sob controle do MSAL e não são gravados manualmente',()=>{
