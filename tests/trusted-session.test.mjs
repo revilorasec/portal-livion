@@ -34,7 +34,17 @@ test('401 na consulta renova o token e tenta novamente uma única vez',async()=>
   assert.deepEqual(headers,['Bearer antigo','Bearer novo']);
 });
 
-test('falha transitória na validação é repetida uma vez antes da opção de reconexão',async()=>{
+test('falha de rede ao renovar token preserva a sessão para reconexão',async()=>{
+  const source=html.match(/^const api=async\(path,opt=\{\}\)=>\{.*\};$/m)?.[0];
+  let calls=0;
+  const runtime={API:'https://example.test',token:'antigo',AbortSignal,interactionRequired:()=>false,
+    refreshPortalToken:async()=>{throw new Error('network_error')},
+    fetch:async()=>{calls++;return{status:401,ok:false,json:async()=>({error:'UNAUTHENTICATED'})}}};
+  await assert.rejects(runInNewContext(`${source};api('/context')`,runtime),/SERVICE_UNAVAILABLE/);
+  assert.equal(calls,1);
+});
+
+test('falha transitória na validação é repetida antes da reconexão automática',async()=>{
   const source=html.match(/^const api=async\(path,opt=\{\}\)=>\{.*\};$/m)?.[0];
   assert.ok(source);
   let unavailableCalls=0;
@@ -45,9 +55,52 @@ test('falha transitória na validação é repetida uma vez antes da opção de 
   const timeout={API:'https://example.test',token:'teste',setTimeout:(fn)=>fn(),AbortSignal:{timeout:()=>AbortSignal.timeout(5)},fetch:async(_url,opt)=>{timeoutCalls++;return new Promise((_,reject)=>opt.signal.addEventListener('abort',()=>reject(new Error('aborted'))))}};
   await assert.rejects(runInNewContext(`${source};api('/context')`,timeout),/SERVICE_UNAVAILABLE/);
   assert.equal(timeoutCalls,2);
-  assert.match(html,/Portal temporariamente indisponível/);
-  assert.match(html,/Tentar novamente/);
-  assert.match(html,/portalAuthError==='SERVICE_UNAVAILABLE'\)\{location\.reload\(\);return\}/);
+  assert.match(html,/Reconectando ao Portal/);
+  assert.match(html,/Tentar agora/);
+  assert.match(html,/if\(unavailable\)scheduleReconnect\(\)/);
+});
+
+test('reconexão automática preserva a sessão e agenda nova tentativa',()=>{
+  const source=html.slice(html.indexOf('let reconnectTimer='),html.indexOf('function loginRequest()'));
+  assert.ok(source.startsWith('let reconnectTimer='));
+  const elements=new Map(),get=id=>{
+    if(!elements.has(id))elements.set(id,{classList:{contains:()=>false,remove(){},toggle(){}},textContent:'',checked:false});
+    return elements.get(id);
+  };
+  let scheduled=null;
+  const runtime={msal:{InteractionRequiredAuthError:class {}},$:get,trustedDevice:()=>true,
+    setTimeout:(fn,delay)=>{scheduled={fn,delay};return 1},clearTimeout:()=>{},resumeLoginAfterTrust:()=>{throw new Error('login indevido')}};
+  runInNewContext(`${source};showAuthError(new Error('SERVICE_UNAVAILABLE'))`,runtime);
+  assert.equal(get('authTitle').textContent,'Reconectando ao Portal...');
+  assert.equal(get('loginBtn').textContent,'Tentar agora');
+  assert.equal(get('trustDeviceWrap').classList.contains('hidden'),false);
+  assert.equal(scheduled.delay,3000);
+});
+
+test('falha de rede do MSAL não redireciona para login e a tentativa seguinte recupera a sessão',async()=>{
+  const source=html.slice(html.indexOf('let reconnectTimer='),html.indexOf('function showAuthError('));
+  const account={username:'teste@livion.example'},errors=[];
+  let silentCalls=0,redirects=0,shown=0;
+  class FakeMsal {
+    async initialize(){}
+    async handleRedirectPromise(){return null}
+    getActiveAccount(){return account}
+    getAllAccounts(){return [account]}
+    setActiveAccount(){}
+    async acquireTokenSilent(){if(++silentCalls===1)throw new Error('network_error');return{accessToken:'validado'}}
+    async acquireTokenRedirect(){redirects++}
+  }
+  const runtime={msal:{PublicClientApplication:FakeMsal,InteractionRequiredAuthError:class {}},msalApp:null,
+    window:{opener:null},document:{documentElement:{}},CLIENT:'client',TENANT:'tenant',REDIRECT:'https://portal.example/',
+    trustedDevice:()=>true,token:null,ctx:null,sessionStorage:{removeItem(){}},LOGIN_AFTER_TRUST_KEY:'pending',
+    api:async()=>({authenticated:true}),showPortal:()=>{shown++},showAuthError:e=>errors.push(e.message),signedOut:()=>{},clearTimeout:()=>{}};
+  runInNewContext(`${source};globalThis.retryPortal=init`,runtime);
+  await runtime.retryPortal();
+  assert.deepEqual(errors,['SERVICE_UNAVAILABLE']);
+  assert.equal(redirects,0);
+  await runtime.retryPortal();
+  assert.equal(shown,1);
+  assert.equal(runtime.window.__PORTAL_TOKEN__,'validado');
 });
 
 test('segunda tentativa recupera o portal após uma falha transitória',async()=>{

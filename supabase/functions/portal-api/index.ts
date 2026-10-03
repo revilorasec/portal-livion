@@ -62,8 +62,9 @@ async function identity(req:Request){
  if(!aud.some((x:string)=>GRAPH_AUDIENCES.has(x)))authFail('audience');
  const clientClaim=String(c.azp||c.appid||'');
  if(clientClaim!==CLIENT_ID)authFail('client');
- let keys=await signingKeys(),jwk=keys.find((k:any)=>k.kid===header.kid&&k.kty==='RSA'&&(!k.use||k.use==='sig'));
- if(!jwk){keys=await signingKeys(true);jwk=keys.find((k:any)=>k.kid===header.kid&&k.kty==='RSA'&&(!k.use||k.use==='sig'));}
+ let keys:any[];try{keys=await signingKeys()}catch{console.warn('portal-auth-key-fetch-fallback');return await graphIdentity(token,c)}
+ let jwk=keys.find((k:any)=>k.kid===header.kid&&k.kty==='RSA'&&(!k.use||k.use==='sig'));
+ if(!jwk){try{keys=await signingKeys(true)}catch{console.warn('portal-auth-key-refresh-fallback');return await graphIdentity(token,c)}jwk=keys.find((k:any)=>k.kid===header.kid&&k.kty==='RSA'&&(!k.use||k.use==='sig'));}
  if(!jwk)authFail('key');
  try{
   const key=await crypto.subtle.importKey('jwk',jwk,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);
@@ -89,7 +90,7 @@ async function guardLastAdmin(existing:any,nextProfile?:string,nextActive?:boole
 const keyify=(v:any)=>String(v||'').trim().toUpperCase().replace(/[^A-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'');
 
 Deno.serve(async(req)=>{const origin=req.headers.get('origin');if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors(origin)});try{const url=new URL(req.url),base='/portal-api',idx=url.pathname.indexOf(base),path=idx>=0?url.pathname.slice(idx+base.length)||'/':'/';
- if(path==='/health'&&req.method==='GET')return reply(origin,200,{ok:true,service:'portal-api',version:14,auth:'entra-jwt-signature-validated'});
+ if(path==='/health'&&req.method==='GET')return reply(origin,200,{ok:true,service:'portal-api',version:16,auth:'entra-jwt-signature-validated'});
  if(path==='/context'&&req.method==='GET')return reply(origin,200,await access(req));
  if(path==='/audit-event'&&req.method==='POST'){const ctx=await access(req),b=await req.json();const allowed=new Set(['LOGIN','APP_OPEN','LOGOUT']);const event=String(b.event||'').toUpperCase();if(!allowed.has(event))return reply(origin,400,{error:'Evento inválido'});await audit(ctx.user.email,event,String(b.target||'PORTAL'),{profile:ctx.profile,entity_key:ctx.entityKey||null});return reply(origin,200,{ok:true});}
  if(path==='/catalog'&&req.method==='GET'){await admin(req);const apps=await appsRegistry(true),ents=await entities();const companies=ents.filter((e:any)=>e.entity_type==='EMPRESA').map((e:any)=>({key:e.key,label:e.name,...e}));const clients=ents.filter((e:any)=>e.entity_type==='CLIENTE').map((e:any)=>({key:e.key,label:e.name,...e}));const profiles=PROFILE_REGISTRY.map(p=>({...p,defaultApps:p.defaultApps.includes('*')?apps.filter((a:any)=>a.active).map((a:any)=>a.key):p.defaultApps,defaultCompanies:p.defaultCompanies.includes('*')?companies.map((c:any)=>c.key):p.defaultCompanies}));return reply(origin,200,{apps,entities:ents,companies,clients,profiles});}
