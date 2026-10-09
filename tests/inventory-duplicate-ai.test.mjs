@@ -43,3 +43,28 @@ test('requires a server-side OpenAI key after portal authorization',async()=>{
   assert.equal(response.status,503);
   assert.equal((await response.json()).error,'OPENAI_NOT_CONFIGURED');
 });
+
+
+test('handles a large catalog without comparing every product pair',()=>{
+  const catalog=Array.from({length:900},(_,index)=>product(
+    'P'+index,
+    'ITEM '+index,
+    'COMPONENTE MODELO '+index,
+    {internal_code:'COD-'+index,category:'ELETRONICO'}
+  ));
+  catalog.push(product(
+    'DUPLICATE',
+    'PAPEL TOALHA INTERFOLHA',
+    'PAPEL TOALHA BRANCO',
+    {internal_code:'PT-01'}
+  ));
+  catalog.push(product(
+    'ORIGINAL',
+    'PAPEL TOALHA',
+    'PAPEL TOALHA INTERFOLHA BRANCO',
+    {internal_code:'PT-01'}
+  ));
+  const rows=rankDuplicatePairs(catalog,24);
+  assert.ok(rows.length<=24);
+  assert.ok(rows.some(row=>new Set([row.left.product_id,row.right.product_id]).has('DUPLICATE')&&new Set([row.left.product_id,row.right.product_id]).has('ORIGINAL')));
+});
