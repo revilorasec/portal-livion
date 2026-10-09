@@ -41,54 +41,95 @@ function publicProduct(product) {
 }
 
 export function rankDuplicatePairs(products, maximum = 24) {
-  const active = products.filter(product => String(product.status || 'ATIVO').toUpperCase() !== 'INATIVO');
-  const pairs = [];
-  for (let i = 0; i < active.length; i++) {
-    for (let j = i + 1; j < active.length; j++) {
-      const left = active[i], right = active[j];
-      const leftText = [left.pn,left.description,left.internal_code,left.barcode,left.category,left.item_type].join(' ');
-      const rightText = [right.pn,right.description,right.internal_code,right.barcode,right.category,right.item_type].join(' ');
-      const lexical = overlap(words(leftText), words(rightText));
-      const leftModels = modelWords(leftText), rightModels = modelWords(rightText);
-      const modelOverlap = overlap(leftModels, rightModels);
-      const barcodeEqual = same(left.barcode,right.barcode);
-      const internalEqual = same(left.internal_code,right.internal_code);
-      const pnEqual = same(left.pn,right.pn);
-      const descriptionEqual = same(left.description,right.description);
-      const unitEqual = same(left.unit,right.unit);
-      const categoryEqual = same(left.category,right.category);
-      const typeEqual = same(left.item_type,right.item_type);
-      if (left.barcode && right.barcode && !barcodeEqual) continue;
-      let score = lexical * 3;
-      if (barcodeEqual) score += 6;
-      if (internalEqual) score += 5;
-      if (pnEqual) score += 5;
-      if (descriptionEqual) score += 4;
-      if (unitEqual) score += .6;
-      else if (left.unit && right.unit) score -= 1;
-      if (categoryEqual) score += .4;
-      if (typeEqual) score += .3;
-      if (leftModels.size && rightModels.size && modelOverlap === 0 && !barcodeEqual && !internalEqual && !pnEqual) score -= 2.5;
-      if (score < 1.35) continue;
-      const signals = [];
-      if (barcodeEqual) signals.push('Mesmo código de barras');
-      if (internalEqual) signals.push('Mesmo código interno');
-      if (pnEqual) signals.push('Mesmo PN');
-      if (descriptionEqual) signals.push('Mesma descrição normalizada');
-      if (lexical >= .45) signals.push('Nomes muito semelhantes');
-      if (unitEqual) signals.push('Mesma unidade');
-      pairs.push({
-        pair_id: 'pair_' + pairs.length,
-        left: publicProduct(left),
-        right: publicProduct(right),
-        local_score: Number(score.toFixed(3)),
-        signals
-      });
+  const stop = new Set(['componente','insumo','unidade','produto','material','para','com','sem','peca','eletronico','eletronica']);
+  const prepared = products
+    .filter(product => String(product.status || 'ATIVO').toUpperCase() !== 'INATIVO')
+    .map((product,index) => {
+      const fields = [product.pn,product.description,product.internal_code,product.barcode,product.category,product.item_type];
+      const text = fields.join(' ');
+      return {
+        index,
+        product,
+        text,
+        tokens:new Set([...words(text)].filter(token => token.length >= 3 && !stop.has(token))),
+        models:modelWords(text),
+        pn:normalize(product.pn).replace(/\s+/g,''),
+        internal:normalize(product.internal_code).replace(/\s+/g,''),
+        barcode:normalize(product.barcode).replace(/\s+/g,''),
+        description:normalize(product.description),
+        unit:normalize(product.unit),
+        category:normalize(product.category),
+        type:normalize(product.item_type)
+      };
+    });
+  const pairKeys = new Set();
+  const addBucketPairs = (bucket,limit=45) => {
+    if (!bucket || bucket.length < 2 || bucket.length > limit) return;
+    for (let a=0;a<bucket.length;a++) for (let b=a+1;b<bucket.length;b++) {
+      const left=Math.min(bucket[a],bucket[b]),right=Math.max(bucket[a],bucket[b]);
+      pairKeys.add(left+':'+right);
     }
+  };
+  const addIndex = (selector,limit=45) => {
+    const map=new Map();
+    prepared.forEach((row,index)=>{
+      const value=selector(row);
+      if(!value)return;
+      const bucket=map.get(value)||[];bucket.push(index);map.set(value,bucket);
+    });
+    map.forEach(bucket=>addBucketPairs(bucket,limit));
+  };
+  addIndex(row=>row.barcode,100);
+  addIndex(row=>row.internal,100);
+  addIndex(row=>row.pn,100);
+  addIndex(row=>row.description,100);
+  const tokenIndex=new Map();
+  prepared.forEach((row,index)=>row.tokens.forEach(token=>{
+    const bucket=tokenIndex.get(token)||[];bucket.push(index);tokenIndex.set(token,bucket);
+  }));
+  tokenIndex.forEach(bucket=>addBucketPairs(bucket,35));
+
+  const pairs=[];
+  for(const key of pairKeys){
+    const [i,j]=key.split(':').map(Number),left=prepared[i],right=prepared[j];
+    const lexical=overlap(left.tokens,right.tokens);
+    const modelOverlap=overlap(left.models,right.models);
+    const barcodeEqual=Boolean(left.barcode&&left.barcode===right.barcode);
+    const internalEqual=Boolean(left.internal&&left.internal===right.internal);
+    const pnEqual=Boolean(left.pn&&left.pn===right.pn);
+    const descriptionEqual=Boolean(left.description&&left.description===right.description);
+    const unitEqual=Boolean(left.unit&&left.unit===right.unit);
+    const categoryEqual=Boolean(left.category&&left.category===right.category);
+    const typeEqual=Boolean(left.type&&left.type===right.type);
+    if(left.barcode&&right.barcode&&!barcodeEqual)continue;
+    let score=lexical*3;
+    if(barcodeEqual)score+=6;
+    if(internalEqual)score+=5;
+    if(pnEqual)score+=5;
+    if(descriptionEqual)score+=4;
+    if(unitEqual)score+=.6;else if(left.unit&&right.unit)score-=1;
+    if(categoryEqual)score+=.4;
+    if(typeEqual)score+=.3;
+    if(left.models.size&&right.models.size&&modelOverlap===0&&!barcodeEqual&&!internalEqual&&!pnEqual)score-=2.5;
+    if(score<1.35)continue;
+    const signals=[];
+    if(barcodeEqual)signals.push('Mesmo código de barras');
+    if(internalEqual)signals.push('Mesmo código interno');
+    if(pnEqual)signals.push('Mesmo PN');
+    if(descriptionEqual)signals.push('Mesma descrição normalizada');
+    if(lexical>=.45)signals.push('Nomes muito semelhantes');
+    if(unitEqual)signals.push('Mesma unidade');
+    pairs.push({
+      pair_id:'',
+      left:publicProduct(left.product),
+      right:publicProduct(right.product),
+      local_score:Number(score.toFixed(3)),
+      signals
+    });
   }
-  return pairs.sort((a,b) => b.local_score - a.local_score ||
-    a.left.description.localeCompare(b.left.description,'pt-BR')).slice(0, maximum)
-    .map((pair,index) => ({...pair,pair_id:'pair_' + index}));
+  return pairs.sort((a,b)=>b.local_score-a.local_score||
+    a.left.description.localeCompare(b.left.description,'pt-BR'))
+    .slice(0,maximum).map((pair,index)=>({...pair,pair_id:'pair_'+index}));
 }
 
 export function createHandler({ env, fetcher = fetch }) {
