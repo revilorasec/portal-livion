@@ -435,7 +435,7 @@
       <div class="form">
         <div class="field full"><label>Produto</label><select id="fProduct">${opts(D.stock || [], 'product_id', 'description')}</select></div>
         <div id="fProductPreview" class="field full"><small class="muted">Selecione um item para visualizar suas fotos.</small></div>
-        <div class="field"><label>Quantidade</label><input id="fQty" type="number" min="0.0001" step="any"></div>
+        <div class="field"><label>Quantidade</label><input id="fQty" type="number" min="0" step="1"></div>
         <div class="field"><label>Fornecedor</label><select id="fParty">${opts((D.suppliers || []).filter(item => personStatus(item) === 'ATIVO'), 'supplier_id', 'name')}</select></div>
         <div class="field"><label>Valor total da entrada (R$)</label><input id="fTotal" type="number" step="0.01" min="0"></div>
         <div class="field"><label>Número da nota / documento</label><input id="fDoc"><small>Quando informado, o registro aparecerá em Notas Fiscais.</small></div>
@@ -495,7 +495,7 @@
       <div class="form stock-adjustment-form">
         ${movementDateFields('AJUSTE').replace('Data e Hora da Saída', 'Data e Hora do Ajuste')}
         <div class="field"><label>Tipo de ajuste</label><select id="adjustmentType"><option value="AJUSTE_POSITIVO">Aumentar saldo (+)</option><option value="AJUSTE_NEGATIVO">Diminuir saldo (−)</option></select></div>
-        <div class="field"><label>Quantidade</label><input id="fQty" type="number" min="0.0001" step="any"></div>
+        <div class="field"><label>Quantidade</label><input id="fQty" type="number" min="0" step="1"></div>
         <div class="field full"><label>Produto</label><select id="fProduct">${opts(D.stock || [], 'product_id', 'description', 'Pesquise o produto…')}</select></div>
         <div id="fProductPreview" class="field full"><small class="muted">Selecione um produto para conferir o saldo atual.</small></div>
         <div class="field full"><label>Motivo do ajuste</label><textarea id="fNotes" placeholder="Explique a diferença encontrada na contagem física"></textarea></div>

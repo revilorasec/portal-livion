@@ -1,0 +1,17 @@
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+const html=fs.readFileSync('estoque.html','utf8');
+const core=fs.readFileSync('estoque-assets-v18-core.js','utf8');
+const wrapper=fs.readFileSync('estoque-assets-v18.js','utf8');
+const sw=fs.readFileSync('sw.js','utf8');
+assert.equal((html.match(/id="fQty"/g)||[]).length,5);
+assert.equal((core.match(/id="fQty"/g)||[]).length,2);
+assert.equal((html.match(/id="fQty" type="number" min="0" step="1"/g)||[]).length,5);
+assert.equal((core.match(/id="fQty" type="number" min="0" step="1"/g)||[]).length,2);
+assert.ok(!html.includes('id="fQty" type="number" min="0.0001" step="any"'));
+assert.ok(!core.includes('id="fQty" type="number" min="0.0001" step="any"'));
+assert.match(wrapper,/estoque-assets-v18-core\.js\?v=6/);
+assert.match(sw,/portal-livion-v57/);
+assert.match(sw,/estoque-assets-v18\.js\?v=5/);
+assert.match(sw,/estoque-assets-v18-core\.js\?v=6/);
+console.log('inventory quantity step checks passed');
