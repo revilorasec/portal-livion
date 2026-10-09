@@ -24,24 +24,33 @@ test('does not propose products with conflicting barcodes',()=>{
   assert.equal(rows.length,0);
 });
 
-test('requires a server-side OpenAI key after portal authorization',async()=>{
+test('returns free local candidates without calling an external AI service',async()=>{
+  let bootstrapCalls=0;
   const fetcher=async url=>{
-    if(String(url).includes('/inventory-api/bootstrap'))return new Response(JSON.stringify({
-      permissions:{product:true},
-      stock:[
-        product('A','PAPEL TOALHA','PAPEL TOALHA INTERFOLHA',{internal_code:'PT-01'}),
-        product('B','PAPEL TOALHA INTERFOLHA','PAPEL TOALHA',{internal_code:'PT-01'})
-      ]
-    }),{status:200,headers:{'content-type':'application/json'}});
-    throw new Error('unexpected network call');
+    if(String(url).includes('/inventory-api/bootstrap')){
+      bootstrapCalls++;
+      return new Response(JSON.stringify({
+        permissions:{product:true},
+        stock:[
+          product('A','PAPEL TOALHA','PAPEL TOALHA INTERFOLHA',{internal_code:'PT-01'}),
+          product('B','PAPEL TOALHA INTERFOLHA','PAPEL TOALHA',{internal_code:'PT-01'})
+        ]
+      }),{status:200,headers:{'content-type':'application/json'}});
+    }
+    throw new Error('unexpected external network call');
   };
   const handler=createHandler({env:name=>name==='SUPABASE_URL'?'https://example.supabase.co':undefined,fetcher});
   const response=await handler(new Request('https://example.test',{
     method:'POST',headers:{authorization:'Bearer portal-token','content-type':'application/json'},
     body:'{}'
   }));
-  assert.equal(response.status,503);
-  assert.equal((await response.json()).error,'OPENAI_NOT_CONFIGURED');
+  const body=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(body.model,'local-v1');
+  assert.equal(body.analysis,'LOCAL_FREE');
+  assert.equal(bootstrapCalls,1);
+  assert.ok(body.candidates.length>0);
+  assert.equal(body.candidates[0].probability,0.97);
 });
 
 
