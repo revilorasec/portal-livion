@@ -1,0 +1,45 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHandler, rankDuplicatePairs } from '../supabase/functions/inventory-duplicate-ai/handler.mjs';
+
+const product=(id,pn,description,extra={})=>({
+  product_id:id,pn,description,status:'ATIVO',item_type:'INSUMO',
+  category:'LIMPEZA',unit:'UNIDADE',balance:1,...extra
+});
+
+test('ranks a renamed duplicate and preserves both records for review',()=>{
+  const rows=rankDuplicatePairs([
+    product('A','PAPEL TOALHA','PAPEL TOALHA INTERFOLHA BRANCO',{internal_code:'PT-01'}),
+    product('B','PAPEL TOALHA INTERFOLHA','PAPEL TOALHA BRANCO',{internal_code:'PT-01'}),
+    product('C','ALCOOL 5L','ALCOOL ISOPROPILICO 5 LITROS',{barcode:'789100000001'})
+  ]);
+  assert.ok(rows.some(row=>new Set([row.left.product_id,row.right.product_id]).has('A')&&new Set([row.left.product_id,row.right.product_id]).has('B')));
+});
+
+test('does not propose products with conflicting barcodes',()=>{
+  const rows=rankDuplicatePairs([
+    product('A','CABO USB','CABO USB',{barcode:'111'}),
+    product('B','CABO USB','CABO USB',{barcode:'222'})
+  ]);
+  assert.equal(rows.length,0);
+});
+
+test('requires a server-side OpenAI key after portal authorization',async()=>{
+  const fetcher=async url=>{
+    if(String(url).includes('/inventory-api/bootstrap'))return new Response(JSON.stringify({
+      permissions:{product:true},
+      stock:[
+        product('A','PAPEL TOALHA','PAPEL TOALHA INTERFOLHA',{internal_code:'PT-01'}),
+        product('B','PAPEL TOALHA INTERFOLHA','PAPEL TOALHA',{internal_code:'PT-01'})
+      ]
+    }),{status:200,headers:{'content-type':'application/json'}});
+    throw new Error('unexpected network call');
+  };
+  const handler=createHandler({env:name=>name==='SUPABASE_URL'?'https://example.supabase.co':undefined,fetcher});
+  const response=await handler(new Request('https://example.test',{
+    method:'POST',headers:{authorization:'Bearer portal-token','content-type':'application/json'},
+    body:'{}'
+  }));
+  assert.equal(response.status,503);
+  assert.equal((await response.json()).error,'OPENAI_NOT_CONFIGURED');
+});

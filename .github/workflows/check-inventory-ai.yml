@@ -1,13 +1,17 @@
-name: Check inventory TypeSafe integration
+name: Check inventory AI integrations
 on:
   workflow_dispatch:
   push:
     paths:
       - estoque.html
       - estoque-typesafe.js
+      - estoque-duplicate-ai.js
+      - estoque-registry-merge.js
       - estoque-assets-v18.css
       - supabase/functions/inventory-product-ai/**
+      - supabase/functions/inventory-duplicate-ai/**
       - tests/inventory-product-ai.test.mjs
+      - tests/inventory-duplicate-ai.test.mjs
       - .github/workflows/check-inventory-ai.yml
 permissions:
   contents: read
@@ -22,5 +26,8 @@ jobs:
       - name: Check syntax and integration
         run: |
           node --check estoque-typesafe.js
+          node --check estoque-duplicate-ai.js
+          node --check estoque-registry-merge.js
           node --check supabase/functions/inventory-product-ai/handler.mjs
-          node --test tests/inventory-product-ai.test.mjs
+          node --check supabase/functions/inventory-duplicate-ai/handler.mjs
+          node --test tests/inventory-product-ai.test.mjs tests/inventory-duplicate-ai.test.mjs
