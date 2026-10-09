@@ -1,4 +1,4 @@
-/* OpenAI Decisions API suggests duplicate inventory registrations; users approve every merge. */
+/* Local rules suggest duplicate inventory registrations; users approve every merge. */
 (function(){
   const AI_API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/inventory-duplicate-ai';
   const hero=document.querySelector('#cadastros .hero');
@@ -35,7 +35,7 @@
       $('modalBody').innerHTML='<div class="empty"><b>Nenhuma duplicidade provável foi encontrada.</b><p>Os cadastros continuam disponíveis para revisão manual.</p></div>';
       return;
     }
-    $('modalBody').innerHTML='<div class="duplicate-summary"><b>'+rows.length+' possíveis duplicidades para revisar</b><p>A IA somente sugere. A mesclagem depende da sua escolha e confirmação.</p></div>'+
+    $('modalBody').innerHTML='<div class="duplicate-summary"><b>'+rows.length+' possíveis duplicidades para revisar</b><p>A análise local somente sugere. A mesclagem depende da sua escolha e confirmação.</p></div>'+
       '<div class="duplicate-list">'+rows.map((row,index)=>{
         const probability=Math.round(Number(row.probability)*100);
         const level=probability>=85?'high':probability>=65?'medium':'review';
@@ -56,17 +56,11 @@
   button.onclick=async()=>{
     if(button.disabled)return;
     button.disabled=true;
-    modal('Analisar cadastros duplicados','<div class="empty">Comparando componentes e insumos…</div>',async()=>{});
+    modal('Analisar cadastros duplicados','<div class="empty">Comparando componentes e insumos localmente…</div>',async()=>{});
     $('modalSave').hidden=true;
     try{renderCandidates(await analyze())}
     catch(error){
       const messages={
-        OPENAI_NOT_CONFIGURED:'A chave da OpenAI ainda não foi cadastrada no servidor.',
-        OPENAI_KEY_INVALID:'A chave da OpenAI precisa ser corrigida.',
-        OPENAI_CREDITS_REQUIRED:'O projeto da OpenAI está sem créditos de API ou atingiu o limite de gastos. Verifique o faturamento do projeto na OpenAI.',
-        OPENAI_ACCESS_DENIED:'O projeto da OpenAI não tem acesso à análise solicitada.',
-        AI_REQUEST_INVALID:'A configuração da análise precisa ser atualizada.',
-        AI_BUSY:'A OpenAI está ocupada. Tente novamente em alguns instantes.',
         AI_TIMEOUT:'A análise demorou além do esperado. Tente novamente.',
         FORBIDDEN:'Seu acesso não permite analisar ou mesclar cadastros.',
         UNAUTHORIZED:'Sua sessão expirou. Atualize o Portal.'
