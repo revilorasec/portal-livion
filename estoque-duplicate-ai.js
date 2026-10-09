@@ -63,6 +63,9 @@
       const messages={
         OPENAI_NOT_CONFIGURED:'A chave da OpenAI ainda não foi cadastrada no servidor.',
         OPENAI_KEY_INVALID:'A chave da OpenAI precisa ser corrigida.',
+        OPENAI_CREDITS_REQUIRED:'O projeto da OpenAI está sem créditos de API ou atingiu o limite de gastos. Verifique o faturamento do projeto na OpenAI.',
+        OPENAI_ACCESS_DENIED:'O projeto da OpenAI não tem acesso à análise solicitada.',
+        AI_REQUEST_INVALID:'A configuração da análise precisa ser atualizada.',
         AI_BUSY:'A OpenAI está ocupada. Tente novamente em alguns instantes.',
         AI_TIMEOUT:'A análise demorou além do esperado. Tente novamente.',
         FORBIDDEN:'Seu acesso não permite analisar ou mesclar cadastros.',
