@@ -189,8 +189,27 @@ export function createHandler({ env, fetcher = fetch }) {
         })
       });
       if (!response.ok) {
+        const requestId = response.headers.get('x-request-id') || '';
+        let upstream = {};
+        try { upstream = await response.json(); } catch {}
+        const upstreamCode = String(upstream?.error?.code || upstream?.code || '').toLowerCase();
+        const upstreamType = String(upstream?.error?.type || upstream?.type || '').toLowerCase();
+        const quotaError = response.status === 429 && /quota|billing|credit/.test(upstreamCode + ' ' + upstreamType);
+        const mappedError = response.status === 401 ? 'OPENAI_KEY_INVALID'
+          : response.status === 429 && quotaError ? 'OPENAI_CREDITS_REQUIRED'
+          : response.status === 429 ? 'AI_BUSY'
+          : [400,404,422].includes(response.status) ? 'AI_REQUEST_INVALID'
+          : response.status === 403 ? 'OPENAI_ACCESS_DENIED'
+          : 'AI_UNAVAILABLE';
+        console.error(JSON.stringify({
+          event:'openai_decisions_error',
+          status:response.status,
+          code:upstreamCode.slice(0,80),
+          type:upstreamType.slice(0,80),
+          request_id:requestId.slice(0,100)
+        }));
         const status = [429,500,502,503,529].includes(response.status) ? 503 : 502;
-        return reply({error:response.status===401?'OPENAI_KEY_INVALID':response.status===429?'AI_BUSY':'AI_UNAVAILABLE'},status);
+        return reply({error:mappedError},status);
       }
       const data = await response.json();
       const answers = new Map((data.answers || []).filter(answer => answer.type==='predicate').map(answer => [answer.name,answer]));
