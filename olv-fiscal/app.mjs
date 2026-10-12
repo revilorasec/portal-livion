@@ -95,7 +95,7 @@ function itemRow(item = {}) {
   return `<div class="item-fields item-row"><input data-item="code" aria-label="Código do item" value="${escape(item.code)}" maxlength="60"><input data-item="description" aria-label="Descrição do item" value="${escape(item.description)}" maxlength="180"><input data-item="ncm" aria-label="NCM do item" value="${escape(item.ncm)}" maxlength="8"><input data-item="unit" aria-label="Unidade do item" value="${escape(item.unit||'UN')}" maxlength="6"><input data-item="quantity" aria-label="Quantidade do item" inputmode="decimal" value="${item.quantity?number(item.quantity):'1'}"><input data-item="unitPrice" aria-label="Valor unitário do item" inputmode="decimal" value="${item.unitPrice?number(item.unitPrice):'0'}"><span class="money help item-total">${money(item.totalCents)}</span><button class="remove" type="button" aria-label="Remover item">×</button></div>`;
 }
 function readForm() {
-  const form = $('draft-form'), data = new FormData(form);
+  const form = $('draft-form'), data = { get: name => form.elements.namedItem(name)?.value ?? '' };
   return { type:form.dataset.type, operation:data.get('operation'), cfop:data.get('cfop'),
     recipient:{name:data.get('recipientName'),document:data.get('recipientDocument'),ie:data.get('recipientIE'),city:data.get('recipientCity'),uf:data.get('recipientUF'),address:data.get('recipientAddress')},
     items:[...document.querySelectorAll('.item-row')].map(row=>Object.fromEntries([...row.querySelectorAll('[data-item]')].map(input=>[input.dataset.item,input.value]))),

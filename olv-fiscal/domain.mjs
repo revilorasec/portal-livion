@@ -45,7 +45,7 @@ export function draftPayload(input) {
   if (!input || !['VENDA', 'DEVOLUCAO'].includes(input.type)) fail('Escolha venda ou devolução.');
   const items = normalizeItems(input.items || []);
   const refs = Array.isArray(input.references) ? input.references : text(input.references, 2000).split(/[\s,;]+/);
-  const references = [...new Set(refs.map(v => text(v, 44)).filter(Boolean))];
+  const references = [...new Set(refs.map(v => text(v, 100)).filter(Boolean))];
   if (references.length > 20 || references.some(key => !/^\d{44}$/.test(key))) fail('Cada chave de nota referenciada deve ter 44 dígitos.');
   const recipient = input.recipient || {};
   return { type: input.type, operation: text(input.operation, 160), cfop: text(input.cfop, 4),

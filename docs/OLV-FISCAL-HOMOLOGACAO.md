@@ -71,3 +71,15 @@ Teste local de navegador: `http://127.0.0.1:8768/olv-fiscal/index.html?demo=1`. 
 8. Conferir que emissão e migração permanecem bloqueadas e que o OLV Windows continua funcionando.
 
 Não iniciar esta versão com cadastros ou documentos reais durante os testes iniciais.
+
+## Evidência de implantação e testes — 12/10/2026
+
+- Publicado no domínio oficial e incluído no catálogo como OLV Fiscal · Testes.
+- API independente `olv-fiscal-hml-api`, autenticada pelo núcleo do Portal. Health público confirma emissão/migração bloqueadas; chamada anônima à base retorna 401.
+- 24 testes locais cobrem autorização, empresas, valores, estados, chave referenciada, bloqueio fiscal, revisão, repetição de gravação, backup e tratamento de falhas.
+- Navegador autenticado como administrador: abertura no iframe do Portal, conexão ao OneDrive, venda fictícia de R$ 17,25 e devolução fictícia de R$ 24,60, revisão, cadastro e arquivamento confirmados.
+- Duas sessões do mesmo usuário carregaram o mesmo rascunho. A segunda atualizou; a primeira recebeu 409, manteve o formulário e não sobrescreveu a versão nova. Leitura independente do arquivo no OneDrive confirmou a versão preservada.
+- Dois rascunhos fictícios foram arquivados, um por empresa; existe um cliente fictício de testes na RHCS. Os exemplos não têm autorização, número fiscal ou validade fiscal.
+- Hashes SHA-256 de app.py, static/index.html e dos três bancos MDB atuais permaneceram iguais antes/depois. Os dez cadastros de aplicativos anteriores também mantiveram o mesmo hash.
+- Nenhum usuário não administrador foi alterado. Testes reais em Mac, outro usuário e perfis de permissão continuam no roteiro de homologação do usuário.
+- Emissão SEFAZ, cálculo tributário, XML/DANFE fiscal e migração continuam fora desta etapa.
