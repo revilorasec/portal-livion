@@ -39,7 +39,7 @@ const API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/portal-api';
 const CLIENT='88cf5cba-9f67-467d-8a51-9638200bed52',TENANT='911e1aee-070e-421b-ae71-439f01c2263e';
 const REDIRECT=new URL('./',window.location.href).href;
 const GRAPH_INVITE_SCOPE='User.Invite.All';
-const PORTAL_VERSION='2026.10.02.2';
+const PORTAL_VERSION='2026.10.12.olv-hml.1';
 const TRUSTED_DEVICE_KEY='livion.portal.trusted-device.v1',LOGIN_AFTER_TRUST_KEY='livion.portal.login-after-trust.v1';
 let msalApp,ctx,token,catalog,users=[],audit=[],editing=null,currentApp=null;
 let portalAuthError='';
@@ -51,6 +51,16 @@ const portalSessionChannel='BroadcastChannel' in window?new BroadcastChannel('li
 const api=async(path,opt={})=>{const context=path==='/context',pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),send=async()=>fetch(API+path,{...opt,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',...(opt.headers||{})},cache:'no-store',signal:context?AbortSignal.timeout(15000):opt.signal});let r;try{r=await send()}catch(e){if(!context)throw e;await pause(700);try{r=await send()}catch{throw new Error('SERVICE_UNAVAILABLE')}}if(context&&r.status>=500){await pause(700);try{r=await send()}catch{throw new Error('SERVICE_UNAVAILABLE')}}if(r.status===401&&String(opt.method||'GET').toUpperCase()==='GET'){let renewed=false;try{await refreshPortalToken(true);renewed=true}catch(e){if(!interactionRequired(e)&&e?.message!=='Sessão Microsoft não encontrada')throw new Error('SERVICE_UNAVAILABLE')}if(renewed)try{r=await send()}catch{throw new Error(context?'SERVICE_UNAVAILABLE':'UNAUTHENTICATED')}}const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(r.status>=500||b.code==='PGRST003'?'SERVICE_UNAVAILABLE':b.error||String(r.status));return b};
 async function refreshPortalToken(forceRefresh=false){const account=msalApp?.getActiveAccount()||msalApp?.getAllAccounts()?.[0];if(!account)throw new Error('Sessão Microsoft não encontrada');const result=await msalApp.acquireTokenSilent({scopes:['User.Read'],account,forceRefresh});token=result.accessToken;window.__PORTAL_TOKEN__=token;return token}
 window.__PORTAL_GET_TOKEN__=refreshPortalToken;
+window.__PORTAL_GET_OLV_GRAPH_TOKEN__=async(interactive=false)=>{
+ if(currentApp?.key!=='olv-fiscal')throw new Error('Abra o OLV Fiscal no Portal antes de conectar o OneDrive.');
+ const fresh=await api('/context');
+ if(!fresh.apps.includes('olv-fiscal'))throw new Error('Seu usuário não tem acesso ao OLV Fiscal.');
+ const account=msalApp?.getActiveAccount()||msalApp?.getAllAccounts()?.[0];
+ if(!account)throw new Error('Sessão Microsoft não encontrada');
+ const request={scopes:['User.Read','Files.ReadWrite.All'],account};
+ try{return (await msalApp.acquireTokenSilent(request)).accessToken}
+ catch(e){if(!interactive||!interactionRequired(e))throw e;return (await msalApp.acquireTokenPopup(request)).accessToken}
+};
 if(portalSessionChannel)portalSessionChannel.onmessage=async e=>{if(e.data?.type!=='PORTAL_TOKEN_REQUEST'||!e.data?.requestId)return;try{const currentToken=await refreshPortalToken(false);portalSessionChannel.postMessage({type:'PORTAL_TOKEN_RESPONSE',requestId:e.data.requestId,token:currentToken,context:ctx})}catch{}};
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;if(!isStandalone())$('installBtn').classList.remove('hidden')});
@@ -91,6 +101,7 @@ function signedOut(){stopReconnect();portalAuthError='';$('authTitle').textConte
 $('loginBtn').onclick=()=>{if(portalAuthError==='SERVICE_UNAVAILABLE'){stopReconnect();init();return}const trust=$('trustDevice').checked,request=loginRequest();if(trust!==trustedDevice()){trust?localStorage.setItem(TRUSTED_DEVICE_KEY,'1'):localStorage.removeItem(TRUSTED_DEVICE_KEY);sessionStorage.setItem(LOGIN_AFTER_TRUST_KEY,request.prompt||'login');location.reload();return}msalApp.loginRedirect(request)};$('logoutBtn').onclick=()=>msalApp.logoutRedirect({account:msalApp.getActiveAccount()});
 function showPortal(){portalAuthError='';$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('portalVersion').textContent=`Portal v${PORTAL_VERSION}`;$('profilePill').textContent=ctx.profile;$('userPill').textContent=ctx.user.name;$('configBtn').classList.toggle('hidden',!ctx.administrator);$('installBtn').classList.toggle('hidden',isStandalone());renderCards();const requested=new URLSearchParams(location.search).get('app');if(requested){const a=allowedRegistry().find(x=>x.key===requested);if(a){history.replaceState(null,'',location.pathname);setTimeout(()=>openApp(a),0)}}}
 function appIcon(key){const icons={
+ 'olv-fiscal':`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5z"></path><path d="M15 3v5h4M8 12h8M8 16h5"></path></svg>`,
  rh:`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"></rect><path d="M9 3V2h6v1"></path><circle cx="12" cy="9" r="2.4"></circle><path d="M7.5 17c.8-2.3 2.3-3.5 4.5-3.5s3.7 1.2 4.5 3.5"></path></svg>`,
  fretes:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3z"></path><path d="M14 10h4l3 3v3h-7z"></path><path d="M17 10v3h4"></path><circle cx="7" cy="18" r="2"></circle><circle cx="18" cy="18" r="2"></circle><path d="M4 4h7"></path></svg>`,
  'reparos-claro':`<img src="./claro-logo.svg?v=7" alt="Claro" width="34" height="34">`,

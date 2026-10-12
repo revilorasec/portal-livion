@@ -1,0 +1,15 @@
+{
+  "id":"./?app=olv-fiscal",
+  "name":"OLV Fiscal · Homologação",
+  "short_name":"OLV Fiscal",
+  "description":"Rascunhos de venda e devolução em ambiente de testes do Portal Livion.",
+  "start_url":"./?app=olv-fiscal",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#f5f8fb",
+  "theme_color":"#10438e",
+  "icons":[
+    {"src":"./olv-fiscal/assets/icone-app-192.png","sizes":"192x192","type":"image/png"},
+    {"src":"./olv-fiscal/assets/icone-app-512.png","sizes":"512x512","type":"image/png"}
+  ]
+}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10438e">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://kvfjjtkwxxbvzlicwnrz.supabase.co; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <title>OLV Fiscal · Homologação</title>
+  <link rel="icon" href="./assets/favicon-32.png"><link rel="stylesheet" href="./app.css?v=1">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <img class="brand" src="./assets/logo-horizontal.png" alt="OLV Fiscal">
+      <span class="stage">HOMOLOGAÇÃO</span>
+      <nav aria-label="OLV Fiscal">
+        <button data-page="dashboard" class="active">Visão geral</button>
+        <button data-page="drafts">Rascunhos de notas</button>
+        <button data-page="catalogs">Cadastros</button>
+        <button data-page="history">Histórico de alterações</button>
+        <button data-page="settings">Configuração</button>
+      </nav>
+      <div class="sidebar-foot"><span>OLV web · v0.1.0</span><small>Ambiente de testes</small></div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div><p class="eyebrow">GESTÃO FISCAL</p><h1 id="page-title">Visão geral</h1></div>
+        <div class="account"><label for="company">Empresa</label><select id="company" disabled><option>Carregando acesso…</option></select><span id="user-name"></span></div>
+      </header>
+      <div class="test-notice"><span class="notice-dot"></span><div><strong>Você está no ambiente de testes.</strong> Os rascunhos ficam separados do OLV Windows. A emissão de notas está bloqueada.</div></div>
+      <div id="message" role="status" aria-live="polite" hidden></div>
+      <section id="gate" class="card gate"><h2>Preparando seu acesso</h2><p>Verificando a sessão do Portal Livion.</p></section>
+      <section id="content" hidden></section>
+      <footer><span id="storage-status">OneDrive corporativo</span><button id="reload" class="text-button" hidden>Atualizar dados</button></footer>
+    </main>
+  </div>
+  <script type="module" src="./app.mjs?v=1"></script>
+</body>
+</html>
