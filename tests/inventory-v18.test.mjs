@@ -11,15 +11,15 @@ const api = readFileSync(new URL('../supabase/functions/inventory-api/index.ts',
 const qrSourceMigration = readFileSync(new URL('../supabase/migrations/20260910170000_inventory_qr_invoice_source.sql', import.meta.url), 'utf8');
 
 test('publica a versão 12 do estoque com recursos v18 atualizados', () => {
-  assert.match(html, /data-app-version="14"/);
-  assert.match(html, /class="app-release">v14/);
+  assert.match(html, /data-app-version="15"/);
+  assert.match(html, /class="app-release">v15/);
   assert.match(html, /estoque-assets-v18\.css\?v=8/);
   assert.match(html, /estoque-assets-v18\.js\?v=5/);
   assert.match(html, /estoque-invoice-receipt\.js\?v=1/);
-  assert.match(serviceWorker, /portal-livion-v61-inventory-v14/);
+  assert.match(serviceWorker, /portal-livion-v62-inventory-v15/);
   assert.match(serviceWorker, /estoque-assets-v18-core\.js\?v=6/);
   assert.match(serviceWorker, /estoque-invoice-receipt\.js\?v=1/);
-  assert.match(versions, /estoque\.html\?v=14/);
+  assert.match(versions, /estoque\.html\?v=15/);
 });
 
 test('entrada oferece QR com câmera, foto, chave e validação do XML', () => {

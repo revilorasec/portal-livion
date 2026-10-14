@@ -22,3 +22,9 @@ export function availableDispatchUnits(balance, factor) {
   const unitFactor = requirePositiveNumber(factor, 'INVALID_DISPATCH_FACTOR');
   return Math.floor((current + 0.0000001) / unitFactor);
 }
+
+export function factorsMatch(currentFactor, proposedFactor, tolerance = 0.000001) {
+  const current = requirePositiveNumber(currentFactor, 'INVALID_DISPATCH_FACTOR');
+  const proposed = requirePositiveNumber(proposedFactor, 'INVALID_DISPATCH_FACTOR');
+  return Math.abs(current - proposed) <= tolerance;
+}
