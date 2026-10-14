@@ -34,3 +34,12 @@ test('supplier merge relinks invoices, products and procurement records',()=>{
   assert.match(migration,/update public\.procurement_offers set supplier_id=p_target_id/);
 });
 
+test('merged products stay pending until a human confirms the resulting balance',()=>{
+  assert.match(api,/registryMergeReview/);
+  assert.match(api,/review_status:'CONFIRMADO'/);
+  assert.match(ui,/Conferir mesclagens/);
+  assert.match(ui,/Saldo conferido — OK/);
+  assert.match(ui,/balance_review/);
+  assert.match(ui,/registro antigo sem fotografia dos saldos/i);
+});
+

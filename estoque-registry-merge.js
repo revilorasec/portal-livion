@@ -59,11 +59,33 @@
     const button=document.createElement('button');button.type='button';button.className='btn registry-merge-button';button.textContent='Mesclar e retirar duplicado';button.onclick=()=>openMerge(type,row);$('modalCancel').before(button);
   }
 
+  function pendingProductMerges(){return(D.registry_merges||[]).filter(row=>row.entity_type==='PRODUCT'&&String(row.review_status||'PENDENTE')!=='CONFIRMADO').sort((a,b)=>String(b.merged_at||'').localeCompare(String(a.merged_at||'')))}
+  function currentTargetBalance(row){return(D.stock||[]).find(product=>product.product_id===row.target_id)?.balance}
+  function balanceReviewHtml(row){
+    const snapshot=row.detail?.balance_review,current=currentTargetBalance(row),unit=snapshot?.unit||(D.stock||[]).find(product=>product.product_id===row.target_id)?.unit||'';
+    if(!snapshot)return`<div class="merge-review-balance"><b>Registro antigo sem fotografia dos saldos.</b><span>Saldo atual do cadastro mantido: ${current==null?'não localizado':`${fmt(current)} ${esc(unit)}`}.</span></div>`;
+    return`<div class="merge-review-balance"><span>Saldo do cadastro retirado: <b>${fmt(snapshot.source_balance)} ${esc(unit)}</b></span><span>Saldo anterior do cadastro mantido: <b>${fmt(snapshot.target_balance_before)} ${esc(unit)}</b></span><span>Resultado da mesclagem: <b>${fmt(snapshot.source_balance)} + ${fmt(snapshot.target_balance_before)} = ${fmt(snapshot.target_balance_after)} ${esc(unit)}</b></span><span>Saldo atual no estoque: <b>${current==null?'não localizado':`${fmt(current)} ${esc(unit)}`}</b></span></div>`;
+  }
+  function renderPendingMergeList(){
+    const body=$('pendingMergeList'),rows=pendingProductMerges();if(!body)return;
+    body.innerHTML=rows.map(row=>`<article class="merge-review-card" data-merge-id="${esc(row.merge_id)}"><div><small>Cadastro retirado</small><b>${esc(row.source_name)}</b></div><div><small>Cadastro que permaneceu</small><b>${esc(row.target_name)}</b></div>${balanceReviewHtml(row)}<div class="merge-review-meta">Mesclado em ${dt(row.merged_at)} por ${esc(row.merged_by||'—')}</div><button type="button" class="btn good merge-review-confirm">Saldo conferido — OK</button></article>`).join('')||'<div class="empty">Todas as mesclagens já foram conferidas.</div>';
+    body.querySelectorAll('.merge-review-confirm').forEach(button=>button.onclick=async()=>{const card=button.closest('[data-merge-id]'),mergeId=card.dataset.mergeId;button.disabled=true;button.textContent='Confirmando…';try{await api('/registry-merge-review',{method:'POST',body:JSON.stringify({merge_id:mergeId})});const row=(D.registry_merges||[]).find(item=>item.merge_id===mergeId);if(row)row.review_status='CONFIRMADO';flash('Saldo da mesclagem confirmado.');renderPendingMergeList();ensurePendingMergeButton()}catch(error){button.disabled=false;button.textContent='Saldo conferido — OK';alert(error.message)}})
+  }
+  function openPendingMergeReview(){modal('Conferir saldos após mesclagem','<p class="merge-help">Confira o resultado de cada mesclagem. Ao marcar como conferido, o item sai desta fila e continua disponível na auditoria.</p><div id="pendingMergeList" class="merge-review-list"></div>',null);$('modalSave').classList.add('hidden');renderPendingMergeList()}
+  function ensurePendingMergeButton(){
+    const hero=document.querySelector('#cadastros .hero');if(!hero)return;let actions=hero.querySelector('.actions');if(!actions){actions=document.createElement('div');actions.className='actions';hero.appendChild(actions)}
+    let button=$('pendingMergeReviewButton');if(!button){button=document.createElement('button');button.id='pendingMergeReviewButton';button.type='button';button.className='btn';button.onclick=openPendingMergeReview;actions.appendChild(button)}
+    const count=pendingProductMerges().length;button.textContent=`Conferir mesclagens (${count})`;button.classList.toggle('good',count>0);button.disabled=count===0;
+  }
+
   const productBase=openProduct;openProduct=function(row={}){cleanupActionButtons();productBase(row);if(row.product_id)addButton('PRODUCT',row)};
   const personBase=person;person=function(kind,row={}){cleanupActionButtons();personBase(kind,row);if(kind==='supplier'&&row.supplier_id)addButton('SUPPLIER',row)};
 
+  const renderBase=render;render=function(){renderBase();ensurePendingMergeButton()};
+  ensurePendingMergeButton();
+
   window.InventoryRegistryMerge={reviewPair};
 
-  const style=document.createElement('style');style.textContent='.registry-merge-button{border-color:#8aa4c6;color:#173f73}.merge-registry{display:grid;gap:14px}.merge-keep,.merge-preview{padding:13px;border:1px solid #cbdcf2;border-radius:11px;background:#f3f7fd}.merge-keep small,.merge-keep b{display:block}.merge-keep small{color:var(--muted);margin-bottom:4px}.merge-help{margin:0;color:var(--muted)}.merge-option{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #cbdcf2;border-radius:10px;background:#fff;cursor:pointer}.merge-option input{margin-top:4px}.merge-option span,.merge-option b,.merge-option small{display:block}.merge-option small{color:var(--muted);margin-top:3px}.merge-preview{border-color:#e6c55a;background:#fffaf0}.merge-preview p{margin:7px 0}.merge-preview ul{margin:8px 0;padding-left:20px}.merge-after{display:flex;align-items:center;gap:8px;margin-top:10px}';document.head.appendChild(style);
+  const style=document.createElement('style');style.textContent='.registry-merge-button{border-color:#8aa4c6;color:#173f73}.merge-registry{display:grid;gap:14px}.merge-keep,.merge-preview{padding:13px;border:1px solid #cbdcf2;border-radius:11px;background:#f3f7fd}.merge-keep small,.merge-keep b{display:block}.merge-keep small{color:var(--muted);margin-bottom:4px}.merge-help{margin:0;color:var(--muted)}.merge-option{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #cbdcf2;border-radius:10px;background:#fff;cursor:pointer}.merge-option input{margin-top:4px}.merge-option span,.merge-option b,.merge-option small{display:block}.merge-option small{color:var(--muted);margin-top:3px}.merge-preview{border-color:#e6c55a;background:#fffaf0}.merge-preview p{margin:7px 0}.merge-preview ul{margin:8px 0;padding-left:20px}.merge-after{display:flex;align-items:center;gap:8px;margin-top:10px}.merge-review-list{display:grid;gap:12px;margin-top:14px}.merge-review-card{display:grid;gap:10px;padding:14px;border:1px solid #cbdcf2;border-radius:12px;background:#fff}.merge-review-card small,.merge-review-card b{display:block}.merge-review-card small,.merge-review-meta{color:var(--muted)}.merge-review-balance{display:grid;gap:5px;padding:10px;border-radius:9px;background:#f3f7fd}.merge-review-confirm{justify-self:end}';document.head.appendChild(style);
 })();
 
