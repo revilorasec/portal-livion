@@ -46,8 +46,4 @@ body{background:radial-gradient(circle at 12% 0%,rgba(33,79,143,.055),transparen
 .app-card[data-key='reparos-claro'] .icon img{width:38px;height:38px;object-fit:contain}
 .app-card[data-key='vtal'] .icon{background:#fff!important}
 .app-card[data-key='vtal'] .icon img{width:46px;height:auto;object-fit:contain}
-.client-logo-pair{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transform:translateY(-2px)}
-.client-logo-pair img{display:block;object-fit:contain}
-.client-logo-pair img:first-child{width:24px;height:24px}
-.client-logo-pair img:last-child{width:42px;height:10px}
 @media(max-width:620px){.app-directory-top{display:block;margin:4px 0 12px}.app-directory-top h2{font-size:18px}.app-search{width:100%;margin-top:12px}.app-groups{margin-right:-12px;padding-right:12px}.app-group-tab{min-height:44px}.app-card-version{display:none!important}}

@@ -2,7 +2,7 @@
 -- É idempotente e não altera permissões, usuários ou dados operacionais.
 update public.portal_apps
 set href = case key
-  when 'rh' then 'https://revilorasec.github.io/rh-livion/?v=1.18.1'
+  when 'rh' then 'https://revilorasec.github.io/rh-livion/?v=1.18.2'
   when 'fretes' then 'https://revilorasec.github.io/fretes-livion/?v=1.3.6'
   when 'reparos-claro' then './cliente-claro.html?v=8'
   when 'estoque' then 'https://portal.livionsolutions.com.br/estoque.html?v=15'

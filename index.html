@@ -13,7 +13,7 @@
 <link rel="icon" href="./assets/icons/livion-64.png?v=1" type="image/png" />
 <link rel="apple-touch-icon" href="./assets/icons/livion-180.png?v=1" />
 <script src="./msal-browser.min.js"></script>
-<link rel="stylesheet" href="./portal-theme.css?v=6" />
+<link rel="stylesheet" href="./portal-theme.css?v=7" />
 <link rel="stylesheet" href="./unified-nav.css?v=2" />
 <style>
 :root{--navy:#0b1733;--blue:#173b70;--red:#d51f2a;--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#687389;--line:#dfe5ef;--ok:#16784a;--danger:#b42318}
@@ -39,7 +39,7 @@ const API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/portal-api';
 const CLIENT='88cf5cba-9f67-467d-8a51-9638200bed52',TENANT='911e1aee-070e-421b-ae71-439f01c2263e';
 const REDIRECT=new URL('./',window.location.href).href;
 const GRAPH_INVITE_SCOPE='User.Invite.All';
-const PORTAL_VERSION='2026.10.19.1';
+const PORTAL_VERSION='2026.10.19.2';
 const TRUSTED_DEVICE_KEY='livion.portal.trusted-device.v1',LOGIN_AFTER_TRUST_KEY='livion.portal.login-after-trust.v1';
 let msalApp,ctx,token,catalog,users=[],audit=[],editing=null,currentApp=null;
 let portalAuthError='';
@@ -107,19 +107,20 @@ function appIcon(key){const icons={
  'reparos-claro':`<img src="./claro-logo.svg?v=7" alt="Claro" width="34" height="34">`,
  estoque:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h7v7H4zM13 13h7v7h-7zM8.5 4h7v7h-7z"></path><path d="M8.5 6.5 12 8.5l3.5-2M4 15.5 7.5 18l3.5-2.5M13 15.5l3.5 2.5 3.5-2.5"></path></svg>`,
  'compras-cotacoes':`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 1.9-1.4L21 7H6"></path><circle cx="10" cy="20" r="1.5"></circle><circle cx="18" cy="20" r="1.5"></circle><path d="M10 11h7M13.5 7.5v7"></path></svg>`,
- 'desempenho-funcionarios':`<span class="client-logo-pair"><img src="./claro-logo.svg?v=7" alt="Claro" width="25" height="25"><img src="./assets/client-logos/nokia.svg" alt="Nokia" width="42" height="20"></span>`,
+ 'desempenho-funcionarios':`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V5M16 20v-8M3 20h18"></path><path d="m4 7 6-4 6 6 4-3"></path><circle cx="4" cy="7" r="1"></circle><circle cx="10" cy="3" r="1"></circle><circle cx="16" cy="9" r="1"></circle><circle cx="20" cy="6" r="1"></circle></svg>`,
  'despesas-reembolsos':`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11v18l-2-1.5L12 21l-2-1.5L8 21l-3-2z"></path><path d="M8 8h5M8 12h4M8 16h2"></path><circle cx="17.5" cy="15.5" r="3.5"></circle><path d="M17.5 13.5v4M16.2 14.4c.8-.7 2.4-.4 2.4.6 0 1.2-2.3.7-2.3 1.7 0 .9 1.6 1.2 2.5.4"></path></svg>`,
  vtal:`<img src="./assets/client-logos/vtal.png" alt="V.Tal" width="48" height="20">`
 };return icons[key]||`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect></svg>`}
 const APP_GROUPS=[{key:'operacao',label:'Operação'},{key:'clientes',label:'Clientes'},{key:'pessoas',label:'Pessoas'},{key:'gestao',label:'Gestão'}];
 const APP_GROUP_BY_KEY={fretes:'operacao',estoque:'operacao','compras-cotacoes':'operacao','reparos-claro':'clientes',vtal:'clientes',rh:'pessoas','desempenho-funcionarios':'pessoas','despesas-reembolsos':'gestao','olv-fiscal':'gestao'};
-const APP_CLIENTS={'reparos-claro':'Claro',vtal:'V.Tal','desempenho-funcionarios':'Claro + Nokia'};
+const APP_CLIENTS={'reparos-claro':'Claro',vtal:'V.Tal'};
+const APP_SEARCH_ALIASES={'desempenho-funcionarios':'Claro Nokia'};
 const RETIRED_APP_KEYS=new Set(['painel-executivo-nokia']);
 const INSTALLABLE_APP_KEYS=new Set(['olv-fiscal','rh','fretes','reparos-claro','estoque','compras-cotacoes','despesas-reembolsos','vtal']);
 let activeAppGroup='operacao';
 function appGroup(key){return APP_GROUP_BY_KEY[key]||'outros'}
 function listedApps(registry){return registry.filter(a=>ctx?.apps?.includes(a.key)&&!RETIRED_APP_KEYS.has(a.key))}
-function appSearchText(a){return [a.title,a.description,a.eyebrow,APP_CLIENTS[a.key]].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
+function appSearchText(a){return [a.title,a.description,a.eyebrow,APP_CLIENTS[a.key],APP_SEARCH_ALIASES[a.key]].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
 function renderCards(){
  const apps=allowedRegistry(),groups=APP_GROUPS.filter(g=>apps.some(a=>appGroup(a.key)===g.key));
  if(apps.some(a=>appGroup(a.key)==='outros'))groups.push({key:'outros',label:'Outros'});
