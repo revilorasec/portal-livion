@@ -2,12 +2,14 @@
 -- É idempotente e não altera permissões, usuários ou dados operacionais.
 update public.portal_apps
 set href = case key
-  when 'rh' then 'https://revilorasec.github.io/rh-livion/?v=1.8.4'
+  when 'rh' then 'https://revilorasec.github.io/rh-livion/?v=1.18.1'
   when 'fretes' then 'https://revilorasec.github.io/fretes-livion/?v=1.3.6'
-  when 'reparos-claro' then './cliente-claro.html?v=7'
+  when 'reparos-claro' then './cliente-claro.html?v=8'
   when 'estoque' then 'https://portal.livionsolutions.com.br/estoque.html?v=15'
-  when 'despesas-reembolsos' then 'https://portal.livionsolutions.com.br/despesas-reembolsos-v2.html?v=20'
+  when 'despesas-reembolsos' then 'https://portal.livionsolutions.com.br/despesas-reembolsos-v2.html?v=54'
+  when 'vtal' then 'https://portal.livionsolutions.com.br/vtal.html?v=2'
+  when 'desempenho-funcionarios' then './desempenho-funcionarios/index.html?v=12'
   else href
 end,
 updated_at = now()
-where key in ('rh', 'fretes', 'reparos-claro', 'estoque', 'despesas-reembolsos');
+where key in ('rh', 'fretes', 'reparos-claro', 'estoque', 'despesas-reembolsos', 'vtal', 'desempenho-funcionarios');

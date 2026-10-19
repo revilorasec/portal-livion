@@ -24,3 +24,30 @@ body{background:radial-gradient(circle at 12% 0%,rgba(33,79,143,.055),transparen
 .app-card[data-key='reparos-claro'] .icon{background:#fff url('./claro-logo.svg?v=5') center/82% auto no-repeat!important}
 @media(max-width:900px){.top{padding-inline:16px!important}.btn{min-height:42px}.app-card .btn{min-height:42px!important}.settings{grid-template-columns:170px minmax(0,1fr)!important}.section{padding:20px!important}}
 @media(max-width:620px){html,body{max-width:100%;overflow-x:hidden}.top{padding-inline:10px!important}.top-actions #configBtn{font-size:0!important;width:42px}.top-actions #configBtn:after{content:'⚙';font-size:18px}.shell{width:100%!important}.cards,.app-card{width:100%!important}.settings{grid-template-columns:1fr!important}.sidebar{position:static!important;display:flex!important;overflow-x:auto!important}.sidebar button{min-width:max-content;min-height:44px}.workspace{height:100dvh!important}.workspace iframe{height:calc(100dvh - 62px)!important}.workspace-app,.workspace-brand,.workspace-external,.top-actions .btn{min-height:44px}.workspace-version{font-size:9px;padding:5px 7px}.app-card-version{margin-right:2px}}
+
+/* Diretório compacto: apenas um grupo por vez, com busca em todos os grupos. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.app-directory-top{display:flex;align-items:end;justify-content:space-between;gap:20px;margin:8px 0 18px}
+.app-directory-top h2{font-size:20px;line-height:1.2;margin:0 0 3px;color:#173f73}
+.app-directory-top p{margin:0;color:#687389;font-size:12px}
+.app-search{display:block;width:min(350px,100%)}
+.app-search input{width:100%;min-height:44px;padding:10px 14px;border:1px solid #d8e2ee;border-radius:12px;background:#fff;color:#172033;outline:none;box-shadow:0 4px 14px rgba(31,67,111,.04)}
+.app-search input:focus{border-color:#245da3;box-shadow:0 0 0 3px rgba(36,93,163,.13)}
+.app-groups{display:flex;gap:8px;overflow-x:auto;padding:0 0 16px;scrollbar-width:thin}
+.app-group-tab{display:inline-flex;align-items:center;gap:9px;white-space:nowrap;min-height:42px;padding:9px 14px;border:1px solid #dce5ef;border-radius:999px;background:#fff;color:#315273;font-weight:700}
+.app-group-tab:hover{background:#f1f6fb}
+.app-group-tab.active{background:#173f73;color:#fff;border-color:#173f73}
+.app-group-tab span{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#edf3fa;color:#24528e;font-size:11px}
+.app-group-tab.active span{background:#fff;color:#173f73}
+.app-directory .cards{padding-top:3px}
+.app-card .app-actions{grid-area:button;align-self:end;margin-top:0}
+.app-empty{grid-column:1/-1}
+.app-card[data-key='reparos-claro'] .icon{background:#fff!important}
+.app-card[data-key='reparos-claro'] .icon img{width:38px;height:38px;object-fit:contain}
+.app-card[data-key='vtal'] .icon{background:#fff!important}
+.app-card[data-key='vtal'] .icon img{width:46px;height:auto;object-fit:contain}
+.client-logo-pair{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transform:translateY(-2px)}
+.client-logo-pair img{display:block;object-fit:contain}
+.client-logo-pair img:first-child{width:24px;height:24px}
+.client-logo-pair img:last-child{width:42px;height:10px}
+@media(max-width:620px){.app-directory-top{display:block;margin:4px 0 12px}.app-directory-top h2{font-size:18px}.app-search{width:100%;margin-top:12px}.app-groups{margin-right:-12px;padding-right:12px}.app-group-tab{min-height:44px}.app-card-version{display:none!important}}

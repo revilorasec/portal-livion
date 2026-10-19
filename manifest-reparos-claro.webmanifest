@@ -1,8 +1,8 @@
 {
   "id": "./pwa/reparos-claro",
-  "name": "Status Reparos Claro · Livion",
-  "short_name": "Reparos Claro",
-  "description": "Acompanhamento dos reparos Claro no Portal Livion.",
+  "name": "Status de Reparos · Livion",
+  "short_name": "Reparos",
+  "description": "Acompanhamento dos reparos no Portal Livion.",
   "lang": "pt-BR",
   "start_url": "./?app=reparos-claro",
   "scope": "./",

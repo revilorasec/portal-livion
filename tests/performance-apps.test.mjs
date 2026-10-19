@@ -64,10 +64,11 @@ test('os dois painéis oferecem apresentação seletiva com proteção financeir
   assert.match(nokia, /safe\[key\]='Oculto'/);
 });
 
-test('o Portal trata os dois painéis como aplicativos internos separados', () => {
+test('o Portal mantém o painel consolidado e retira o painel Nokia da navegação', () => {
   const portal = readFileSync(path.join(root, 'index.html'), 'utf8');
-  assert.match(portal, /'painel-executivo-nokia'/);
-  assert.match(portal, /\['reparos-claro','desempenho-funcionarios','painel-executivo-nokia'\]/);
+  assert.match(portal, /'desempenho-funcionarios'/);
+  assert.match(portal, /RETIRED_APP_KEYS=new Set\(\['painel-executivo-nokia'\]\)/);
+  assert.match(portal, /\['reparos-claro','desempenho-funcionarios'\]/);
 });
 
 test('o bônus usa devolução real, exclui fórmulas e permite editar todas as regras', () => {
