@@ -38,6 +38,8 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
       return { id: me.id, email: String(me.mail || me.userPrincipalName || '').trim().toLowerCase() };
     },
     db: {
+      settings: (actor,client)=>first('expedicao_settings?select=client,folder,revision,updated_at&owner_email=eq.'+query(actor)+'&client=eq.'+query(client)),
+      saveSettings: p=>rpc('save_settings',{p}),
       user: async identity => { const fields = 'id,name,email,profile,user_type,active,apps,actions,microsoft_id'; const found = await first('portal_users?select=' + fields + '&microsoft_id=eq.' + query(identity.id)); return found || first('portal_users?select=' + fields + '&email=eq.' + query(identity.email)); },
       appEnabled: async app => (await first('portal_apps?select=active&key=eq.' + query(app)))?.active === true,
       models: async client => (await all('expedicao_models?select=id,client,metadata,sha256,storage_path,active&active=eq.true&deleted_at=is.null&client=eq.' + query(client) + '&order=id')).map(m => ({ ...m.metadata, id: m.id, client: m.client, sha256: m.sha256, storagePath: m.storage_path, active: m.active })),
@@ -52,6 +54,13 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
       operation: id => first('expedicao_operations?select=*&id=eq.' + query(id)),
       recordExport: p => rpc('record_export', { p }), export: id => first('expedicao_exports?select=*&id=eq.' + query(id)),
       completeDispatch: p => rpc('complete_dispatch', { p })
+    },
+    verifyFolder: async (token,folder)=>{
+      need(folder&&['driveId','folderId','path'].every(k=>typeof folder[k]==='string'&&folder[k].length>0&&folder[k].length<=1000),'Confira a pasta do OneDrive.');
+      const r=await fetcher('https://graph.microsoft.com/v1.0/drives/'+query(folder.driveId)+'/items/'+query(folder.folderId)+'?$select=id,name,folder,parentReference,webUrl',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(15000)});
+      need(r.ok,'Não foi possível acessar essa pasta do OneDrive com sua conta.',403);const item=await r.json();need(item.folder&&item.id===folder.folderId&&item.parentReference?.driveId===folder.driveId,'Selecione uma pasta válida do OneDrive.');
+      const path=String(item.parentReference.path||'').split('root:').pop().replace(/^\/+|\/+$/g,'');
+      return {driveId:folder.driveId,folderId:item.id,name:item.name,path:(path?path+'/':'')+item.name,webUrl:item.webUrl};
     },
     readSource: client => bridge(client, { action: 'read' }),
     writeEnabled: client => env('EXPEDICAO_' + client.toUpperCase() + '_WRITE_ENABLED') === 'true',

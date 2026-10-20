@@ -25,6 +25,13 @@ export function decodeModel(body){
  need(typeof body.bytes==='string'&&body.bytes.length<2800000&&/^[A-Za-z0-9+/]+={0,2}$/.test(body.bytes),'Conteúdo do arquivo inválido.');
  try{return Uint8Array.from(atob(body.bytes),c=>c.charCodeAt(0));}catch{need(false,'Conteúdo do arquivo inválido.');}
 }
+export function dimensionOptions(book){
+ const cells=book.cells['04 Configurações']||{},heading=Object.entries(cells).find(([,c])=>norm(c.value)==='DIMENSOES PADRAO');
+ need(heading,'Cadastre as dimensões padrão na aba 04 Configurações.');
+ const [,column,row]=heading[0].match(/^([A-Z]+)(\d+)$/)||[];need(column,'Lista de dimensões inválida.');
+ const options=[];for(let r=Number(row)+1;r<=Number(row)+200;r++){const value=text(book.value('04 Configurações',column+r));if(!value)break;need(value.length<=160,'Dimensão do modelo muito longa.');if(!options.includes(value))options.push(value);}
+ need(options.length>0,'A lista de dimensões padrão do modelo está vazia.');return options;
+}
 export async function inspectModel(JSZip,client,bytes,name){
  guardModelZip(bytes);const {Book}=createWorkbookEngine(JSZip);let book,info;
  try{
@@ -39,7 +46,7 @@ export async function inspectModel(JSZip,client,bytes,name){
   labelTargets(book);
  }catch(e){need(false,e.message||'O modelo não é compatível.');}
  need(info.cnpj.length===14&&info.city&&/^[A-Z]{2}$/.test(info.uf)&&info.address,'Confira CNPJ, cidade, UF e endereço do modelo.');
- return {id:client+'-'+book.hash.slice(0,20),client,name,sha256:book.hash,cnpj:info.cnpj,city:info.city,uf:info.uf,address:info.address,capacity:info.capacity,boxCapacity:info.box_capacity,inheritedErrors:info.inherited_error_cells,defaults:{invoiceAddress:book.value('01 Pesagem v2','B13'),observation:book.value('01 Pesagem v2','B14')},...(client==='nokia'?{destinationKey:'NOKIA-BH'}:{})};
+ return {id:client+'-'+book.hash.slice(0,20),client,name,sha256:book.hash,cnpj:info.cnpj,city:info.city,uf:info.uf,address:info.address,capacity:info.capacity,boxCapacity:info.box_capacity,dimensionOptions:dimensionOptions(book),inheritedErrors:info.inherited_error_cells,defaults:{invoiceAddress:book.value('01 Pesagem v2','B13'),observation:book.value('01 Pesagem v2','B14')},...(client==='nokia'?{destinationKey:'NOKIA-BH'}:{})};
 }
 export function modelDestinations(client,model,source,models){
  const rows=client==='nokia'?[nokiaDestination]:source.destinations.filter(d=>digits(d.cnpj)===model.cnpj);

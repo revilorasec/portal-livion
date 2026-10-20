@@ -1,6 +1,6 @@
 # Expedição e Romaneios — Nokia e Claro
 
-Versão de liberação: aplicativo v2, Portal 2026.10.20.1, backend v7. Publicado em 20/10/2026, com catálogo ativo. A sessão administrativa Microsoft, as leituras Nokia/Claro, as 20 notas Claro em expedição e o catálogo privado foram confirmados no frontend publicado. Nenhum plano pago, compra ou serviço de IA foi contratado.
+Versão de liberação: aplicativo v3, Portal 2026.10.20.2, backend v8. Publicado em 20/10/2026, com catálogo ativo. A sessão administrativa Microsoft, as leituras Nokia/Claro, as 20 notas Claro em expedição e o catálogo privado foram confirmados no frontend publicado. Nenhum plano pago, compra ou serviço de IA foi contratado.
 
 ## Operação
 
@@ -8,11 +8,11 @@ Abra pelo Portal Livion. As abas Nokia e Claro têm leituras e regras independen
 
 Cada caixa contém um único status, validado no navegador, na API e no script da origem. O status é preenchido imediatamente à direita de STATUS em 03 Etiquetas. Qualquer status não vazio é aceito. Séries e códigos de barras repetidos são mantidos; a identidade da peça é o ID do BD.
 
-Após salvar o XLSX e reler seus bytes, a API confere a geração e as caixas atuais do BD e registra Expedido. A nota sai de Em expedição e permanece no histórico. Cancelar o salvamento ou falhar a conferência mantém a expedição aberta. O status de reparo e a localização no BD não são alterados por essa conclusão.
+Após enviar o XLSX ao OneDrive e baixar seus bytes para conferência, a API confere a geração e as caixas atuais do BD e registra Expedido. A nota sai de Em expedição e permanece no histórico. Cancelar o salvamento ou falhar a conferência mantém a expedição aberta. O status de reparo e a localização no BD não são alterados por essa conclusão.
 
 Cidade, UF e endereço de destino, endereço de emissão, responsável, observações e pesagem podem ser corrigidos no rascunho do romaneio. CNPJ, peças, status e caixas continuam vinculados à origem. No histórico, as caixas ficam bloqueadas; uma nova cópia pode corrigir os dados do documento, preservando a data e o comprovante originais da expedição. Alterar a composição real/status/caixas sinaliza uma nova conferência.
 
-O usuário escolhe a pasta local: @EXPEDIÇÃO RHCS ou @EXPEDIÇÃO LIVION. Cada cópia recebe um sufixo exclusivo e não sobrescreve arquivos existentes. A conferência local não comprova o término da sincronização OneDrive. O arquivo operacional é apenas XLSX, sem JSON ao lado.
+Em Configurações, o usuário conecta o OneDrive e confere as pastas Nokia e Claro uma vez. Os IDs e caminhos são guardados em expedicao_settings por conta Microsoft e cliente, com revisão otimista; seguem o usuário no computador, celular e tablet até nova alteração. Nenhum token é gravado nessa tabela. A sessão Microsoft pode precisar de reconexão sem perder as preferências. O aplicativo envia o XLSX diretamente ao OneDrive, sem depender da sincronização de uma pasta Windows, e baixa o arquivo por URL temporária fornecida pelo Graph para conferir o SHA-256. Cada cópia tem UUID completo e conflito fail; nenhuma gravação HTTP é repetida automaticamente. O arquivo operacional é apenas XLSX, sem JSON ao lado.
 
 ## Catálogo de modelos
 
@@ -51,6 +51,16 @@ Para uma instalação nova, aplicar expedicao-schema.sql e expedicao-model-manag
 
 ## Evidências
 
-A regressão final passou com 167 testes, zero falhas e zero ignorados. Há testes de regras, autorização, leitura sem permissão ampla na fase inicial, escrita limitada de caixas, concorrência e pendências, PostgreSQL real isolado, exclusão recuperável de modelos, ZIP, edição de cópias e preservação da data de expedição. Cópias Excel foram geradas/reabertas para os modelos estruturalmente válidos; os dois modelos anteriores com UF SPI são bloqueados até correção.
+A regressão final passou com 172 testes, zero falhas e zero ignorados. Há testes de regras, autorização, leitura sem permissão ampla na fase inicial, escrita limitada de caixas, concorrência e pendências, PostgreSQL real isolado, exclusão recuperável de modelos, ZIP, edição de cópias e preservação da data de expedição. Cópias Excel foram geradas/reabertas para os modelos estruturalmente válidos; os dois modelos anteriores com UF SPI são bloqueados até correção.
 
 Leituras assinadas reais confirmaram 7.697 registros Nokia, 4.928 Claro e 43 destinos CD_Regional. As saídas fictícias, relatórios de leitura real, screenshots e comprovantes ficam fora do repositório publicável, em EXPEDIÇÃO E ROMANEIOS/Validacao. Autenticação no frontend publicado, a primeira expedição operacional real e a sincronização final OneDrive são verificações distintas.
+
+## Interface v3 e dimensões
+
+A nota mostra a logo do cliente e a bandeira/nome da UF do rascunho. As 27 bandeiras são cópias estáticas de domínio público identificadas na galeria Wikimedia Commons; as páginas de origem e os créditos estão em assets/state-flags/sources.json. UF vazia ou desconhecida não mostra bandeira substituta. A área Rascunhos reúne os salvos do cliente selecionado, inclusive notas expedidas; rascunhos cuja nota saiu do BD continuam listados sem permitir uma operação desatualizada. Salvar uma nota nova sem editar campos também cria o rascunho.
+
+Dimensões são selecionadas em dropdown a partir da lista Dimensões padrão da aba 04 Configurações do modelo. A importação e a edição de modelos extraem novamente essa lista. As 25 cópias instaladas usam P - 35X35X24, M - 47X38X24, G - 60X40X40 e OUTRA. Valores anteriores divergentes são preservados no rascunho, mas precisam de escolha válida antes da geração.
+
+O layout adapta navegação, listas e formulários para celular/tablet, com campos de toque, navegação Notas/Rascunhos, rolagem das tabelas dentro do painel e foco automático na nota selecionada em telas pequenas. O envio ao OneDrive depende da conexão Microsoft e internet.
+
+Instalação adicional: aplicar supabase/expedicao-settings.sql. A integração do Portal usa User.Read e Files.ReadWrite; o escopo de arquivos é solicitado apenas ao conectar o OneDrive, nunca no login inicial do Portal. As rotas settings validam conta/cliente/ação e conferem a pasta no Graph antes de persistir IDs. A tabela tem RLS sem acesso direto por anon/authenticated e sem DELETE para service_role.

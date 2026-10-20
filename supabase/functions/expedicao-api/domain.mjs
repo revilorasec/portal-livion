@@ -18,7 +18,7 @@ export async function sourceGroups(client, source, models = []) {
     const candidates = models.filter(m => m.active !== false && adapter.modelMatches(m, g));
     g.errors = [...(g.errors || [])];
     if (candidates.length !== 1) g.errors.push(candidates.length ? 'Mais de um modelo corresponde ao destino.' : 'Modelo do destino ainda não conferido.');
-    g.model = candidates.length === 1 ? { id: candidates[0].id, name: candidates[0].name, sha256: candidates[0].sha256, capacity: candidates[0].capacity, boxCapacity: candidates[0].boxCapacity,defaults:candidates[0].defaults||{} } : null;
+    g.model = candidates.length === 1 ? { id: candidates[0].id, name: candidates[0].name, sha256: candidates[0].sha256, capacity: candidates[0].capacity, boxCapacity: candidates[0].boxCapacity,dimensionOptions:candidates[0].dimensionOptions||[],defaults:candidates[0].defaults||{} } : null;
     if(candidates.length===1&&candidates[0].overrideDestination===true){const m=candidates[0];g.destination={...g.destination,cnpj:m.cnpj,city:m.city,uf:m.uf,address:m.address,customAddress:true};}
     g.fingerprint = await sha256(JSON.stringify({ key: g.key, destination: g.destination, model: g.model, items: g.items.map(({ days, year, ...i }) => i).sort((a, b) => a.id.localeCompare(b.id)) }));
     // Later delivery/location updates and model revisions must not put an already shipped note back in the queue.
@@ -39,6 +39,7 @@ export function validateDraft(group, input, complete = false) {
   need(input.boxes && typeof input.boxes === 'object' && !Array.isArray(input.boxes) && Object.keys(input.boxes).length <= 500, 'Pesagem inválida.');
   for (const [key, b] of Object.entries(input.boxes)) { need(/^[1-9]\d{0,5}$/.test(key) && b && typeof b === 'object', 'Caixa inválida na pesagem.'); draft.boxes[key] = { weight: bounded(text(b.weight), 30), dimension: bounded(b.dimension ?? '', 160), observation: bounded(b.observation ?? '', 2000) }; }
   if (!complete) return draft;
+  if(group.model?.dimensionOptions?.length)for(const b of Object.values(draft.boxes))need(group.model.dimensionOptions.includes(b.dimension),'Selecione uma dimensão da lista do modelo Excel para cada caixa.');
   need(draft.destinationCity&&/^[A-Z]{2}$/.test(draft.destinationUf)&&draft.destinationAddress,'Confira cidade, UF e endereço de destino do romaneio.');
   need(group.errors.length === 0, group.errors.join(' ')); need(draft.responsible, 'Selecione quem fez a expedição.');
   need(group.items.every(i => i.status), 'Há peças sem status preenchido.');

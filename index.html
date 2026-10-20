@@ -39,7 +39,7 @@ const API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/portal-api';
 const CLIENT='88cf5cba-9f67-467d-8a51-9638200bed52',TENANT='911e1aee-070e-421b-ae71-439f01c2263e';
 const REDIRECT=new URL('./',window.location.href).href;
 const GRAPH_INVITE_SCOPE='User.Invite.All';
-const PORTAL_VERSION='2026.10.20.1';
+const PORTAL_VERSION='2026.10.20.2';
 const TRUSTED_DEVICE_KEY='livion.portal.trusted-device.v1',LOGIN_AFTER_TRUST_KEY='livion.portal.login-after-trust.v1';
 let msalApp,ctx,token,catalog,users=[],audit=[],editing=null,currentApp=null;
 let portalAuthError='';
@@ -51,6 +51,12 @@ const portalSessionChannel='BroadcastChannel' in window?new BroadcastChannel('li
 const api=async(path,opt={})=>{const context=path==='/context',pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),send=async()=>fetch(API+path,{...opt,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',...(opt.headers||{})},cache:'no-store',signal:context?AbortSignal.timeout(15000):opt.signal});let r;try{r=await send()}catch(e){if(!context)throw e;await pause(700);try{r=await send()}catch{throw new Error('SERVICE_UNAVAILABLE')}}if(context&&r.status>=500){await pause(700);try{r=await send()}catch{throw new Error('SERVICE_UNAVAILABLE')}}if(r.status===401&&String(opt.method||'GET').toUpperCase()==='GET'){let renewed=false;try{await refreshPortalToken(true);renewed=true}catch(e){if(!interactionRequired(e)&&e?.message!=='Sessão Microsoft não encontrada')throw new Error('SERVICE_UNAVAILABLE')}if(renewed)try{r=await send()}catch{throw new Error(context?'SERVICE_UNAVAILABLE':'UNAUTHENTICATED')}}const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(r.status>=500||b.code==='PGRST003'?'SERVICE_UNAVAILABLE':b.error||String(r.status));return b};
 async function refreshPortalToken(forceRefresh=false){const account=msalApp?.getActiveAccount()||msalApp?.getAllAccounts()?.[0];if(!account)throw new Error('Sessão Microsoft não encontrada');const result=await msalApp.acquireTokenSilent({scopes:['User.Read'],account,forceRefresh});token=result.accessToken;window.__PORTAL_TOKEN__=token;return token}
 window.__PORTAL_GET_TOKEN__=refreshPortalToken;
+window.__PORTAL_GET_EXPEDICAO_GRAPH_TOKEN__=async(interactive=false)=>{
+ if(currentApp?.key!=='expedicao'||!ctx?.apps?.includes('expedicao'))throw new Error('Abra Expedição e Romaneios no Portal para conectar o OneDrive.');
+ const account=msalApp?.getActiveAccount()||msalApp?.getAllAccounts()?.[0];if(!account)throw new Error('Entre com sua conta Microsoft.');
+ const request={scopes:['User.Read','Files.ReadWrite'],account};
+ return (await (interactive?msalApp.acquireTokenPopup(request):msalApp.acquireTokenSilent(request))).accessToken;
+};
 window.__PORTAL_GET_OLV_GRAPH_TOKEN__=async(interactive=false)=>{
  if(currentApp?.key!=='olv-fiscal')throw new Error('Abra o OLV Fiscal no Portal antes de conectar o OneDrive.');
  const fresh=await api('/context');

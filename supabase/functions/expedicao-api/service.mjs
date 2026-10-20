@@ -23,6 +23,12 @@ export function createService(deps) {
       need(body && typeof body === 'object' && !Array.isArray(body), 'Solicitação inválida.');
       const client = req.method === 'GET' ? url.searchParams.get('client') : body.client;
       authorize(user, client, 'view');
+      if(route==='settings'){
+        if(req.method==='GET')return reply({client,settings:await deps.db.settings(user.email,client)});
+        authorize(user,client,'generate');need(Number.isSafeInteger(body.revision)&&body.revision>=0,'Atualize as configurações.');
+        const folder=await deps.verifyFolder(raw.slice(7),body.folder);
+        return reply(await deps.db.saveSettings({client,actor:user.email,folder,revision:body.revision}));
+      }
       if(modelRoute){
         need(user.profile==='ADMINISTRADOR','Somente administradores podem gerenciar modelos.',403);
         const actor=user.email;

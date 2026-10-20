@@ -9,8 +9,11 @@ test('actual PostgreSQL RPCs: atomic draft revisions, one pending operation, imm
  await db.exec("create role anon;create role authenticated;create role service_role bypassrls;create schema storage;create table storage.buckets(id text primary key,name text,public boolean);");
  const schema=await fs.readFile(new URL('../supabase/expedicao-schema.sql',import.meta.url),'utf8');await db.exec(schema);
  await db.exec(await fs.readFile(new URL('../supabase/expedicao-model-management.sql',import.meta.url),'utf8'));
+ await db.exec(await fs.readFile(new URL('../supabase/expedicao-settings.sql',import.meta.url),'utf8'));
  const call=async(name,p)=> (await db.query('select public.'+name+'($1::jsonb) as value',[JSON.stringify(p)])).rows[0].value;
  const p={client:'nokia',groupKey:'test-note',fingerprint:'f'.repeat(64),revision:0,draft:{responsible:'Fictício'},actor:'operador@example.test'};
+ const output={actor:p.actor,client:'nokia',revision:0,folder:{driveId:'test',folderId:'test-folder',path:'destino'}};
+ await db.exec('set role service_role');assert.equal((await call('expedicao_save_settings',output)).revision,1);await assert.rejects(()=>call('expedicao_save_settings',output),/CONFLICT/);await assert.rejects(()=>call('expedicao_save_settings',{...output,revision:null}),/CONFLICT/);await call('expedicao_save_settings',{...output,actor:'outro@example.test'});assert.equal((await db.query('select count(*)::int n from public.expedicao_settings')).rows[0].n,2);await assert.rejects(()=>db.query('delete from public.expedicao_settings'),/permission denied/);
  await db.exec('set role service_role');const d=await call('expedicao_save_draft',p);assert.equal(d.revision,1);await assert.rejects(()=>call('expedicao_save_draft',p),/CONFLICT/);await assert.rejects(()=>call('expedicao_save_draft',{...p,revision:null}),/CONFLICT/);
  const op={...p,id:crypto.randomUUID(),payloadHash:'a'.repeat(64),updates:[{id:'N_TEST',box:'1'}]};const created=await call('expedicao_begin_operation',op);assert.equal(created.state,'PREPARED');assert.equal((await call('expedicao_begin_operation',op)).id,op.id);await assert.rejects(()=>call('expedicao_begin_operation',{...op,id:crypto.randomUUID()}),/PENDING/);
  assert.equal((await db.query('select public.expedicao_claim_operation($1::uuid) as claimed',[op.id])).rows[0].claimed,true);assert.equal((await db.query('select public.expedicao_claim_operation($1::uuid) as claimed',[op.id])).rows[0].claimed,false);
@@ -29,6 +32,7 @@ test('actual PostgreSQL RPCs: atomic draft revisions, one pending operation, imm
  const recovered=await call('expedicao_manage_model',{client:'claro',id:m2.id,revision:archived.revision,action:'restore',actor:p.actor});assert.equal(recovered.deleted_at,null);assert.equal(recovered.active,false);
  assert.equal((await db.query('select count(*)::int n from public.expedicao_models where content_base64 is not null')).rows[0].n,2);
  for(const role of ['anon','authenticated']){await db.exec('reset role;set role '+role);await assert.rejects(()=>db.query('select * from public.expedicao_drafts'),/permission denied/);await assert.rejects(()=>call('expedicao_save_draft',p),/permission denied/);await assert.rejects(()=>call('expedicao_manage_model',first),/permission denied/);}
- await db.exec('reset role');const rls=(await db.query("select count(*)::int n from pg_class where relname like 'expedicao_%' and relkind='r' and relrowsecurity")).rows[0].n;assert.equal(rls,6);
+ for(const role of ['anon','authenticated']){await db.exec('reset role;set role '+role);await assert.rejects(()=>db.query('select * from public.expedicao_settings'),/permission denied/);await assert.rejects(()=>call('expedicao_save_settings',output),/permission denied/);}
+ await db.exec('reset role');const rls=(await db.query("select count(*)::int n from pg_class where relname like 'expedicao_%' and relkind='r' and relrowsecurity")).rows[0].n;assert.equal(rls,7);
  }finally{await db.close();}
 });
