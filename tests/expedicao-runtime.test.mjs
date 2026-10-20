@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtimeDependencies } from '../supabase/functions/expedicao-api/runtime.mjs';
 
+test('bridge failures expose only known safe diagnostics',async()=>{
+ const env={EXPEDICAO_CLARO_URL:'https://script.google.com/macros/s/test-only/exec',EXPEDICAO_CLARO_SECRET:'test-only'};
+ for(const [source,code] of [['AUTH','SOURCE_AUTH'],['BUSY','SOURCE_BUSY'],['private data must never escape','SOURCE_ERROR']]){
+  const deps=runtimeDependencies(k=>env[k],null,async()=>Response.json({ok:false,error:source}));
+  await assert.rejects(deps.readSource('claro'),e=>e.status===502&&e.code===code&&!e.message.includes('private data'));
+ }
+});
+
 test('private database templates stay out of catalog responses and decode unchanged on the server',async()=>{
  const bytes=new Uint8Array([0,1,127,128,255]),calls=[];
  const deps=runtimeDependencies(k=>({SUPABASE_URL:'https://isolated.test',SUPABASE_SERVICE_ROLE_KEY:'test-only'})[k],null,async(url,options)=>{

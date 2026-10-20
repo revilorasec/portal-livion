@@ -22,7 +22,9 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
     // Never retry writes after timeout, redirect failure or malformed response.
     const response = await fetcher(target, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ timestamp, nonce, data, signature }), signal: AbortSignal.timeout(55000) });
     need(response.ok, 'A origem não respondeu.', 502); const result = await response.json();
-    need(result.ok === true && result.client === client && result.schemaVersion === 1, 'A origem recusou a operação ou retornou formato incompatível.', 502);
+    const failures={AUTH:'A conexão segura da origem precisa ser conferida.',BUSY:'A origem está ocupada. Aguarde e atualize a consulta.',REPLAY:'A origem recusou uma chamada repetida. Atualize a consulta.',SCHEMA:'As colunas da origem mudaram. Confira o cadastro.',CONFIG:'A origem precisa de configuração.',ERROR:'A origem encontrou uma falha ao consultar a planilha.'};
+    need(result.ok === true, failures[result.error] || 'A origem recusou a operação.', 502, Object.hasOwn(failures,result.error)?'SOURCE_'+result.error:'SOURCE_ERROR');
+    need(result.client === client && result.schemaVersion === 1, 'A origem retornou formato incompatível.', 502, 'SOURCE_SCHEMA');
     return result;
   }
   return {

@@ -1,6 +1,6 @@
 # Expedição e Romaneios — Nokia e Claro
 
-Versão de liberação: aplicativo v2, Portal 2026.10.20.1. Backend, integrações Google e modelos privados instalados em 20/10/2026; publicação e validação autenticada final do frontend em andamento. Nenhum plano pago, compra ou serviço de IA foi contratado.
+Versão de liberação: aplicativo v2, Portal 2026.10.20.1, backend v7. Publicado em 20/10/2026, com catálogo ativo. A sessão administrativa Microsoft, as leituras Nokia/Claro, as 20 notas Claro em expedição e o catálogo privado foram confirmados no frontend publicado. Nenhum plano pago, compra ou serviço de IA foi contratado.
 
 ## Operação
 
@@ -51,6 +51,6 @@ Para uma instalação nova, aplicar expedicao-schema.sql e expedicao-model-manag
 
 ## Evidências
 
-A regressão final passou com 166 testes, zero falhas e zero ignorados. Há testes de regras, autorização, leitura sem permissão ampla na fase inicial, escrita limitada de caixas, concorrência e pendências, PostgreSQL real isolado, exclusão recuperável de modelos, ZIP, edição de cópias e preservação da data de expedição. Cópias Excel foram geradas/reabertas para os modelos estruturalmente válidos; os dois modelos anteriores com UF SPI são bloqueados até correção.
+A regressão final passou com 167 testes, zero falhas e zero ignorados. Há testes de regras, autorização, leitura sem permissão ampla na fase inicial, escrita limitada de caixas, concorrência e pendências, PostgreSQL real isolado, exclusão recuperável de modelos, ZIP, edição de cópias e preservação da data de expedição. Cópias Excel foram geradas/reabertas para os modelos estruturalmente válidos; os dois modelos anteriores com UF SPI são bloqueados até correção.
 
 Leituras assinadas reais confirmaram 7.697 registros Nokia, 4.928 Claro e 43 destinos CD_Regional. As saídas fictícias, relatórios de leitura real, screenshots e comprovantes ficam fora do repositório publicável, em EXPEDIÇÃO E ROMANEIOS/Validacao. Autenticação no frontend publicado, a primeira expedição operacional real e a sincronização final OneDrive são verificações distintas.

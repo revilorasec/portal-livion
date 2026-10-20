@@ -1,4 +1,4 @@
-import { setupModels } from './models.mjs?v=2';
+import { setupModels } from './models.mjs?v=3';
 const API = 'https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/expedicao-api';
 const $ = id => document.getElementById(id), esc = v => String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm = v => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase(), text = v => String(v ?? '').trim();

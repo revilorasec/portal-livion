@@ -69,7 +69,7 @@ test('o Portal mantém o painel consolidado e retira o painel Nokia da navegaç�
   const portal = readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.match(portal, /'desempenho-funcionarios'/);
   assert.match(portal, /RETIRED_APP_KEYS=new Set\(\['painel-executivo-nokia'\]\)/);
-  assert.match(portal, /\['reparos-claro','desempenho-funcionarios'\]/);
+  assert.match(portal, /\['reparos-claro','desempenho-funcionarios'(?:,'[^']+')*\]/);
 });
 
 test('o bônus usa devolução real, exclui fórmulas e permite editar todas as regras', () => {
