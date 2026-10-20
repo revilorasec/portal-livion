@@ -1,0 +1,126 @@
+import { APP, permissions, authorize, sourceGroups, validateDraft, boxUpdates, prepareExport } from './domain.mjs';
+import { ExpeditionError, need, text, sha256 } from './common.mjs';
+import { decodeModel,modelDestinations } from './models.mjs';
+const ORIGINS = new Set(['https://portal.livionsolutions.com.br', 'https://revilorasec.github.io']);
+export function createService(deps) {
+  return async req => {
+    const origin = req.headers.get('origin'), headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Vary': 'Origin', 'X-Content-Type-Options': 'nosniff', 'Access-Control-Allow-Origin': ORIGINS.has(origin) ? origin : 'https://portal.livionsolutions.com.br', 'Access-Control-Allow-Headers': 'authorization,content-type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' };
+    const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
+    try {
+      need(!origin || ORIGINS.has(origin), 'Origem não permitida.', 403);
+      if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+      need(['GET', 'POST'].includes(req.method), 'Método não permitido.', 405);
+      const raw = req.headers.get('authorization') || ''; need(/^Bearer \S+$/.test(raw) && raw.length < 10000, 'Entre no Portal Livion.', 401);
+      const identity = await deps.identify(raw.slice(7)), user = await deps.db.user(identity);
+      need(user?.active && user.user_type === 'INTERNO' && (!user.microsoft_id || user.microsoft_id === identity.id), 'Usuário não liberado.', 403);
+      need(await deps.db.appEnabled(APP), 'Aplicativo ainda não liberado.', 403);
+      const url = new URL(req.url), route = url.pathname.split('/').pop();
+      const clients = ['nokia', 'claro'].filter(c => permissions(user, c).view);
+      if (route === 'context' && req.method === 'GET') return reply({ clients, user: { name: user.name, email: user.email }, canManageModels:user.profile==='ADMINISTRADOR', permissions: Object.fromEntries(clients.map(c => [c, permissions(user, c)])) });
+      const modelRoute=route==='models'||route.startsWith('model-');
+      const bodyText = req.method === 'POST' ? await req.text() : ''; need(bodyText.length <= (modelRoute?3000000:250000), 'Solicitação muito grande.', 413);
+      let body = {}; if (bodyText) { try { body = JSON.parse(bodyText); } catch { throw new ExpeditionError(400, 'Solicitação inválida.'); } }
+      need(body && typeof body === 'object' && !Array.isArray(body), 'Solicitação inválida.');
+      const client = req.method === 'GET' ? url.searchParams.get('client') : body.client;
+      authorize(user, client, 'view');
+      if(modelRoute){
+        need(user.profile==='ADMINISTRADOR','Somente administradores podem gerenciar modelos.',403);
+        const actor=user.email;
+        const catalog=await deps.db.allModels(client),stored=catalog.find(m=>m.id===(body.id||url.searchParams.get('id')));
+        if(route==='models'&&req.method==='GET')return reply({client,models:catalog});
+        if(route==='model-download'&&['GET','POST'].includes(req.method)){
+          need(stored,'Modelo não encontrado.',404);const bytes=await deps.modelBytes(stored);need(await sha256(bytes)===stored.sha256,'A cópia do modelo não passou na conferência.',409);
+          return reply({filename:/\.xlsx$/i.test(stored.name)?stored.name:stored.name+'.xlsx',bytes:deps.base64(bytes),sha256:stored.sha256});
+        }
+        if(route==='model-state'&&req.method==='POST'){
+          need(stored&&['archive','restore'].includes(body.action),'Modelo ou ação inválida.');need(Number.isInteger(body.revision),'Revisão inválida.');
+          return reply(await deps.db.manageModel({client,action:body.action,id:stored.id,revision:body.revision,actor}));
+        }
+        need(req.method==='POST'&&['model-check','model-edit-check','model-save'].includes(route),'Operação de modelo inválida.',404);
+        let bytes,model;
+        if(route==='model-edit-check'){
+          need(stored&&!stored.deletedAt&&stored.revision===body.revision,'O modelo mudou. Atualize o catálogo.',409);
+          const original=await deps.modelBytes(stored);need(await sha256(original)===stored.sha256,'O modelo original não passou na conferência.',409);
+          const result=await deps.editModel(stored,original,body.fields);bytes=result.bytes;model=result.model;
+        }else{bytes=decodeModel(body);model=await deps.inspectModel(client,bytes,body.filename);}
+        const source=await deps.readSource(client),active=catalog.filter(m=>m.active&&!m.deletedAt),destinations=modelDestinations(client,model,source,active);
+        need(destinations.length,'O CNPJ do modelo não identifica um destino único e válido no cadastro atual. Confira o cadastro antes de ativar.');
+        if(route!=='model-save')return reply({model,destinations,...(route==='model-edit-check'?{bytes:deps.base64(bytes),sourceId:stored.id,sourceRevision:stored.revision}:{})});
+        need(model.sha256===body.sha256,'O arquivo mudou após a validação.',409);
+        if(body.sourceId){const previous=catalog.find(m=>m.id===body.sourceId);need(previous&&!previous.deletedAt&&Number.isInteger(body.sourceRevision)&&previous.revision===body.sourceRevision,'A versão editada mudou. Atualize o catálogo.',409);}
+        const selected=destinations.find(d=>d.key===body.destinationKey);need(selected,'Selecione um destino conferido.');
+        need(selected.matches||body.useModelAddress===true,'O endereço do modelo difere do cadastro. Confirme expressamente o uso do endereço do modelo.');
+        need(Array.isArray(body.expectedActiveIds)&&body.expectedActiveIds.every(v=>typeof v==='string'),'Atualize a validação do destino.');
+        need(JSON.stringify([...body.expectedActiveIds].sort())===JSON.stringify(selected.activeIds),'O modelo ativo mudou. Confira novamente.',409);
+        model={...model,centers:client==='claro'?[selected.center]:undefined,overrideDestination:body.useModelAddress===true,validatedBy:actor,validatedAt:new Date().toISOString()};
+        const saved=await deps.db.manageModel({client,action:'save',model,center:selected.center,contentBase64:deps.base64(bytes),expectedActiveIds:selected.activeIds,sourceId:body.sourceId,sourceRevision:body.sourceRevision,actor});
+        return reply(saved);
+      }
+      const actor = user.email, source = await deps.readSource(client), models = await deps.db.models(client), loaded = await sourceGroups(client, source, models);
+      const states = await deps.db.dispatches(client);
+      for (const group of loaded.groups) { const state = states.find(s => s.group_key === group.key); group.dispatch = state || null; group.dispatchState = state?.fingerprint === group.dispatchFingerprint ? 'EXPEDIDO' : group.active ? 'EM_EXPEDICAO' : 'FINALIZADO_BD'; group.changedSinceDispatch = Boolean(state && state.fingerprint !== group.dispatchFingerprint); }
+      if (route === 'load' && req.method === 'GET') return reply({ ...loaded, client, permissions: permissions(user, client), writeEnabled: deps.writeEnabled(client), drafts: await deps.db.drafts(client), pendingOperations: await deps.db.pending(client) });
+      const group = loaded.groups.find(g => g.key === body.groupKey); need(group, 'A nota não existe mais nesta origem.', 409, 'CONFLICT');
+      need(body.fingerprint === group.fingerprint, 'O BD, destino ou modelo mudou. Atualize e confira a nota.', 409, 'CONFLICT');
+      if (route === 'draft' && req.method === 'POST') {
+        authorize(user, client, 'edit');
+        need(Number.isSafeInteger(body.revision) && body.revision >= 0 && body.revision < 2147483647, 'Revisão do rascunho inválida.');
+        const draft = validateDraft(group, body.draft);
+        if(group.dispatchState!=='EM_EXPEDICAO')need(group.items.every(i=>text(i.box)===text(draft.assignments[i.id])),'As caixas do histórico devem permanecer iguais ao BD.',409);
+        const saved = await deps.db.saveDraft({ client, groupKey: group.key, fingerprint: group.fingerprint, revision: body.revision, draft, actor });
+        return reply(saved);
+      }
+      if (route === 'boxes' && req.method === 'POST') {
+        authorize(user, client, 'write'); need(group.dispatchState !== 'EXPEDIDO', 'A expedição já foi concluída.', 409);
+        need(deps.writeEnabled(client), 'A gravação está bloqueada até a homologação da integração.', 503, 'WRITE_DISABLED');
+        const updates = boxUpdates(group, body.draft); need(/^[a-f0-9-]{36}$/.test(body.operationId), 'Identificador da operação inválido.');
+        const payloadHash = await sha256(JSON.stringify({ group: group.key, updates }));
+        const op = await deps.db.beginOperation({ id: body.operationId, client, groupKey: group.key, fingerprint: group.fingerprint, payloadHash, updates, actor });
+        if (op.state !== 'PREPARED') return reply({ operation: op, pending: op.state !== 'CONFIRMED' });
+        // A durable claim is committed before any network request. A timeout never retries a POST.
+        need(await deps.db.claimOperation(op.id), 'Operação já em execução. Confira o histórico.', 409);
+        try {
+          await deps.writeSource(client, { operationId: op.id, group, updates, actor });
+          const reread = await sourceGroups(client, await deps.readSource(client), models), current = reread.groups.find(g => g.key === group.key);
+          need(current && updates.every(u => current.items.some(i => i.id === u.id && text(i.box) === u.box && (client !== 'nokia' || i.expeditionDate))), 'A gravação ainda não foi confirmada por leitura de retorno.', 409, 'PENDING');
+          const saved = await deps.db.finishOperation(op.id, 'CONFIRMED', { verified: updates.length }, actor); return reply({ operation: saved, verified: updates.length });
+        } catch {
+          await deps.db.finishOperation(op.id, 'PENDING', { message: 'Resultado pendente de conferência; nenhuma repetição automática foi executada.' }, actor);
+          return reply({ pending: true, operationId: op.id, message: 'A resposta da gravação não foi confirmada. Use Conferir gravação; a operação não será repetida.' }, 202);
+        }
+      }
+      if (route === 'reconcile' && req.method === 'POST') {
+        authorize(user, client, 'write'); const op = await deps.db.operation(body.operationId);
+        need(op && op.client === client && op.group_key === group.key, 'Operação inválida.', 404);
+        need(['DISPATCHED', 'PENDING', 'CONFIRMED'].includes(op.state), 'A operação não foi enviada.', 409);
+        const matched = op.updates.every(u => group.items.some(i => i.id === u.id && i.box === u.box && (client !== 'nokia' || i.expeditionDate)));
+        need(matched, 'Os valores ainda não correspondem à operação. O histórico foi preservado; nenhuma escrita foi repetida.', 409, 'PENDING');
+        return reply({ operation: await deps.db.finishOperation(op.id, 'CONFIRMED', { verified: op.updates.length, reconciled: true }, actor) });
+      }
+      if (route === 'generate' && req.method === 'POST') {
+        authorize(user, client, 'generate');
+        const plan = prepareExport(group, body.draft);
+        need(group.items.every(i => text(i.box) === text(plan.draft.assignments[i.id])), 'Grave e confira as caixas no BD antes de gerar e concluir a expedição.', 409);
+        const model = models.find(m => m.id === group.model.id), bytes = await deps.modelBytes(model);
+        need(await sha256(bytes) === model.sha256, 'O modelo não corresponde à versão conferida.', 409);
+        const result = await deps.generateWorkbook(model, bytes, group, plan);
+        // Bind completion to the fresh BD snapshot, generated bytes and authenticated actor.
+        const record = await deps.db.recordExport({ client, groupKey: group.key, fingerprint: group.fingerprint, dispatchFingerprint:group.dispatchFingerprint, actor, modelId: model.id, modelHash: model.sha256, fileHash: result.sha256, output: plan.output, ids: group.items.map(i => i.id), draft: plan.draft });
+        return reply({ exportId: record.id, ...plan.output, sha256: result.sha256, bytes: deps.base64(result.bytes), alreadyDispatched: group.dispatchState === 'EXPEDIDO', warnings: model.inheritedErrors?.length ? ['O modelo contém erros em cache anteriores à geração. As fórmulas foram preservadas para recálculo no Excel.'] : [] });
+      }
+      if (route === 'saved' && req.method === 'POST') {
+        authorize(user, client, 'generate'); const exp = await deps.db.export(body.exportId);
+        need(exp && exp.client === client && exp.group_key === group.key && exp.actor_email === actor, 'Comprovante de geração inválido.', 403);
+        need(exp.file_hash === body.sha256 && exp.fingerprint === group.fingerprint, 'Arquivo ou BD divergente da geração. Atualize e confira.', 409);
+        need(group.items.every(i => text(i.box) === text(exp.draft.assignments[i.id])), 'Grave e confira as caixas no BD antes de concluir a expedição.', 409);
+        need(!(await deps.db.pending(client)).some(op => op.group_key === group.key), 'Há gravação pendente de conferência para esta nota.', 409);
+        const result = await deps.db.completeDispatch({ exportId: exp.id, groupKey: group.key, client, fingerprint: group.dispatchFingerprint, actor, savedPath: text(body.savedPath).slice(0, 1500), fileHash: body.sha256 });
+        return reply({ ...result, dispatchState: 'EXPEDIDO' });
+      }
+      throw new ExpeditionError(404, 'Operação não encontrada.');
+    } catch (error) {
+      const known = error instanceof ExpeditionError;
+      return reply({ message: known ? error.message : 'O serviço não conseguiu concluir a operação. Seus dados foram preservados.', code: known ? error.code : 'SERVICE_UNAVAILABLE' }, known ? error.status : 503);
+    }
+  };
+}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light"><meta name="referrer" content="same-origin">
+  <title>Expedição e Romaneios · Livion</title>
+  <link rel="stylesheet" href="./style.css?v=2"><script type="module" src="./app.mjs?v=2"></script>
+</head>
+<body>
+<header><div><span class="eyebrow">OPERAÇÕES · LIVION</span><h1>Expedição e Romaneios</h1><p>Conferência, caixas e pesagem em um só lugar.</p></div><span id="identity" class="pill">Validando acesso…</span></header>
+<main>
+  <div id="notice" class="notice" role="status" aria-live="polite">Conectando ao Portal Livion…</div>
+  <div id="login" hidden><p>Abra este aplicativo com sua conta corporativa.</p><a href="../?app=expedicao" target="_top" class="button">Entrar pelo Portal</a></div>
+  <div id="app" hidden>
+    <section class="toolbar panel"><div id="clients" class="tabs" role="tablist" aria-label="Empresa"></div><label>Exibir<select id="filter"><option value="EM_EXPEDICAO">Em expedição</option><option value="EXPEDIDO">Expedido</option><option value="ALL">Todas as notas</option></select></label><label class="search">Buscar nota ou destino<input id="search" type="search" placeholder="Número da nota, cidade…"></label><button id="manageModels" class="secondary" hidden>Modelos</button><button id="refresh" class="secondary">Atualizar BD</button><button id="pickFolder" class="secondary">Pasta de saída</button></section>
+    <div id="source" class="muted"></div>
+    <div class="layout"><aside class="panel"><div class="list-heading"><h2>Notas</h2><span id="noteCount" class="pill">0</span></div><div id="notes" class="note-list"></div></aside>
+    <div id="empty" class="empty panel"><div class="box-icon">▣</div><h2>Selecione uma nota</h2><p>Confira todas as peças, separe os status por caixa e informe a pesagem.</p></div>
+    <article id="detail" hidden>
+      <section class="panel"><div class="detail-title"><div><span id="clientLabel" class="eyebrow"></span><h2 id="noteTitle"></h2><p id="destination"></p></div><span id="dispatchState" class="pill"></span></div><p id="dispatchInfo" class="muted"></p><div class="metrics"><div><span>Peças</span><strong id="pieces">0</strong></div><div><span>Caixas</span><strong id="boxesCount">0</strong></div><div><span>Peso total</span><strong id="weight">0 kg</strong></div><div><span>Rascunho</span><strong id="draftState">Sem alterações</strong></div></div><div class="form-grid"><label>Responsável pela expedição<input id="responsible" maxlength="160" placeholder="Nome do responsável"></label><label id="valueLabel">Valor da NF (R$)<input id="invoiceValue" inputmode="decimal" placeholder="Opcional"></label><label>Cidade de destino<input id="destinationCity" maxlength="160"></label><label>UF de destino<input id="destinationUf" maxlength="2"></label><label class="wide">Endereço de destino deste romaneio<textarea id="destinationAddress" rows="2" maxlength="2000"></textarea></label><label class="wide">Endereço para emissão<input id="invoiceAddress" maxlength="2000"></label><label class="wide">Observação geral<textarea id="observation" rows="2" maxlength="4000"></textarea></label></div><p id="model" class="muted"></p></section>
+      <section class="panel"><div class="section-heading"><div><h2>Todas as peças</h2><p>Uma caixa deve conter apenas peças do mesmo status.</p></div><button id="suggestBoxes" class="secondary">Separar caixas por status</button></div><div class="table-scroll"><table><thead><tr id="itemsHeader"></tr></thead><tbody id="items"></tbody></table></div></section>
+      <section class="panel"><h2>Caixas / Pesagem</h2><div class="table-scroll"><table><thead><tr><th>Caixa</th><th>Status das peças</th><th>Peças</th><th>Peso (kg)</th><th>Dimensão</th><th>Observação</th></tr></thead><tbody id="boxes"></tbody></table></div><p id="boxCheck" class="muted"></p></section>
+      <section class="panel"><h2>Notas de origem</h2><div class="table-scroll"><table><thead><tr><th>Nota</th><th>Ano</th><th>Total</th><th>Anteriores</th><th>Atual</th><th>Restantes</th><th>Devolução</th></tr></thead><tbody id="invoices"></tbody></table></div></section>
+      <section id="pendingPanel" class="panel" hidden><h2>Gravações pendentes de conferência</h2><div id="pending"></div></section>
+      <section class="actions panel"><div><p id="folderInfo">Selecione a pasta de saída.</p><p id="lastOutput" class="muted"></p></div><div class="buttons"><button id="saveDraft" class="secondary">Salvar rascunho</button><button id="writeBoxes" class="secondary">Gravar caixas no BD</button><button id="generate">Gerar Excel e concluir expedição</button></div></section>
+    </article></div>
+  </div>
+</main>
+<dialog id="modelsDialog" class="models-dialog"><div class="section-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2>Modelos de romaneio</h2></div><button id="modelClose" class="secondary">Fechar</button></div>
+<p>Envie uma cópia, edite os dados ou baixe para alterar no Excel. Os originais e as versões anteriores são preservados.</p><div id="modelMessage" class="notice" role="status"></div>
+<div class="toolbar"><label>Empresa<select id="modelClient"></select></label><label class="check-label"><input type="checkbox" id="modelShowDeleted">Mostrar excluídos</label></div>
+<div class="table-scroll model-catalog"><table><thead><tr><th>Modelo</th><th>Destino</th><th>Estado</th><th>Ações</th></tr></thead><tbody id="modelList"></tbody></table></div>
+<section class="panel model-upload"><h2>Novo modelo ou nova versão</h2><label>Arquivo Excel (XLSX, até 2 MB)<input type="file" id="modelFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label><button id="modelValidate" class="secondary">Validar arquivo</button></section>
+<section id="modelEditor" class="panel" hidden><h2>Editar dados do modelo</h2><div class="form-grid"><label>CNPJ de destino<input id="model_cnpj" maxlength="30"></label><label>UF<input id="model_uf" maxlength="2"></label><label class="wide">Cidade<input id="model_city" maxlength="160"></label><label class="wide">Endereço de destino<textarea id="model_address" maxlength="2000" rows="2"></textarea></label><label class="wide">Endereço para emissão<input id="model_invoiceAddress" maxlength="2000"></label><label class="wide">Observação padrão<textarea id="model_observation" maxlength="4000" rows="2"></textarea></label></div><button id="modelValidateEdit" class="secondary">Validar nova versão</button></section>
+<section id="modelReview" class="panel" hidden><h2>Conferência antes de ativar</h2><p id="modelSummary"></p><label>Destino vinculado<select id="modelDestination"></select></label><p id="modelMatch" class="model-match"></p><label id="modelOverrideLabel" class="check-label" hidden><input type="checkbox" id="modelOverride">Conferi a diferença e autorizo usar o endereço e a cidade deste modelo nos próximos romaneios, preservando o cadastro do BD.</label><button id="modelActivate">Ativar modelo conferido</button></section></dialog>
+<footer>Os modelos originais são preservados. A conclusão da expedição não altera o status de reparo das peças.</footer>
+</body></html>
