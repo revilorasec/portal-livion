@@ -8,7 +8,7 @@ set href = case key
   when 'estoque' then 'https://portal.livionsolutions.com.br/estoque.html?v=15'
   when 'despesas-reembolsos' then 'https://portal.livionsolutions.com.br/despesas-reembolsos-v2.html?v=54'
   when 'vtal' then 'https://portal.livionsolutions.com.br/vtal.html?v=2'
-  when 'desempenho-funcionarios' then './desempenho-funcionarios/index.html?v=12'
+  when 'desempenho-funcionarios' then './desempenho-funcionarios/index.html?v=13'
   else href
 end,
 updated_at = now()

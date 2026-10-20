@@ -14,7 +14,7 @@ update public.portal_apps
 set title='Desempenho Técnico',
     description='Indicadores de produção, reparabilidade e bônus com filtros por cliente.',
     eyebrow='Pessoas & Gestão',
-    href='./desempenho-funcionarios/index.html?v=12',
+    href='./desempenho-funcionarios/index.html?v=13',
     updated_at=now()
 where key='desempenho-funcionarios';
 

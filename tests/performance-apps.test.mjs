@@ -39,12 +39,13 @@ test('publica os dois HTMLs sem incorporar dados internos', () => {
   assert.match(nokia, /Desempenho Técnico Nokia/);
 });
 
-test('consulta o serviço autenticado ao abrir e a cada 30 segundos', () => {
+test('consulta o serviço autenticado e pausa a atualização em segundo plano no celular', () => {
   assert.match(combined, /desempenho-api\/panel-data/);
   assert.match(nokia, /desempenho-api\/panel-data/);
   assert.match(combined, /fetchPanelPayload\('combined'\)/);
   assert.match(nokia, /fetchPanelPayload\('nokia'\)/);
-  assert.match(combined, /setInterval\(refreshData,30000\)/);
+  assert.match(combined, /if\(!document\.hidden\)refreshData\(\)/);
+  assert.match(combined, /matches\?90000:30000/);
   assert.match(nokia, /setInterval\(refreshData,30000\)/);
   assert.match(combined, /if\(\$\('refreshBtn'\)\.disabled\)return/);
   assert.match(nokia, /if\(\$\('refreshBtn'\)\.disabled\)return/);
