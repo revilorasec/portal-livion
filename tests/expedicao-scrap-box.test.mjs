@@ -7,6 +7,13 @@ import {prepareExport,boxUpdates} from '../supabase/functions/expedicao-api/doma
 import {sha256} from '../supabase/functions/expedicao-api/common.mjs';
 import {source,groupFor,draftFor,harness} from './expedicao-fixtures.mjs';
 
+test('explicit Save draft records a fresh revision even when fields are unchanged; passive save does not',async()=>{
+ const line=readFileSync(new URL('../expedicao/app.mjs',import.meta.url),'utf8').split('\n').find(l=>l.startsWith('async function save(force=false)'));
+ const fields={responsible:'Operador',assignments:{piece:'2'}},calls=[],state={};
+ const context={selected:{key:'note',fingerprint:'fresh-snapshot'},dirty:false,revision:3,editable:()=>true,fieldPayload:()=>fields,request:extra=>({fingerprint:'fresh-snapshot',...extra}),api:async(route,body)=>{calls.push({route,body});return {revision:4,group_key:'note',payload:fields};},data:{drafts:[{group_key:'note',revision:3}]},$:()=>state,renderNotes:()=>{}};
+ const save=runInNewContext(line+';save',context);await save();assert.equal(calls.length,0);await save(true);assert.equal(calls.length,1);assert.equal(calls[0].body.revision,3);assert.equal(calls[0].body.fingerprint,'fresh-snapshot');assert.deepEqual(calls[0].body.draft,fields);assert.equal(context.revision,4);assert.equal(state.textContent,'Salvo · revisão 4');
+});
+
 test('frontend and service use the same status compatibility policy',()=>{
  assert.equal(readFileSync(new URL('../expedicao/box-status.mjs',import.meta.url),'utf8'),readFileSync(new URL('../supabase/functions/expedicao-api/box-status.mjs',import.meta.url),'utf8'));
  assert.notEqual(boxStatusKey('claro','02-IRREPARÁVEL'),boxStatusKey('claro','SEM REPARO'));
