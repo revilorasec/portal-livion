@@ -45,7 +45,7 @@ function doPost(e) {
         var checks=client==='nokia'?{2:i.location,6:i.sourceNote,9:i.barcode,10:i.serial,11:i.pn,18:i.note,21:i.box,24:i.status}:{3:i.location,7:i.sourceNote,16:i.pn,17:i.serial,19:i.iw,20:i.sap,26:i.sgp,31:i.status,36:i.box,37:i.note};
         Object.keys(checks).forEach(function(c){if(String(r[c]||'')!==String(checks[c]||''))throw Error('CONFLICT');});
       });
-      var targets = [], verifyRanges = [], statusByBox = {};
+      var targets = [], verifyRanges = [];
       updates.forEach(function(u) {
         var id=String(u.id||''),found=byId[id],b=String(u.box||''),old=String(u.oldBox||''),expected=u.expected;
         if (!found || seen[id] || !/^[1-9][0-9]{0,5}$/.test(b) || !expected) throw Error('INVALID'); seen[id]=true;
@@ -54,17 +54,16 @@ function doPost(e) {
         if (String(r[boxCol])!==old || String(r[statusCol])!==expected.status) throw Error('CONFLICT');
         if (client==='claro' && (String(r[9]).replace(/\D/g,'')!==group.destination.cnpj || expeditionNorm_(r[10])!==group.destination.center)) throw Error('CONFLICT');
         if (client==='nokia' && (old || Number(b)>999)) throw Error('CONFLICT');
-        var status=expeditionNorm_(r[statusCol]); if(statusByBox[b] && statusByBox[b]!==status) throw Error('MIXED_STATUS'); statusByBox[b]=status;
         targets.push({range:"'"+sheetName+"'!"+(client==='nokia'?'V':'AK')+found.row,values:[[Number(b)]]});
         verifyRanges.push({range:targets[targets.length-1].range,expected:String(Number(b))});
         if(client==='nokia' && !r[20]) { var timeZone=Sheets.Spreadsheets.get(spreadsheetId,{fields:'properties.timeZone'}).properties.timeZone,offset=Utilities.formatDate(new Date(),timeZone,'Z'),minutes=(Number(offset.slice(1,3))*60+Number(offset.slice(3,5)))*(offset[0]==='-'?-1:1),serial=(Date.now()+minutes*60000-Date.UTC(1899,11,30))/86400000; targets.push({range:"'"+sheetName+"'!U"+found.row,values:[[serial]]}); verifyRanges.push({range:targets[targets.length-1].range,date:true}); }
       });
-      // Include pieces already in those boxes: concurrent changes cannot create mixed-status boxes.
+      // Different statuses may share a box. The complete source snapshot must still match.
       data.slice(1).forEach(function(r) {
         if(String(r[noteCol])!==String(group.note))return;
         if(client==='claro'&&(String(r[9]).replace(/\D/g,'')!==group.destination.cnpj||expeditionNorm_(r[10])!==group.destination.center))return;
         var u=updates.filter(function(u){return u.id===String(r[0]);})[0],b=u?String(u.box):String(r[boxCol]||'');
-        if(!b)return;var s=expeditionNorm_(r[statusCol]);if(!s||statusByBox[b]&&statusByBox[b]!==s)throw Error('MIXED_STATUS');statusByBox[b]=s;
+        if(b&&!expeditionNorm_(r[statusCol]))throw Error('CONFLICT');
       });
       // Single batch after all validation. Only V/U or AK are permitted.
       Sheets.Spreadsheets.Values.batchUpdate({valueInputOption:'RAW',data:targets},spreadsheetId);
@@ -72,7 +71,7 @@ function doPost(e) {
       verifyRanges.forEach(function(v,i){var value=actual[i]&&actual[i].values&&actual[i].values[0]?String(actual[i].values[0][0]||''):'';if(v.date?!value:value!==v.expected)throw Error('READBACK');});
       return expeditionReply_({ok:true,client:client,schemaVersion:1,operationId:payload.operationId,verified:updates.length,capturedAt:new Date().toISOString()});
     } finally { lock.releaseLock(); }
-  } catch(error) { return expeditionReply_({ok:false,error:String(error.message||'ERROR').match(/^(AUTH|BUSY|REPLAY|CONFIG|SCHEMA|WRITE_DISABLED|INVALID|DUPLICATE_ID|CONFLICT|MIXED_STATUS|READBACK)$/)?error.message:'ERROR'}); }
+  } catch(error) { return expeditionReply_({ok:false,error:String(error.message||'ERROR').match(/^(AUTH|BUSY|REPLAY|CONFIG|SCHEMA|WRITE_DISABLED|INVALID|DUPLICATE_ID|CONFLICT|READBACK)$/)?error.message:'ERROR'}); }
 }
 function doGet() { return expeditionReply_({ok:false,error:'AUTH'}); }
 function autorizarLeitura() {

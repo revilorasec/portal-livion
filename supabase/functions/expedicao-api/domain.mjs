@@ -1,6 +1,7 @@
 import * as nokia from './adapters/nokia.mjs';
 import * as claro from './adapters/claro.mjs';
 import { need, text, norm, sha256, number } from './common.mjs';
+import { describeBoxStatus } from './box-status.mjs';
 export const ADAPTERS = Object.freeze({ nokia, claro });
 export const APP = 'expedicao';
 export function permissions(user, client) {
@@ -53,10 +54,15 @@ export function boxStatuses(group, draft) {
   for (const i of group.items) {
     const box = text(draft.assignments[i.id] ?? i.box); if (!box) continue;
     need(i.status, `${i.id}: status não preenchido.`);
-    if (!byBox.has(box)) byBox.set(box, { value: i.status, normalized: norm(i.status), ids: [] });
+    if (!byBox.has(box)) byBox.set(box, { values: [], ids: [] });
     const status = byBox.get(box);
-    need(status.normalized === norm(i.status), `Caixa ${box}: há peças com status diferentes. Separe os status em caixas distintas.`);
+    status.values.push(i.status);
     status.ids.push(i.id);
+  }
+  for(const [box,status] of byBox){
+    const summary=describeBoxStatus(group.client,status.values);
+    need(summary.valid,`Caixa ${box}: há peças sem status preenchido.`);
+    status.value=summary.label;
   }
   return byBox;
 }

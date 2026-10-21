@@ -18,11 +18,11 @@ function setup(client,writeEnabled='true'){
 test('signed bridges only write Nokia U/V or Claro AK; original statuses and all other cells preserved',async()=>{
  for(const client of ['nokia','claro']){const h=setup(client),group=await groupFor(client),draft=draftFor(group),updates=boxUpdates(group,draft),before=structuredClone(h.data);const r=h.call({action:'boxes',operationId:crypto.randomUUID(),actor:'operador@example.test',group,updates});assert.equal(r.ok,true,JSON.stringify(r));assert.equal(h.writes(),1);for(let row=1;row<h.data.length;row++)for(let c=0;c<h.data[row].length;c++)if(!(client==='nokia'?[20,21]:[36]).includes(c))assert.equal(h.data[row][c],before[row][c]);assert.equal(h.data[1][client==='nokia'?21:36],'1');}
 });
-test('invalid HMAC, changed member set/status, and mixed boxes are rejected before writes',async()=>{
+test('invalid HMAC and changed member set/status are rejected before writes',async()=>{
  let h=setup('nokia'),group=await groupFor(),updates=boxUpdates(group,draftFor(group)),p={action:'boxes',operationId:crypto.randomUUID(),actor:'operador@example.test',group,updates};assert.equal(h.call(p,e=>e.signature='bad').ok,false);assert.equal(h.writes(),0);
  h.data[1][24]='STATUS ALTERADO';assert.equal(h.call(p).ok,false);assert.equal(h.writes(),0);
  h=setup('nokia');h.data.push([...h.data[1]]);h.data.at(-1)[0]='N_NEW';assert.equal(h.call(p).ok,false);assert.equal(h.writes(),0);
- h=setup('nokia');p=structuredClone(p);p.updates[1].box='1';assert.equal(h.call(p).error,'MIXED_STATUS');assert.equal(h.writes(),0);
+
 });
 
 test('read-only scope uses Advanced Sheets without SpreadsheetApp or any writes',()=>{
@@ -30,5 +30,16 @@ test('read-only scope uses Advanced Sheets without SpreadsheetApp or any writes'
   const h=setup(client,'false');h.context.autorizarLeitura();const result=h.call({action:'read'});
   assert.equal(result.ok,true,JSON.stringify(result));assert.equal(result.rows.length,h.source.rows.length);
   assert.equal(h.call({action:'boxes'}).error,'WRITE_DISABLED');assert.equal(h.writes(),0);
+ }
+});
+
+
+test('signed bridges accept any combination of unchanged statuses in the same box',async()=>{
+ for(const client of ['nokia','claro']){
+  const h=setup(client),group=await groupFor(client),draft=draftFor(group);draft.assignments[group.items[1].id]='1';
+  const before=structuredClone(h.data),updates=boxUpdates(group,draft),result=h.call({action:'boxes',operationId:crypto.randomUUID(),actor:'operador@example.test',group,updates});
+  assert.equal(result.ok,true,JSON.stringify(result));assert.equal(h.writes(),1);
+  assert.equal(h.data[1][client==='nokia'?21:36],'1');assert.equal(h.data[2][client==='nokia'?21:36],'1');
+  for(let row=1;row<h.data.length;row++)for(let col=0;col<h.data[row].length;col++)if(!(client==='nokia'?[20,21]:[36]).includes(col))assert.equal(h.data[row][col],before[row][col]);
  }
 });

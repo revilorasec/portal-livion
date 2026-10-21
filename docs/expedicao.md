@@ -1,12 +1,12 @@
 # Expedição e Romaneios — Nokia e Claro
 
-Versão de liberação: aplicativo v3, Portal 2026.10.20.2, backend v8. Publicado em 20/10/2026, com catálogo ativo. A sessão administrativa Microsoft, as leituras Nokia/Claro, as 20 notas Claro em expedição e o catálogo privado foram confirmados no frontend publicado. Nenhum plano pago, compra ou serviço de IA foi contratado.
+Versão de liberação: aplicativo v4, Portal 2026.10.20.3, backend v9. Publicado em 20/10/2026, com catálogo ativo. A sessão administrativa Microsoft, as leituras Nokia/Claro, as 20 notas Claro em expedição e o catálogo privado foram confirmados no frontend publicado. Nenhum plano pago, compra ou serviço de IA foi contratado.
 
 ## Operação
 
 Abra pelo Portal Livion. As abas Nokia e Claro têm leituras e regras independentes. A tela lista notas, todas as peças, caixa por peça, pesagem, dimensões, observações, notas de origem e histórico. Rascunho, gravação de caixas e geração do Excel são ações separadas.
 
-Cada caixa contém um único status, validado no navegador, na API e no script da origem. O status é preenchido imediatamente à direita de STATUS em 03 Etiquetas. Qualquer status não vazio é aceito. Séries e códigos de barras repetidos são mantidos; a identidade da peça é o ID do BD.
+Cada caixa pode conter qualquer combinação de status, na Claro e na Nokia. Todos os status distintos da caixa são preenchidos imediatamente à direita de STATUS em 03 Etiquetas, separados por /, preservando o status individual de cada peça. Qualquer status não vazio é aceito. A regra deve ser a mesma no navegador, na API e nos dois serviços Google. Séries e códigos de barras repetidos são mantidos; a identidade da peça é o ID do BD.
 
 Após enviar o XLSX ao OneDrive e baixar seus bytes para conferência, a API confere a geração e as caixas atuais do BD e registra Expedido. A nota sai de Em expedição e permanece no histórico. Cancelar o salvamento ou falhar a conferência mantém a expedição aberta. O status de reparo e a localização no BD não são alterados por essa conclusão.
 
@@ -67,3 +67,6 @@ Instalação adicional: aplicar supabase/expedicao-settings.sql. A integração 
 
 
 Instalação individual: o cartão Expedição e Romaneios e a barra do aplicativo têm o botão Instalar, inclusive no celular. A página install-app.html?app=expedicao usa o manifesto manifest-expedicao.webmanifest, com identidade própria ./pwa/expedicao e abertura em ./?app=expedicao pelo Portal autenticado. A instalação não concede novas permissões. A pasta de saída continua vinculada à conta no servidor.
+
+
+Atualização de 21/10/2026: a geração mostra andamento e mensagens de erro junto aos botões, com rolagem até a mensagem. O teste da nota 394 usa o rascunho revisão 3: caixa 1 com 11 peças 03-REPARADO e 21,4 kg; caixa 2 com 4 peças 02-IRREPARÁVEL e 1 SEM REPARO, 10,2 kg. Ambas usam P - 35X35X24. A cópia de conferência e os dados reais ficam fora do repositório público.
