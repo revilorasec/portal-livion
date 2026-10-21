@@ -12,6 +12,9 @@ const root=path.resolve(import.meta.dirname,'..'),dir=path.resolve(root,'../../E
 const {models}=JSON.parse(await fs.readFile(path.join(dir,'modelos.json'),'utf8'));
 const req=createRequire(pathToFileURL('C:/Users/cesar/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/_loader.cjs')),JSZip=req('jszip');
 const h=harness();
+if(process.env.EXPEDICAO_PREVIEW_ROLE==='operator'){h.user.profile='OPERADOR';h.user.apps=['expedicao'];h.user.actions=['expedicao.nokia.acessar','expedicao.claro.acessar','expedicao.visualizar','expedicao.editar_rascunho','expedicao.gravar_caixas','expedicao.gerar_romaneio'];}
+const centralTargets=new Map(['nokia','claro'].map(c=>[c,{client:c,folder:{path:'HOMOLOGAÇÃO/'+c},revision:1}]));
+h.deps.cloud={status:async(c,admin)=>({central:true,connected:true,ready:true,...(admin?{owner:'admin@example.test',settings:centralTargets.get(c)}:{})}),pending:async()=>[],saveFolder:async(c,path,revision,actor)=>{const s={client:c,folder:{path},revision:revision+1,updated_by:actor};centralTargets.set(c,s);return s;},connect:async()=>{throw Error('A prévia local não conecta contas Microsoft reais.');}};
 for(const client of ['nokia','claro']){
  const model=models.find(m=>m.client===client);h.models[client]=[{...model,centers:['TESTE']}];
  if(client==='claro'){const s=h.sources.claro;s.destinations=[{cnpj:model.cnpj,center:'TESTE',region:'NORDESTE',ufRegional:'TEST - '+model.uf,city:model.city,address:model.address}];s.rows.forEach(r=>Object.assign(r,{J:model.cnpj,K:'TESTE',M:'TEST - '+model.uf,N:model.city}));}

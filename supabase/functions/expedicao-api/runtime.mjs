@@ -1,12 +1,13 @@
 import { ExpeditionError, need, sha256 } from './common.mjs';
 import { generateWorkbook } from './excel.mjs';
 import { inspectModel,editModel } from './models.mjs';
+import { centralCloud } from './cloud.mjs';
 const TENANT = '911e1aee-070e-421b-ae71-439f01c2263e', CLIENT = '88cf5cba-9f67-467d-8a51-9638200bed52';
 export function runtimeDependencies(env, JSZip, fetcher = fetch) {
   const base = env('SUPABASE_URL'), key = env('SUPABASE_SERVICE_ROLE_KEY');
   const rest = async (path, options = {}) => {
     const response = await fetcher(base + '/rest/v1/' + path, { ...options, headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'return=representation', ...options.headers }, signal: AbortSignal.timeout(15000) });
-    if (!response.ok) { let e = {}; try { e = await response.json(); } catch {} if (/CONFLICT|PENDING/.test(e.message || '') || response.status === 409) throw new ExpeditionError(409, 'Outro usuário alterou o rascunho ou há uma gravação pendente. Atualize antes de continuar.', 'CONFLICT'); throw new ExpeditionError(503, 'O armazenamento da expedição não está disponível.'); }
+    if (!response.ok) { let e = {}; try { e = await response.json(); } catch {} if(path.includes('cloud_begin_job')&&/PENDING/.test(e.message||''))throw new ExpeditionError(409,'Há um salvamento central pendente para esta nota. Use Conferir salvamento; a gravação não será repetida.','CLOUD_PENDING');if (/CONFLICT|PENDING/.test(e.message || '') || response.status === 409) throw new ExpeditionError(409, 'Outro usuário alterou os dados ou há uma gravação pendente. Atualize antes de continuar.', 'CONFLICT'); throw new ExpeditionError(503, 'O armazenamento da expedição não está disponível.'); }
     return response.status === 204 ? null : response.json();
   };
   const query = v => encodeURIComponent(v), first = async path => (await rest(path))[0] || null;
@@ -20,7 +21,17 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
     const hmacKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
     const signature = [...new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, new TextEncoder().encode(input)))].map(n => n.toString(16).padStart(2, '0')).join('');
     // Never retry writes after timeout, redirect failure or malformed response.
-    const response = await fetcher(target, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ timestamp, nonce, data, signature }), signal: AbortSignal.timeout(55000) });
+    let response = await fetcher(target, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ timestamp, nonce, data, signature }), signal: AbortSignal.timeout(55000) });
+    // ContentService delivers the response through a one-time Google-hosted URL.
+    // Follow only that response URL, never replay the signed POST or call doGet on /exec.
+    for(let hop=0;response.status>=300&&response.status<400&&hop<3;hop++){
+      let next;try{next=new URL(response.headers.get('location'),target);}catch{}
+      const allowed=next?.protocol==='https:'&&next.hostname==='script.googleusercontent.com'&&next.pathname==='/macros/echo'&&[302,303].includes(response.status);
+      console.info('expedicao_bridge_redirect',JSON.stringify({client,status:response.status,host:next?.hostname||'missing',path:next?.pathname||'',allowed}));
+      const expired=next?.origin===target.origin&&next?.pathname===target.pathname&&response.status===302;
+      need(allowed,'O Google não entregou a resposta segura. Atualize a consulta; nenhuma gravação será repetida automaticamente.',502,expired?'SOURCE_RESPONSE_EXPIRED':'SOURCE_REDIRECT');
+      response=await fetcher(next,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(55000)});
+    }
     need(response.ok, 'A origem não respondeu.', 502); const result = await response.json();
     const failures={AUTH:'A conexão segura da origem precisa ser conferida.',BUSY:'A origem está ocupada. Aguarde e atualize a consulta.',REPLAY:'A origem recusou uma chamada repetida. Atualize a consulta.',SCHEMA:'As colunas da origem mudaram. Confira o cadastro.',CONFIG:'A origem precisa de configuração.',ERROR:'A origem encontrou uma falha ao consultar a planilha.'};
     need(result.ok === true, failures[result.error] || 'A origem recusou a operação.', 502, Object.hasOwn(failures,result.error)?'SOURCE_'+result.error:'SOURCE_ERROR');
@@ -28,6 +39,7 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
     return result;
   }
   return {
+    cloud: centralCloud({env,rest,rpc,fetcher}),
     identify: async token => {
       let c; try { c = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch { throw new ExpeditionError(401, 'Sessão inválida.'); }
       need(c.tid === TENANT && (c.azp || c.appid) === CLIENT && Number(c.exp) > Date.now() / 1000 && ['00000003-0000-0000-c000-000000000000', 'https://graph.microsoft.com'].includes(c.aud), 'Sessão inválida.', 401);
@@ -62,7 +74,11 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
       const path=String(item.parentReference.path||'').split('root:').pop().replace(/^\/+|\/+$/g,'');
       return {driveId:folder.driveId,folderId:item.id,name:item.name,path:(path?path+'/':'')+item.name,webUrl:item.webUrl};
     },
-    readSource: client => bridge(client, { action: 'read' }),
+    readSource: async client => {
+      // An expired one-time ContentService response may redirect back to /exec.
+      // Only a read may start one fresh signed request; writes are never retried.
+      try{return await bridge(client,{action:'read'});}catch(e){if(e.code!=='SOURCE_RESPONSE_EXPIRED')throw e;return bridge(client,{action:'read'});}
+    },
     writeEnabled: client => env('EXPEDICAO_' + client.toUpperCase() + '_WRITE_ENABLED') === 'true',
     writeSource: (client, payload) => bridge(client, { action: 'boxes', ...payload }),
     modelBytes: async model => { need(/^(nokia|claro)\/[a-f0-9]{64}\.xlsx$/.test(model.storagePath), 'Caminho do modelo inválido.', 503); const record=await first('expedicao_models?select=content_base64&id=eq.'+query(model.id)); if(record?.content_base64){const decoded=atob(record.content_base64);return Uint8Array.from(decoded,c=>c.charCodeAt(0));} const response = await fetcher(base + '/storage/v1/object/expedicao-modelos/' + model.storagePath, { headers: { apikey: key, Authorization: 'Bearer ' + key }, signal: AbortSignal.timeout(20000) }); need(response.ok, 'Modelo não disponível.', 503); return new Uint8Array(await response.arrayBuffer()); },

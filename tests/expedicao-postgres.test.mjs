@@ -10,6 +10,7 @@ test('actual PostgreSQL RPCs: atomic draft revisions, one pending operation, imm
  const schema=await fs.readFile(new URL('../supabase/expedicao-schema.sql',import.meta.url),'utf8');await db.exec(schema);
  await db.exec(await fs.readFile(new URL('../supabase/expedicao-model-management.sql',import.meta.url),'utf8'));
  await db.exec(await fs.readFile(new URL('../supabase/expedicao-settings.sql',import.meta.url),'utf8'));
+ await db.exec(await fs.readFile(new URL('../supabase/expedicao-cloud.sql',import.meta.url),'utf8'));
  const call=async(name,p)=> (await db.query('select public.'+name+'($1::jsonb) as value',[JSON.stringify(p)])).rows[0].value;
  const p={client:'nokia',groupKey:'test-note',fingerprint:'f'.repeat(64),revision:0,draft:{responsible:'Fictício'},actor:'operador@example.test'};
  const output={actor:p.actor,client:'nokia',revision:0,folder:{driveId:'test',folderId:'test-folder',path:'destino'}};
@@ -33,6 +34,14 @@ test('actual PostgreSQL RPCs: atomic draft revisions, one pending operation, imm
  assert.equal((await db.query('select count(*)::int n from public.expedicao_models where content_base64 is not null')).rows[0].n,2);
  for(const role of ['anon','authenticated']){await db.exec('reset role;set role '+role);await assert.rejects(()=>db.query('select * from public.expedicao_drafts'),/permission denied/);await assert.rejects(()=>call('expedicao_save_draft',p),/permission denied/);await assert.rejects(()=>call('expedicao_manage_model',first),/permission denied/);}
  for(const role of ['anon','authenticated']){await db.exec('reset role;set role '+role);await assert.rejects(()=>db.query('select * from public.expedicao_settings'),/permission denied/);await assert.rejects(()=>call('expedicao_save_settings',output),/permission denied/);}
- await db.exec('reset role');const rls=(await db.query("select count(*)::int n from pg_class where relname like 'expedicao_%' and relkind='r' and relrowsecurity")).rows[0].n;assert.equal(rls,7);
+ await db.exec('reset role;set role service_role');
+ const central={client:'nokia',actor:'admin@example.test',revision:0,folder:{driveId:'central',folderId:'only-admin-target',path:'central-output'}};
+ assert.equal((await call('expedicao_cloud_save_folder',central)).revision,1);await assert.rejects(()=>call('expedicao_cloud_save_folder',{...central,actor:'another-admin@example.test'}),/CONFLICT/);
+ const job={id:crypto.randomUUID(),client:'nokia',groupKey:'central-test-note',fingerprint:'snapshot',actor:'operator@example.test',target:central.folder};
+ assert.equal((await call('expedicao_cloud_begin_job',job)).created,true);assert.equal((await call('expedicao_cloud_begin_job',job)).created,false);await assert.rejects(()=>call('expedicao_cloud_begin_job',{...job,id:crypto.randomUUID()}),/PENDING/);await assert.rejects(()=>call('expedicao_cloud_begin_job',{...job,actor:'other@example.test'}),/CONFLICT/);
+ const session=crypto.randomUUID();await db.query("insert into public.expedicao_cloud_sessions(id,client_id,actor_email,credential,expires_at,next_poll_at,interval_seconds,state) values($1,$2,'admin@example.test','encrypted-test',now()+interval '10 minutes',now()-interval '1 second',5,'OPEN')",[session,crypto.randomUUID()]);
+ assert.equal(await call('expedicao_cloud_claim_session',{id:session,actor:'other@example.test'}),null);assert.equal((await call('expedicao_cloud_claim_session',{id:session,actor:'admin@example.test'})).credential,'encrypted-test');assert.equal((await call('expedicao_cloud_claim_session',{id:session,actor:'admin@example.test'})).waiting,true);
+ for(const role of ['anon','authenticated']){await db.exec('reset role;set role '+role);for(const table of ['expedicao_cloud_connection','expedicao_cloud_sessions','expedicao_cloud_settings','expedicao_cloud_jobs'])await assert.rejects(()=>db.query('select * from public.'+table),/permission denied/);await assert.rejects(()=>call('expedicao_cloud_save_folder',central),/permission denied/);await assert.rejects(()=>call('expedicao_cloud_claim_session',{id:session,actor:'admin@example.test'}),/permission denied/);await assert.rejects(()=>call('expedicao_cloud_begin_job',job),/permission denied/);}
+ await db.exec('reset role');const rls=(await db.query("select count(*)::int n from pg_class where relname like 'expedicao_%' and relkind='r' and relrowsecurity")).rows[0].n;assert.equal(rls,11);
  }finally{await db.close();}
 });

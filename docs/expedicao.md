@@ -1,6 +1,6 @@
 # Expedição e Romaneios — Nokia e Claro
 
-Versão de liberação: aplicativo v4, Portal 2026.10.20.3, backend v9. Publicado em 20/10/2026, com catálogo ativo. A sessão administrativa Microsoft, as leituras Nokia/Claro, as 20 notas Claro em expedição e o catálogo privado foram confirmados no frontend publicado. Nenhum plano pago, compra ou serviço de IA foi contratado.
+Versão de liberação: aplicativo v5, Portal 2026.10.20.3. O fluxo central é administrado pela empresa; operadores não conectam OneDrive. A ativação Microsoft e a validação operacional devem ser registradas separadamente dos testes locais. Nenhum serviço pago foi contratado.
 
 ## Operação
 
@@ -12,7 +12,7 @@ Após enviar o XLSX ao OneDrive e baixar seus bytes para conferência, a API con
 
 Cidade, UF e endereço de destino, endereço de emissão, responsável, observações e pesagem podem ser corrigidos no rascunho do romaneio. CNPJ, peças, status e caixas continuam vinculados à origem. No histórico, as caixas ficam bloqueadas; uma nova cópia pode corrigir os dados do documento, preservando a data e o comprovante originais da expedição. Alterar a composição real/status/caixas sinaliza uma nova conferência.
 
-Em Configurações, o usuário conecta o OneDrive e confere as pastas Nokia e Claro uma vez. Os IDs e caminhos são guardados em expedicao_settings por conta Microsoft e cliente, com revisão otimista; seguem o usuário no computador, celular e tablet até nova alteração. Nenhum token é gravado nessa tabela. A sessão Microsoft pode precisar de reconexão sem perder as preferências. O aplicativo envia o XLSX diretamente ao OneDrive, sem depender da sincronização de uma pasta Windows, e baixa o arquivo por URL temporária fornecida pelo Graph para conferir o SHA-256. Cada cópia tem UUID completo e conflito fail; nenhuma gravação HTTP é repetida automaticamente. O arquivo operacional é apenas XLSX, sem JSON ao lado.
+Somente ADMINISTRADOR define os destinos centrais Nokia e Claro. A conta central cesar.oliver@livionsolutions.com.br autoriza uma integração Microsoft dedicada, sem consentimento geral da organização. O servidor conserva a credencial de renovação com AES-GCM e HKDF com separação de contexto; nunca a envia ao navegador. O segredo de proteção é EXPEDICAO_CLOUD_KEY, quando configurado, ou uma derivação isolada do segredo de integração existente. Rotacionar esse segredo exige reconectar a conta central. Não há senha Microsoft armazenada. A equipe usa apenas o login e as permissões do Portal: não recebe credenciais, links de navegação ou acesso às pastas do OneDrive. As preferências individuais anteriores foram preservadas e não são mais utilizadas para salvar.
 
 ## Catálogo de modelos
 
@@ -61,12 +61,14 @@ A nota mostra a logo do cliente e a bandeira/nome da UF do rascunho. As 27 bande
 
 Dimensões são selecionadas em dropdown a partir da lista Dimensões padrão da aba 04 Configurações do modelo. A importação e a edição de modelos extraem novamente essa lista. As 25 cópias instaladas usam P - 35X35X24, M - 47X38X24, G - 60X40X40 e OUTRA. Valores anteriores divergentes são preservados no rascunho, mas precisam de escolha válida antes da geração.
 
-O layout adapta navegação, listas e formulários para celular/tablet, com campos de toque, navegação Notas/Rascunhos, rolagem das tabelas dentro do painel e foco automático na nota selecionada em telas pequenas. O envio ao OneDrive depende da conexão Microsoft e internet.
+O layout adapta navegação, listas e formulários para celular/tablet, com campos de toque, navegação Notas/Rascunhos, rolagem das tabelas dentro do painel e foco automático na nota selecionada em telas pequenas. O salvamento central depende de internet e da conexão da conta central; a equipe não precisa conectar OneDrive.
 
-Instalação adicional: aplicar supabase/expedicao-settings.sql. A integração do Portal usa User.Read e Files.ReadWrite; o escopo de arquivos é solicitado apenas ao conectar o OneDrive, nunca no login inicial do Portal. As rotas settings validam conta/cliente/ação e conferem a pasta no Graph antes de persistir IDs. A tabela tem RLS sem acesso direto por anon/authenticated e sem DELETE para service_role.
+Instalação central: aplicar supabase/expedicao-cloud.sql (migração expedicao_central_output). Registrar uma aplicação Microsoft dedicada, de locatário único, com fluxo por código e permissões delegadas User.Read, Files.ReadWrite e offline_access apenas para a conta central. Registrar seu client_id não secreto na linha central de expedicao_cloud_connection em estado RECONNECT, sem credencial. O administrador conclui a conexão e confere os dois destinos na interface. As quatro tabelas têm RLS, sem SELECT ou RPC para anon/authenticated. Apenas o servidor pode gerar, salvar, baixar os bytes para conferir o SHA-256 e registrar Expedido.
 
 
 Instalação individual: o cartão Expedição e Romaneios e a barra do aplicativo têm o botão Instalar, inclusive no celular. A página install-app.html?app=expedicao usa o manifesto manifest-expedicao.webmanifest, com identidade própria ./pwa/expedicao e abertura em ./?app=expedicao pelo Portal autenticado. A instalação não concede novas permissões. A pasta de saída continua vinculada à conta no servidor.
 
 
 Atualização de 21/10/2026: a geração mostra andamento e mensagens de erro junto aos botões, com rolagem até a mensagem. O teste da nota 394 usa o rascunho revisão 3: caixa 1 com 11 peças 03-REPARADO e 21,4 kg; caixa 2 com 4 peças 02-IRREPARÁVEL e 1 SEM REPARO, 10,2 kg. Ambas usam P - 35X35X24. A cópia de conferência e os dados reais ficam fora do repositório público.
+
+O salvamento central reserva uma operação única por nota antes do envio. Um timeout nunca repete POST/PUT. Em caso indeterminado, Conferir salvamento procura a cópia de UUID exato e confere os bytes antes da conclusão. A antiga rota saved não aceita comprovação fornecida pelo navegador no modo central. Destinos só podem ser alterados por administrador, inclusive em chamadas diretas à API. A resposta do Google é seguida apenas até o host oficial de entrega; uma URL de resposta expirada permite no máximo uma leitura nova, nunca uma repetição de gravação.

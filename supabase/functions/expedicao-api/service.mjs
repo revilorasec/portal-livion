@@ -16,14 +16,23 @@ export function createService(deps) {
       need(await deps.db.appEnabled(APP), 'Aplicativo ainda não liberado.', 403);
       const url = new URL(req.url), route = url.pathname.split('/').pop();
       const clients = ['nokia', 'claro'].filter(c => permissions(user, c).view);
-      if (route === 'context' && req.method === 'GET') return reply({ clients, user: { name: user.name, email: user.email }, canManageModels:user.profile==='ADMINISTRADOR', permissions: Object.fromEntries(clients.map(c => [c, permissions(user, c)])) });
+      if (route === 'context' && req.method === 'GET') return reply({ clients, user: { name: user.name, email: user.email }, canManageModels:user.profile==='ADMINISTRADOR',canManageOutput:user.profile==='ADMINISTRADOR',centralOutput:Boolean(deps.cloud), permissions: Object.fromEntries(clients.map(c => [c, permissions(user, c)])) });
       const modelRoute=route==='models'||route.startsWith('model-');
       const bodyText = req.method === 'POST' ? await req.text() : ''; need(bodyText.length <= (modelRoute?3000000:250000), 'Solicitação muito grande.', 413);
       let body = {}; if (bodyText) { try { body = JSON.parse(bodyText); } catch { throw new ExpeditionError(400, 'Solicitação inválida.'); } }
       need(body && typeof body === 'object' && !Array.isArray(body), 'Solicitação inválida.');
       const client = req.method === 'GET' ? url.searchParams.get('client') : body.client;
       authorize(user, client, 'view');
+      if(route==='cloud-status'&&req.method==='GET')return reply(await deps.cloud.status(client,user.profile==='ADMINISTRADOR'));
+      if(['cloud-connect','cloud-poll','cloud-folder'].includes(route)){
+        need(req.method==='POST'&&user.profile==='ADMINISTRADOR','Somente o administrador pode configurar o armazenamento central.',403);
+        if(route==='cloud-connect')return reply(await deps.cloud.connect(user.email));
+        if(route==='cloud-poll')return reply(await deps.cloud.poll(user.email,body.sessionId));
+        need(Number.isSafeInteger(body.revision)&&body.revision>=0,'Atualize as configurações centrais.');
+        return reply(await deps.cloud.saveFolder(client,body.path,body.revision,user.email));
+      }
       if(route==='settings'){
+        need(!deps.cloud,'Use as configurações centrais do administrador. A equipe não precisa conectar OneDrive.',403);
         if(req.method==='GET')return reply({client,settings:await deps.db.settings(user.email,client)});
         authorize(user,client,'generate');need(Number.isSafeInteger(body.revision)&&body.revision>=0,'Atualize as configurações.');
         const folder=await deps.verifyFolder(raw.slice(7),body.folder);
@@ -65,7 +74,7 @@ export function createService(deps) {
       const actor = user.email, source = await deps.readSource(client), models = await deps.db.models(client), loaded = await sourceGroups(client, source, models);
       const states = await deps.db.dispatches(client);
       for (const group of loaded.groups) { const state = states.find(s => s.group_key === group.key); group.dispatch = state || null; group.dispatchState = state?.fingerprint === group.dispatchFingerprint ? 'EXPEDIDO' : group.active ? 'EM_EXPEDICAO' : 'FINALIZADO_BD'; group.changedSinceDispatch = Boolean(state && state.fingerprint !== group.dispatchFingerprint); }
-      if (route === 'load' && req.method === 'GET') return reply({ ...loaded, client, permissions: permissions(user, client), writeEnabled: deps.writeEnabled(client), drafts: await deps.db.drafts(client), pendingOperations: await deps.db.pending(client) });
+      if (route === 'load' && req.method === 'GET') return reply({ ...loaded, client, permissions: permissions(user, client), writeEnabled: deps.writeEnabled(client), drafts: await deps.db.drafts(client), pendingOperations: await deps.db.pending(client),pendingCloudJobs:deps.cloud?await deps.cloud.pending(client):[] });
       const group = loaded.groups.find(g => g.key === body.groupKey); need(group, 'A nota não existe mais nesta origem.', 409, 'CONFLICT');
       need(body.fingerprint === group.fingerprint, 'O BD, destino ou modelo mudou. Atualize e confira a nota.', 409, 'CONFLICT');
       if (route === 'draft' && req.method === 'POST') {
@@ -109,12 +118,29 @@ export function createService(deps) {
         need(group.items.every(i => text(i.box) === text(plan.draft.assignments[i.id])), 'Grave e confira as caixas no BD antes de gerar e concluir a expedição.', 409);
         const model = models.find(m => m.id === group.model.id), bytes = await deps.modelBytes(model);
         need(await sha256(bytes) === model.sha256, 'O modelo não corresponde à versão conferida.', 409);
+        if(deps.cloud){
+          const started=await deps.cloud.begin({id:body.operationId,client,groupKey:group.key,fingerprint:group.fingerprint,actor});
+          const job=started.job;
+          if(!started.created){need(job.state==='COMPLETED','Este salvamento já foi iniciado. Use Conferir salvamento; nenhuma gravação será repetida.',409,'CLOUD_PENDING');return reply({exportId:job.export_id,dispatchState:'EXPEDIDO',alreadyDispatched:true,central:true});}
+          try{
+            need(!(await deps.db.pending(client)).some(op=>op.group_key===group.key),'Há gravação de caixas pendente de conferência.',409);
+            const result=await deps.generateWorkbook(model,bytes,group,plan);
+            const record=await deps.db.recordExport({client,groupKey:group.key,fingerprint:group.fingerprint,dispatchFingerprint:group.dispatchFingerprint,actor,modelId:model.id,modelHash:model.sha256,fileHash:result.sha256,output:plan.output,ids:group.items.map(i=>i.id),draft:plan.draft});
+            const receipt=await deps.cloud.save(job,record,result,plan.output);
+            const fresh=await sourceGroups(client,await deps.readSource(client),await deps.db.models(client)),current=fresh.groups.find(g=>g.key===group.key);
+            need(current?.fingerprint===group.fingerprint,'O Excel foi salvo, mas o BD ou modelo mudou. Use Conferir salvamento para revisar a conclusão.',409,'CLOUD_PENDING');
+            await deps.db.completeDispatch({exportId:record.id,groupKey:group.key,client,fingerprint:group.dispatchFingerprint,actor,savedPath:receipt.path,fileHash:result.sha256});
+            await deps.cloud.complete(job.id);
+            return reply({central:true,exportId:record.id,dispatchState:'EXPEDIDO',alreadyDispatched:group.dispatchState==='EXPEDIDO',filename:plan.output.filename});
+          }catch(e){await deps.cloud.failBeforeUpload(job.id);throw e;}
+        }
         const result = await deps.generateWorkbook(model, bytes, group, plan);
         // Bind completion to the fresh BD snapshot, generated bytes and authenticated actor.
         const record = await deps.db.recordExport({ client, groupKey: group.key, fingerprint: group.fingerprint, dispatchFingerprint:group.dispatchFingerprint, actor, modelId: model.id, modelHash: model.sha256, fileHash: result.sha256, output: plan.output, ids: group.items.map(i => i.id), draft: plan.draft });
         return reply({ exportId: record.id, ...plan.output, sha256: result.sha256, bytes: deps.base64(result.bytes), alreadyDispatched: group.dispatchState === 'EXPEDIDO', warnings: model.inheritedErrors?.length ? ['O modelo contém erros em cache anteriores à geração. As fórmulas foram preservadas para recálculo no Excel.'] : [] });
       }
       if (route === 'saved' && req.method === 'POST') {
+        need(!deps.cloud,'A conclusão é confirmada pelo servidor após conferir o arquivo central.',403);
         authorize(user, client, 'generate'); const exp = await deps.db.export(body.exportId);
         need(exp && exp.client === client && exp.group_key === group.key && exp.actor_email === actor, 'Comprovante de geração inválido.', 403);
         need(exp.file_hash === body.sha256 && exp.fingerprint === group.fingerprint, 'Arquivo ou BD divergente da geração. Atualize e confira.', 409);
@@ -122,6 +148,18 @@ export function createService(deps) {
         need(!(await deps.db.pending(client)).some(op => op.group_key === group.key), 'Há gravação pendente de conferência para esta nota.', 409);
         const result = await deps.db.completeDispatch({ exportId: exp.id, groupKey: group.key, client, fingerprint: group.dispatchFingerprint, actor, savedPath: text(body.savedPath).slice(0, 1500), fileHash: body.sha256 });
         return reply({ ...result, dispatchState: 'EXPEDIDO' });
+      }
+      if(route==='cloud-reconcile'&&req.method==='POST'){
+        authorize(user,client,'generate');const job=await deps.cloud.job(body.operationId);
+        need(job&&job.client===client&&job.group_key===group.key&&(job.actor_email===actor||user.profile==='ADMINISTRADOR'),'Salvamento não disponível para este usuário e nota.',403);
+        need(job.export_id,'O salvamento não chegou à criação do arquivo. Peça ao administrador para conferir.',409);
+        const exp=await deps.db.export(job.export_id);
+        need(exp&&exp.client===client&&exp.group_key===group.key&&exp.fingerprint===group.fingerprint,'O BD ou modelo mudou desde a geração. Confira antes de concluir.',409);
+        need(group.items.every(i=>text(i.box)===text(exp.draft.assignments[i.id])),'As caixas não correspondem ao arquivo gerado.',409);
+        need(!(await deps.db.pending(client)).some(op=>op.group_key===group.key),'Há gravação de caixas pendente de conferência.',409);
+        const receipt=await deps.cloud.verify(job,exp);
+        await deps.db.completeDispatch({exportId:exp.id,groupKey:group.key,client,fingerprint:group.dispatchFingerprint,actor:exp.actor_email,savedPath:receipt.path,fileHash:exp.file_hash});
+        await deps.cloud.complete(job.id);return reply({central:true,dispatchState:'EXPEDIDO'});
       }
       throw new ExpeditionError(404, 'Operação não encontrada.');
     } catch (error) {
