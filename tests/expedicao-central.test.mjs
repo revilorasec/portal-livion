@@ -57,6 +57,8 @@ test('operator without OneDrive scopes saves only to admin target; server verifi
  assert.equal(JSON.stringify(result.body).includes('token'),false);assert.equal(result.body.bytes,undefined);assert.equal(result.body.savedPath,undefined);
  assert.equal((await h.call('generate',body)).status,200);assert.equal(cloud.puts,1);
  assert.equal((await h.call('saved',{...body,exportId:h.exports[0].id,sha256:h.exports[0].file_hash,savedPath:'forged'})).status,403);
+ const copy=await h.call('generate',{...body,operationId:crypto.randomUUID()});assert.equal(copy.status,200);assert.equal(copy.body.alreadyDispatched,true);assert.equal(cloud.puts,2);assert.notEqual(copy.body.exportId,result.body.exportId);
+ assert.equal(cloud.tables.expedicao_cloud_jobs.every(j=>j.state==='COMPLETED'),true);
 });
 
 test('uncertain upload remains open, blocks duplicate writes and reconciles actual bytes without reuploading',async()=>{

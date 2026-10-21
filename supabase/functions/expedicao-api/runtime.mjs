@@ -21,16 +21,19 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
     const hmacKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
     const signature = [...new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, new TextEncoder().encode(input)))].map(n => n.toString(16).padStart(2, '0')).join('');
     // Never retry writes after timeout, redirect failure or malformed response.
-    let response = await fetcher(target, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ timestamp, nonce, data, signature }), signal: AbortSignal.timeout(55000) });
+    // Each signed request must receive its own one-time ContentService response.
+    // Keep intermediary caches from reusing a redirect for this shared /exec URL.
+    target.searchParams.set('requestId',nonce);
+    let response = await fetcher(target, { method: 'POST', redirect: 'manual', cache:'no-store', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ timestamp, nonce, data, signature }), signal: AbortSignal.timeout(55000) });
     // ContentService delivers the response through a one-time Google-hosted URL.
     // Follow only that response URL, never replay the signed POST or call doGet on /exec.
     for(let hop=0;response.status>=300&&response.status<400&&hop<3;hop++){
       let next;try{next=new URL(response.headers.get('location'),target);}catch{}
       const allowed=next?.protocol==='https:'&&next.hostname==='script.googleusercontent.com'&&next.pathname==='/macros/echo'&&[302,303].includes(response.status);
-      console.info('expedicao_bridge_redirect',JSON.stringify({client,status:response.status,host:next?.hostname||'missing',path:next?.pathname||'',allowed}));
+      console.info('expedicao_bridge_redirect',JSON.stringify({client,status:response.status,host:next?.hostname||'missing',responsePath:allowed?'/macros/echo':'other',allowed}));
       const expired=next?.origin===target.origin&&next?.pathname===target.pathname&&response.status===302;
       need(allowed,'O Google não entregou a resposta segura. Atualize a consulta; nenhuma gravação será repetida automaticamente.',502,expired?'SOURCE_RESPONSE_EXPIRED':'SOURCE_REDIRECT');
-      response=await fetcher(next,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(55000)});
+      response=await fetcher(next,{method:'GET',redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(55000)});
     }
     need(response.ok, 'A origem não respondeu.', 502); const result = await response.json();
     const failures={AUTH:'A conexão segura da origem precisa ser conferida.',BUSY:'A origem está ocupada. Aguarde e atualize a consulta.',REPLAY:'A origem recusou uma chamada repetida. Atualize a consulta.',SCHEMA:'As colunas da origem mudaram. Confira o cadastro.',CONFIG:'A origem precisa de configuração.',ERROR:'A origem encontrou uma falha ao consultar a planilha.'};

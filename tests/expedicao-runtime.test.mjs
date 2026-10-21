@@ -27,6 +27,12 @@ test('only an expired Google response may start one fresh read, while a write is
  }
 });
 
+test('signed Google calls get distinct uncached URLs without exposing the signature in the URL',async()=>{
+ const env={EXPEDICAO_CLARO_URL:'https://script.google.com/macros/s/test-only/exec',EXPEDICAO_CLARO_SECRET:'test-only'},urls=[];
+ const deps=runtimeDependencies(k=>env[k],null,async(url,options)=>{const target=new URL(url),envelope=JSON.parse(options.body);urls.push(target.href);assert.equal(target.searchParams.get('requestId'),envelope.nonce);assert.equal(target.searchParams.has('signature'),false);assert.equal(options.cache,'no-store');return Response.json({ok:true,client:'claro',schemaVersion:1,rows:[]});});
+ await deps.readSource('claro');await deps.readSource('claro');assert.notEqual(urls[0],urls[1]);
+});
+
 test('private database templates stay out of catalog responses and decode unchanged on the server',async()=>{
  const bytes=new Uint8Array([0,1,127,128,255]),calls=[];
  const deps=runtimeDependencies(k=>({SUPABASE_URL:'https://isolated.test',SUPABASE_SERVICE_ROLE_KEY:'test-only'})[k],null,async(url,options)=>{
