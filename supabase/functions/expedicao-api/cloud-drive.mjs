@@ -16,7 +16,8 @@ export async function centralFolder(token,path,fetcher=fetch){
 }
 export async function verifyCentralFile(token,receipt,expectedHash,fetcher=fetch){
  const base='/drives/'+enc(receipt.driveId)+'/items/';
- const file=await cloudGraph(token,base+enc(receipt.itemId)+'?$select=id,size,@microsoft.graph.downloadUrl',{},fetcher);
+ // Request full metadata: this tenant omitted downloadUrl under an explicit projection.
+ const file=await cloudGraph(token,base+enc(receipt.itemId),{},fetcher);
  const url=new URL(file['@microsoft.graph.downloadUrl']||'about:blank');
  need(file.id===receipt.itemId&&url.protocol==='https:'&&url.hostname.endsWith('.sharepoint.com')&&!url.username&&!url.password&&Number(file.size)<=10000000,'O OneDrive central não forneceu uma conferência válida.',502);
  const read=await fetcher(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});

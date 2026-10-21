@@ -23,7 +23,7 @@ function cloudHarness(){
   if(url.includes('/central-root?'))return Response.json({id:'central-root',folder:{}});
   if(o.method==='POST'){h.posts++;return Response.json({id:'note-folder',folder:{}});}
   if(o.method==='PUT'){h.puts++;if(h.failUpload)throw Error('timeout after upload');return Response.json({id:'saved-file'});}
-  if(url.includes('/saved-file?'))return Response.json({id:'saved-file',size:1,'@microsoft.graph.downloadUrl':'https://tenant.sharepoint.com/private-download'});
+  if(url.endsWith('/saved-file'))return Response.json({id:'saved-file',size:1,'@microsoft.graph.downloadUrl':'https://tenant.sharepoint.com/private-download'});
   if(url==='https://tenant.sharepoint.com/private-download'){assert.equal(o.headers?.Authorization,undefined);return new Response(h.bytes);}
   if(url.includes('central-root:/')&&url.includes('.xlsx'))return Response.json({id:'saved-file'});
   return new Response('{}',{status:404});
