@@ -7,7 +7,7 @@ const js=readFileSync(new URL('../compras-cotacoes.js',import.meta.url),'utf8');
 const api=readFileSync(new URL('../supabase/functions/procurement-api/index.ts',import.meta.url),'utf8');
 const schema=readFileSync(new URL('../supabase/migrations/20260923120000_procurement_v1.sql',import.meta.url),'utf8');
 const legacy=readFileSync(new URL('../supabase/migrations/20260923123000_procurement_legacy_import.sql',import.meta.url),'utf8');
-const installer=readFileSync(new URL('../install-app.html',import.meta.url),'utf8');
+const installer=readFileSync(new URL('../app-installers.js',import.meta.url),'utf8');
 const manifest=readFileSync(new URL('../manifest-compras-cotacoes.webmanifest',import.meta.url),'utf8');
 
 test('historico inicia paginado e permite carregar mais solicitacoes',()=>{

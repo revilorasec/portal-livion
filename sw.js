@@ -1,5 +1,5 @@
-const CACHE='portal-livion-v67-expedicao-mobile';
-const SHELL=['./','./index.html','./offline.html','./portal-theme.css?v=7','./unified-nav.css?v=3','./livion-logo.svg','./msal-browser.min.js','./manifest.webmanifest','./claro-logo.svg','./assets/client-logos/vtal.png'];
+const CACHE='portal-livion-v68-individual-install';
+const SHELL=['./','./index.html','./offline.html','./portal-theme.css?v=7','./unified-nav.css?v=4','./livion-logo.svg','./msal-browser.min.js','./manifest.webmanifest','./app-installers.js?v=1','./claro-logo.svg','./assets/client-logos/vtal.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{

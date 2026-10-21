@@ -5,21 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0b1733">
 <title>Instalar aplicativo · Livion</title>
+<script src="./app-installers.js?v=1"></script>
 <script>
-const APP_INSTALLERS={
-  'olv-fiscal':{name:'OLV Fiscal · Testes',short:'OLV Fiscal',manifest:'./manifest-olv-fiscal.webmanifest',key:'olv-fiscal',icon:'./olv-fiscal/assets/icone-app-192.png',touch:'./olv-fiscal/assets/icone-app-192.png'},
-  rh:{name:'Recursos Humanos',short:'RH Livion',manifest:'./manifest-rh.webmanifest',key:'rh',icon:'./assets/app-icons/rh-192.png',touch:'./assets/app-icons/rh-180.png'},
-  fretes:{name:'Transportadora',short:'Transportadora',manifest:'./manifest-fretes.webmanifest',key:'fretes',icon:'./assets/app-icons/fretes-192.png',touch:'./assets/app-icons/fretes-180.png'},
-  'reparos-claro':{name:'Status de Reparos',short:'Reparos',manifest:'./manifest-reparos-claro.webmanifest',key:'reparos-claro',icon:'./assets/app-icons/reparos-claro-192.png',touch:'./assets/app-icons/reparos-claro-180.png'},
-  estoque:{name:'Controle de Estoque',short:'Estoque Livion',manifest:'./manifest-estoque.webmanifest',key:'estoque',icon:'./assets/app-icons/estoque-192.png',touch:'./assets/app-icons/estoque-180.png'},
-  'compras-cotacoes':{name:'Compras e Cotações',short:'Compras Livion',manifest:'./manifest-compras-cotacoes.webmanifest',key:'compras-cotacoes',icon:'./assets/app-icons/compras-cotacoes-192.png',touch:'./assets/app-icons/compras-cotacoes-180.png'},
-  'despesas-reembolsos':{name:'Despesas e Reembolsos',short:'Despesas Livion',manifest:'./manifest-despesas-reembolsos.webmanifest',key:'despesas-reembolsos',icon:'./assets/app-icons/despesas-reembolsos-192.png',touch:'./assets/app-icons/despesas-reembolsos-180.png'},
-  vtal:{name:'Checklist de Requisitos',short:'Checklist',manifest:'./manifest-vtal.webmanifest',key:'vtal',icon:'./assets/app-icons/vtal-192.png',touch:'./assets/app-icons/vtal-180.png'}
-};
 const requested=new URLSearchParams(location.search).get('app')||'';
-const selected=APP_INSTALLERS[requested]||APP_INSTALLERS.rh;
+const selected=Object.hasOwn(APP_INSTALLERS,requested)?APP_INSTALLERS[requested]:null;
+if(selected){
 document.write('<link rel="manifest" href="'+selected.manifest+'?v=4"><link rel="icon" type="image/png" href="'+selected.icon+'?v=4"><link rel="apple-touch-icon" href="'+selected.touch+'?v=4">');
 document.title='Instalar '+selected.name+' · Livion';
+document.write('<meta name="application-name" content="'+selected.short+'"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="'+selected.short+'">');
+}
 </script>
 <style>
 :root{--navy:#0b1733;--blue:#173b70;--bg:#f4f7fb;--text:#172033;--muted:#687389;--line:#dfe5ef;--ok:#16784a}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px;background:var(--bg);color:var(--text);font:14px/1.5 Inter,Segoe UI,Arial,sans-serif}.box{width:min(520px,100%);background:#fff;border:1px solid var(--line);border-radius:22px;padding:30px;box-shadow:0 18px 55px rgba(11,23,51,.1)}.brand{display:flex;align-items:center;gap:12px;margin-bottom:24px}.brand img{width:54px;height:54px;border-radius:14px}.brand b{font-size:18px;color:var(--navy)}.brand small{display:block;color:var(--muted)}h1{margin:0 0 8px;font-size:28px}p{color:var(--muted)}.app{margin:22px 0;padding:18px;border-radius:16px;background:#f7f9fc;border:1px solid var(--line)}.app b{font-size:18px}.actions{display:grid;gap:10px}.btn{border:1px solid var(--line);border-radius:11px;padding:12px 16px;background:#fff;color:var(--text);font:inherit;font-weight:700;cursor:pointer;text-align:center;text-decoration:none}.btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}.btn:disabled{opacity:.5;cursor:wait}.status{margin-top:14px;padding:12px;border-radius:11px;background:#eef4fb;color:var(--blue);display:none}.status.on{display:block}.ok{background:#e9f7ef;color:var(--ok)}.steps{margin:12px 0 0;padding-left:20px;color:var(--muted)}
@@ -36,10 +30,15 @@ document.title='Instalar '+selected.name+' · Livion';
     <a class="btn" id="openBtn" href="./">Abrir sem instalar</a>
     <a class="btn" href="./">Voltar ao Portal</a>
   </div>
-  <div id="status" class="status"></div>
+  <div id="status" class="status" role="status" aria-live="polite"></div>
 </main>
 <script>
 const info=selected;
+if(!info){
+ document.getElementById('appName').textContent='Escolha um aplicativo no Portal';
+ document.getElementById('appDesc').textContent='Volte ao Portal e toque em Instalar no aplicativo desejado.';
+ document.getElementById('installBtn').hidden=true;document.getElementById('installerIcon').hidden=true;document.getElementById('openBtn').hidden=true;
+}else{
 const $=id=>document.getElementById(id);
 $('installerIcon').src=info.icon;$('installerIcon').alt=info.name;$('appName').textContent=info.name;
 $('appDesc').textContent='Será instalado como “'+info.short+'” e abrirá direto neste módulo.';
@@ -47,23 +46,25 @@ $('openBtn').href='./?app='+encodeURIComponent(info.key);
 let deferredPrompt=null;
 const standalone=matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
 function explainInstall(){
-  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   const s=$('status');s.classList.add('on');
-  if(ios){s.innerHTML='<b>No iPhone/iPad:</b><ol class="steps"><li>Toque em Compartilhar.</li><li>Escolha “Adicionar à Tela de Início”.</li><li>Confirme em Adicionar.</li></ol>';return;}
+  if(ios){s.innerHTML='<b>No iPhone/iPad:</b><ol class="steps"><li>Abra esta página no Safari e toque em Compartilhar.</li><li>Escolha “Adicionar à Tela de Início”.</li><li>Confira o nome “'+info.short+'” e confirme em Adicionar.</li></ol>';return;}
   s.innerHTML='<b>Se a janela de instalação não aparecer:</b><ol class="steps"><li>Abra o menu do navegador.</li><li>Escolha “Instalar aplicativo” ou “Instalar '+info.short+'”.</li><li>Confirme a instalação.</li></ol>';
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$('installBtn').disabled=false});
 window.addEventListener('appinstalled',()=>{deferredPrompt=null;$('status').textContent='Aplicativo instalado com sucesso.';$('status').className='status on ok';$('installBtn').textContent='Instalado';$('installBtn').disabled=true});
 $('installBtn').onclick=async()=>{
-  if(standalone){$('status').textContent='Este aplicativo já está aberto em modo instalado.';$('status').className='status on ok';return;}
   if(!deferredPrompt){explainInstall();return;}
-  deferredPrompt.prompt();
-  const choice=await deferredPrompt.userChoice;
-  if(choice?.outcome==='accepted'){$('installBtn').disabled=true;$('installBtn').textContent='Instalando…'}
-  deferredPrompt=null;
+  try{
+    await deferredPrompt.prompt();
+    const choice=await deferredPrompt.userChoice;
+    if(choice?.outcome==='accepted'){$('installBtn').disabled=true;$('installBtn').textContent='Instalando…'}
+  }catch{explainInstall();}
+  finally{deferredPrompt=null;}
 };
-if(standalone){$('installBtn').textContent='Já instalado';$('installBtn').disabled=true;$('status').textContent='Este aplicativo já está instalado.';$('status').className='status on ok'}
+if(standalone){$('status').textContent='Para instalar outro aplicativo, abra esta página no navegador do dispositivo.';$('status').className='status on'}
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(()=>{});
+}
 </script>
 </body>
 </html>

@@ -23,6 +23,7 @@ function directory(allowed = ['fretes', 'vtal', 'desempenho-funcionarios', 'pain
     value: '', innerHTML: '', textContent: '', querySelectorAll: () => [],
   }]));
   const scope = {
+    APP_INSTALLERS: runInNewContext(readFileSync(new URL('../app-installers.js',import.meta.url),'utf8')+';APP_INSTALLERS'),
     ctx: { apps: allowed },
     $: key => elements[key],
     allowedRegistry: () => scope.directory.listedApps(catalog),

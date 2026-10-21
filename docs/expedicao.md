@@ -64,3 +64,6 @@ Dimensões são selecionadas em dropdown a partir da lista Dimensões padrão da
 O layout adapta navegação, listas e formulários para celular/tablet, com campos de toque, navegação Notas/Rascunhos, rolagem das tabelas dentro do painel e foco automático na nota selecionada em telas pequenas. O envio ao OneDrive depende da conexão Microsoft e internet.
 
 Instalação adicional: aplicar supabase/expedicao-settings.sql. A integração do Portal usa User.Read e Files.ReadWrite; o escopo de arquivos é solicitado apenas ao conectar o OneDrive, nunca no login inicial do Portal. As rotas settings validam conta/cliente/ação e conferem a pasta no Graph antes de persistir IDs. A tabela tem RLS sem acesso direto por anon/authenticated e sem DELETE para service_role.
+
+
+Instalação individual: o cartão Expedição e Romaneios e a barra do aplicativo têm o botão Instalar, inclusive no celular. A página install-app.html?app=expedicao usa o manifesto manifest-expedicao.webmanifest, com identidade própria ./pwa/expedicao e abertura em ./?app=expedicao pelo Portal autenticado. A instalação não concede novas permissões. A pasta de saída continua vinculada à conta no servidor.

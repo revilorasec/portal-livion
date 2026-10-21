@@ -4,17 +4,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="theme-color" content="#0b1733" />
-<meta name="application-name" content="Portal Livion" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="Portal Livion" />
 <title>Portal Livion</title>
-<link rel="manifest" href="./manifest.webmanifest?v=1" />
-<link rel="icon" href="./assets/icons/livion-64.png?v=1" type="image/png" />
-<link rel="apple-touch-icon" href="./assets/icons/livion-180.png?v=1" />
+<script src="./app-installers.js?v=1"></script>
+<script>
+const launchKey=new URLSearchParams(location.search).get('app'),launchInstaller=Object.hasOwn(APP_INSTALLERS,launchKey)?APP_INSTALLERS[launchKey]:null;
+const launchManifest=launchInstaller?.manifest||'./manifest.webmanifest',launchName=launchInstaller?.short||'Portal Livion',launchIcon=launchInstaller?.icon||'./assets/icons/livion-64.png',launchTouch=launchInstaller?.touch||'./assets/icons/livion-180.png';
+document.write('<link rel="manifest" href="'+launchManifest+'?v=5"><link rel="icon" type="image/png" href="'+launchIcon+'?v=5"><link rel="apple-touch-icon" href="'+launchTouch+'?v=5"><meta name="application-name" content="'+launchName+'"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="'+launchName+'">');
+</script>
 <script src="./msal-browser.min.js"></script>
 <link rel="stylesheet" href="./portal-theme.css?v=7" />
-<link rel="stylesheet" href="./unified-nav.css?v=3" />
+<link rel="stylesheet" href="./unified-nav.css?v=4" />
 <style>
 :root{--navy:#0b1733;--blue:#173b70;--red:#d51f2a;--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#687389;--line:#dfe5ef;--ok:#16784a;--danger:#b42318}
 *{box-sizing:border-box}body{margin:0;font:14px/1.45 Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}button,input,select{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}.hidden{display:none!important}
@@ -33,13 +32,13 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1p
 <header class="top"><a class="brand" href="#" id="homeLink"><div class="mark">L</div><div><b>Livion Solutions</b><small>Portal corporativo</small></div></a><div class="top-actions"><span id="profilePill" class="pill"></span><span id="userPill" class="pill user-pill"></span><button id="installBtn" class="btn hidden">Instalar Portal</button><button id="configBtn" class="btn hidden">Configurações</button><button id="logoutBtn" class="btn">Sair</button></div></header>
 <main class="shell"><section id="home"><div class="hero"><div class="kicker">Aplicativos</div><h1>Portal Livion</h1><p>Encontre o que precisa por área ou pesquise pelo aplicativo e cliente.</p><span id="portalVersion" class="release-version"></span></div><div id="appDirectory" class="app-directory"><div class="app-directory-top"><div><h2>Seus aplicativos</h2><p id="appCount" aria-live="polite"></p></div><label class="app-search"><span class="sr-only">Buscar aplicativo ou cliente</span><input id="appSearch" type="search" placeholder="Buscar aplicativo ou cliente" autocomplete="off"></label></div><div id="appGroups" class="app-groups" role="tablist" aria-label="Grupos de aplicativos"></div><div id="appCards" class="cards"></div></div></section><section id="settingsView" class="hidden"><div class="hero"><div class="kicker">Administração</div><h1>Usuários e permissões</h1><p>O login é feito pela Microsoft. O Portal não cria nem armazena senhas.</p></div><div class="settings"><aside class="sidebar" id="tabs"><button data-tab="users" class="active">Usuários</button><button data-tab="profiles">Perfis</button><button data-tab="companies">Empresas e clientes</button><button data-tab="audit">Auditoria</button></aside><div class="stack" id="tabContent"></div></div></section></main>
 </div>
-<div id="workspace" class="workspace hidden"><div class="workspace-bar"><button id="workspaceHome" class="workspace-brand" title="Portal Livion" aria-label="Portal Livion"></button><nav id="workspaceApps" class="workspace-apps" aria-label="Aplicativos liberados"></nav><label class="workspace-mobile-switcher"><span class="sr-only">Trocar aplicativo</span><select id="workspaceSelect" aria-label="Trocar aplicativo"></select></label><span class="grow"></span><span id="workspaceVersion" class="workspace-version" aria-label="Versão do aplicativo"></span><button id="workspaceInstall" class="btn workspace-external">Instalar este app</button><button id="openExternal" class="btn workspace-external">Abrir em nova guia</button></div><iframe id="workspaceFrame" title="Aplicativo Livion" allow="camera; geolocation"></iframe></div>
+<div id="workspace" class="workspace hidden"><div class="workspace-bar"><button id="workspaceHome" class="workspace-brand" title="Portal Livion" aria-label="Portal Livion"></button><nav id="workspaceApps" class="workspace-apps" aria-label="Aplicativos liberados"></nav><label class="workspace-mobile-switcher"><span class="sr-only">Trocar aplicativo</span><select id="workspaceSelect" aria-label="Trocar aplicativo"></select></label><span class="grow"></span><span id="workspaceVersion" class="workspace-version" aria-label="Versão do aplicativo"></span><button id="workspaceInstall" class="btn workspace-external" title="Instalar este aplicativo">Instalar</button><button id="openExternal" class="btn workspace-external">Abrir em nova guia</button></div><iframe id="workspaceFrame" title="Aplicativo Livion" allow="camera; geolocation"></iframe></div>
 <script>
 const API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/portal-api';
 const CLIENT='88cf5cba-9f67-467d-8a51-9638200bed52',TENANT='911e1aee-070e-421b-ae71-439f01c2263e';
 const REDIRECT=new URL('./',window.location.href).href;
 const GRAPH_INVITE_SCOPE='User.Invite.All';
-const PORTAL_VERSION='2026.10.20.2';
+const PORTAL_VERSION='2026.10.20.3';
 const TRUSTED_DEVICE_KEY='livion.portal.trusted-device.v1',LOGIN_AFTER_TRUST_KEY='livion.portal.login-after-trust.v1';
 let msalApp,ctx,token,catalog,users=[],audit=[],editing=null,currentApp=null;
 let portalAuthError='';
@@ -106,7 +105,7 @@ function resumeLoginAfterTrust(){const mode=sessionStorage.getItem(LOGIN_AFTER_T
 function signedOut(){stopReconnect();portalAuthError='';$('authTitle').textContent='Entre no Portal Livion';$('authText').textContent='Use sua conta Microsoft corporativa para continuar.';$('trustDevice').checked=trustedDevice();$('trustDeviceWrap').classList.remove('hidden');$('loginBtn').classList.remove('hidden');resumeLoginAfterTrust()}
 $('loginBtn').onclick=()=>{if(portalAuthError==='SERVICE_UNAVAILABLE'){stopReconnect();init();return}const trust=$('trustDevice').checked,request=loginRequest();if(trust!==trustedDevice()){trust?localStorage.setItem(TRUSTED_DEVICE_KEY,'1'):localStorage.removeItem(TRUSTED_DEVICE_KEY);sessionStorage.setItem(LOGIN_AFTER_TRUST_KEY,request.prompt||'login');location.reload();return}msalApp.loginRedirect(request)};$('logoutBtn').onclick=()=>msalApp.logoutRedirect({account:msalApp.getActiveAccount()});
 if($('reauthBtn'))$('reauthBtn').onclick=async()=>{stopReconnect();try{const account=msalApp.getActiveAccount()||msalApp.getAllAccounts()[0];await msalApp.acquireTokenRedirect({scopes:['User.Read'],...(account?{account}:{})})}catch(e){showAuthError(e)}};
-function showPortal(){portalAuthError='';$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('portalVersion').textContent=`Portal v${PORTAL_VERSION}`;$('profilePill').textContent=ctx.profile;$('userPill').textContent=ctx.user.name;$('configBtn').classList.toggle('hidden',!ctx.administrator);$('installBtn').classList.toggle('hidden',isStandalone());renderCards();const requested=new URLSearchParams(location.search).get('app');if(requested){const a=allowedRegistry().find(x=>x.key===requested);if(a){history.replaceState(null,'',location.pathname);setTimeout(()=>openApp(a),0)}}}
+function showPortal(){portalAuthError='';$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('portalVersion').textContent=`Portal v${PORTAL_VERSION}`;$('profilePill').textContent=ctx.profile;$('userPill').textContent=ctx.user.name;$('configBtn').classList.toggle('hidden',!ctx.administrator);$('installBtn').classList.toggle('hidden',isStandalone());renderCards();const requested=new URLSearchParams(location.search).get('app');if(requested){const a=allowedRegistry().find(x=>x.key===requested);if(a){setTimeout(()=>openApp(a),0)}}}
 function appIcon(key){const icons={
  expedicao:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 7 9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10M7.5 5l9 4"></path></svg>`,
  'olv-fiscal':`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5z"></path><path d="M15 3v5h4M8 12h8M8 16h5"></path></svg>`,
@@ -124,7 +123,7 @@ const APP_GROUP_BY_KEY={expedicao:'operacao',fretes:'operacao',estoque:'operacao
 const APP_CLIENTS={'reparos-claro':'Claro',vtal:'V.Tal'};
 const APP_SEARCH_ALIASES={expedicao:'Nokia Claro romaneios caixas pesagem','desempenho-funcionarios':'Claro Nokia'};
 const RETIRED_APP_KEYS=new Set(['painel-executivo-nokia']);
-const INSTALLABLE_APP_KEYS=new Set(['olv-fiscal','rh','fretes','reparos-claro','estoque','compras-cotacoes','despesas-reembolsos','vtal']);
+const INSTALLABLE_APP_KEYS=new Set(Object.keys(APP_INSTALLERS));
 let activeAppGroup='operacao';
 function appGroup(key){return APP_GROUP_BY_KEY[key]||'outros'}
 function listedApps(registry){return registry.filter(a=>ctx?.apps?.includes(a.key)&&!RETIRED_APP_KEYS.has(a.key))}
@@ -156,8 +155,8 @@ function renderWorkspaceApps(){
  select.onchange=async()=>{const a=apps.find(x=>x.key===select.value);if(a&&a.key!==currentApp?.key)await openApp(a);select.value=currentApp?.key||''};
 }
 workspaceMobileMedia.addEventListener?.('change',()=>{if(currentApp)renderWorkspaceApps()});
-async function openApp(a){try{ctx=await api('/context');if(!ctx.apps.includes(a.key))throw new Error('FORBIDDEN');const fresh=(Array.isArray(ctx.appCatalog)?ctx.appCatalog.find(x=>x.key===a.key):null)||a;a=fresh;if(RETIRED_APP_KEYS.has(a.key))throw new Error('FORBIDDEN');currentApp=a;renderWorkspaceApps();$('workspaceVersion').textContent=appVersion(a);$('workspaceInstall').classList.toggle('hidden',!INSTALLABLE_APP_KEYS.has(a.key));$('openExternal').classList.toggle('hidden',['reparos-claro','desempenho-funcionarios','expedicao'].includes(a.key));const frame=$('workspaceFrame');frame.onload=()=>{stampFrameVersion(frame,a);if(a.key==='rh'){try{frame.contentWindow.postMessage({type:'PORTAL_SESSION',token,context:ctx},'https://revilorasec.github.io')}catch(e){console.warn('RH session bridge',e)}}};const appUrl=new URL(a.href,location.href);appUrl.searchParams.set('_portal',PORTAL_VERSION);frame.src=appUrl.href;$('workspace').classList.remove('hidden')}catch{alert('Seu acesso mudou ou expirou. Entre novamente.')}}
-$('workspaceHome').onclick=()=>{$('workspace').classList.add('hidden');$('workspaceFrame').src='about:blank';currentApp=null;$('settingsView').classList.add('hidden');$('home').classList.remove('hidden')};$('workspaceInstall').onclick=()=>currentApp&&window.open('./install-app.html?app='+encodeURIComponent(currentApp.key),'_blank','noopener');$('openExternal').onclick=()=>currentApp&&window.open(currentApp.href,'_blank','noopener');
+async function openApp(a){try{ctx=await api('/context');if(!ctx.apps.includes(a.key))throw new Error('FORBIDDEN');const fresh=(Array.isArray(ctx.appCatalog)?ctx.appCatalog.find(x=>x.key===a.key):null)||a;a=fresh;if(RETIRED_APP_KEYS.has(a.key))throw new Error('FORBIDDEN');currentApp=a;const currentUrl=new URL(location.href);currentUrl.searchParams.set('app',a.key);history.replaceState(null,'',currentUrl);$('workspaceInstall').title='Instalar '+a.title;renderWorkspaceApps();$('workspaceVersion').textContent=appVersion(a);$('workspaceInstall').classList.toggle('hidden',!INSTALLABLE_APP_KEYS.has(a.key));$('openExternal').classList.toggle('hidden',['reparos-claro','desempenho-funcionarios','expedicao'].includes(a.key));const frame=$('workspaceFrame');frame.onload=()=>{stampFrameVersion(frame,a);if(a.key==='rh'){try{frame.contentWindow.postMessage({type:'PORTAL_SESSION',token,context:ctx},'https://revilorasec.github.io')}catch(e){console.warn('RH session bridge',e)}}};const appUrl=new URL(a.href,location.href);appUrl.searchParams.set('_portal',PORTAL_VERSION);frame.src=appUrl.href;$('workspace').classList.remove('hidden')}catch{alert('Seu acesso mudou ou expirou. Entre novamente.')}}
+$('workspaceHome').onclick=()=>{const homeUrl=new URL(location.href);homeUrl.searchParams.delete('app');history.replaceState(null,'',homeUrl);$('workspace').classList.add('hidden');$('workspaceFrame').src='about:blank';currentApp=null;$('settingsView').classList.add('hidden');$('home').classList.remove('hidden')};$('workspaceInstall').onclick=()=>currentApp&&window.open('./install-app.html?app='+encodeURIComponent(currentApp.key),'_blank','noopener');$('openExternal').onclick=()=>currentApp&&window.open(currentApp.href,'_blank','noopener');
 $('configBtn').onclick=()=>openSettings();$('homeLink').onclick=e=>{e.preventDefault();$('settingsView').classList.add('hidden');$('home').classList.remove('hidden')};
 async function openSettings(){$('home').classList.add('hidden');$('settingsView').classList.remove('hidden');catalog=await api('/catalog');users=(await api('/users')).users||[];renderTab('users')}
 $('tabs').onclick=e=>{const b=e.target.closest('button[data-tab]');if(!b)return;document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderTab(b.dataset.tab)};

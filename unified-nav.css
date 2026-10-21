@@ -46,6 +46,7 @@
  .workspace-mobile-switcher select{appearance:none;-webkit-appearance:none;display:block;width:100%;min-width:0;height:42px;padding:0 38px 0 13px;border:1px solid #d9e6f3;border-radius:11px;background:#edf4fb;color:#123f78;font:700 13px/1.2 Inter,Segoe UI,Arial,sans-serif;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
  .workspace-mobile-switcher select:focus-visible{outline:2px solid #245a9c;outline-offset:2px}
  .workspace-external{display:none!important}
+ #workspaceInstall:not(.hidden){display:inline-flex!important;align-items:center;justify-content:center;min-height:44px;padding:8px 10px;font-size:12px;flex:0 0 auto}
  .brand{width:128px!important;height:42px!important;flex-basis:128px!important;background-size:auto 145%!important}
  .auth-card .mark{background-size:auto 125%!important}
 }
