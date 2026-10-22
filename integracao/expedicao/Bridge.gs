@@ -30,7 +30,7 @@ function doPost(e) {
         }
         return expeditionReply_({ok:true,client:client,schemaVersion:1,sheet:sheetName,capturedAt:new Date().toISOString(),rows:rows,destinations:destinations});
       }
-      if (payload.action !== 'boxes' || props.getProperty('EXPEDICAO_WRITE_ENABLED') !== 'true') throw Error('WRITE_DISABLED');
+      if (['boxes','check-boxes'].indexOf(payload.action) < 0 || props.getProperty('EXPEDICAO_WRITE_ENABLED') !== 'true') throw Error('WRITE_DISABLED');
       var updates = payload.updates, group = payload.group;
       if (!/^[a-f0-9-]{36}$/.test(payload.operationId) || !payload.actor || !group || group.client !== client || !Array.isArray(updates) || !updates.length || updates.length > 500) throw Error('INVALID');
       var byId = {}, seen = {}, boxCol = client === 'nokia' ? 21 : 36, noteCol = client === 'nokia' ? 18 : 37, locationCol = client === 'nokia' ? 2 : 3, statusCol = client === 'nokia' ? 24 : 31;
@@ -66,6 +66,7 @@ function doPost(e) {
         if(b&&!expeditionNorm_(r[statusCol]))throw Error('CONFLICT');
       });
       // Single batch after all validation. Only V/U or AK are permitted.
+      if(payload.action==='check-boxes')return expeditionReply_({ok:true,client:client,schemaVersion:1,operationId:payload.operationId,validated:updates.length,written:0});
       Sheets.Spreadsheets.Values.batchUpdate({valueInputOption:'RAW',data:targets},spreadsheetId);
       var actual=Sheets.Spreadsheets.Values.batchGet(spreadsheetId,{ranges:verifyRanges.map(function(v){return v.range;}),valueRenderOption:'FORMATTED_VALUE'}).valueRanges||[];
       verifyRanges.forEach(function(v,i){var value=actual[i]&&actual[i].values&&actual[i].values[0]?String(actual[i].values[0][0]||''):'';if(v.date?!value:value!==v.expected)throw Error('READBACK');});

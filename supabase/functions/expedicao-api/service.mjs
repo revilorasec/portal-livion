@@ -91,17 +91,27 @@ export function createService(deps) {
         const updates = boxUpdates(group, body.draft); need(/^[a-f0-9-]{36}$/.test(body.operationId), 'Identificador da operação inválido.');
         const payloadHash = await sha256(JSON.stringify({ group: group.key, updates }));
         const op = await deps.db.beginOperation({ id: body.operationId, client, groupKey: group.key, fingerprint: group.fingerprint, payloadHash, updates, actor });
-        if (op.state !== 'PREPARED') return reply({ operation: op, pending: op.state !== 'CONFIRMED' });
+        if (op.state !== 'PREPARED') {
+          need(op.state!=='NOT_WRITTEN','Esta tentativa foi encerrada sem gravação. Atualize a nota e inicie uma nova gravação.',409,'NOT_WRITTEN');
+          return reply({ operation: op, pending: op.state !== 'CONFIRMED' });
+        }
         // A durable claim is committed before any network request. A timeout never retries a POST.
         need(await deps.db.claimOperation(op.id), 'Operação já em execução. Confira o histórico.', 409);
+        let writeError;
+        try { await deps.writeSource(client, { operationId: op.id, group, updates, actor }); } catch(error) { writeError=error; }
+        // A lost Google response is not proof that the write failed. Always read
+        // the actual cells once, without resending the write, before marking pending.
         try {
-          await deps.writeSource(client, { operationId: op.id, group, updates, actor });
           const reread = await sourceGroups(client, await deps.readSource(client), models), current = reread.groups.find(g => g.key === group.key);
-          need(current && updates.every(u => current.items.some(i => i.id === u.id && text(i.box) === u.box && (client !== 'nokia' || i.expeditionDate))), 'A gravação ainda não foi confirmada por leitura de retorno.', 409, 'PENDING');
+          if(!(current && updates.every(u => current.items.some(i => i.id === u.id && text(i.box) === u.box && (client !== 'nokia' || i.expeditionDate)))))throw writeError||new ExpeditionError(409,'A gravação ainda não foi confirmada por leitura de retorno.','PENDING');
           const saved = await deps.db.finishOperation(op.id, 'CONFIRMED', { verified: updates.length }, actor); return reply({ operation: saved, verified: updates.length });
-        } catch {
-          await deps.db.finishOperation(op.id, 'PENDING', { message: 'Resultado pendente de conferência; nenhuma repetição automática foi executada.' }, actor);
-          return reply({ pending: true, operationId: op.id, message: 'A resposta da gravação não foi confirmada. Use Conferir gravação; a operação não será repetida.' }, 202);
+        } catch(error) {
+          const failure=writeError||error,known=failure instanceof ExpeditionError;
+          const code=known?failure.code:'SOURCE_UNCONFIRMED';
+          const message=(known?failure.message+' ':'A resposta da gravação não foi confirmada. ')+'Use Conferir gravação; nenhuma gravação foi repetida.';
+          console.warn('expedicao_boxes_pending',JSON.stringify({client,operationId:op.id,code}));
+          await deps.db.finishOperation(op.id, 'PENDING', { message,code }, actor);
+          return reply({ pending: true, operationId: op.id, message,code }, 202);
         }
       }
       if (route === 'reconcile' && req.method === 'POST') {
@@ -109,6 +119,17 @@ export function createService(deps) {
         need(op && op.client === client && op.group_key === group.key, 'Operação inválida.', 404);
         need(['DISPATCHED', 'PENDING', 'CONFIRMED'].includes(op.state), 'A operação não foi enviada.', 409);
         const matched = op.updates.every(u => group.items.some(i => i.id === u.id && i.box === u.box && (client !== 'nokia' || i.expeditionDate)));
+        if(!matched&&['DISPATCHED','PENDING'].includes(op.state)&&Date.now()-Date.parse(op.updated_at)>=600000){
+          // Wait beyond the Google worker lifetime, then release only a completely
+          // unwritten, unchanged request. This never sends a Google write or retry.
+          const fields=client==='nokia'?['id','location','sourceNote','barcode','serial','pn','note','box','status','expeditionDate']:['id','location','sourceNote','pn','serial','iw','sap','sgp','status','box','note'];
+          const unchanged=op.updates.length>0&&op.updates.every(u=>group.items.some(i=>i.id===u.id&&text(i.box)===text(u.oldBox)&&u.box!==u.oldBox&&u.expected&&fields.every(f=>text(i[f])===text(u.expected[f]))));
+          if(unchanged){
+            const operation=await deps.db.finishOperation(op.id,'NOT_WRITTEN',{unchanged:op.updates.length,readOnlyCheck:true},actor);
+            need(operation.state==='NOT_WRITTEN','A operação mudou durante a conferência. Atualize a nota.',409);
+            return reply({operation,notWritten:true,message:'Nenhuma caixa desta tentativa foi gravada. O histórico foi preservado e a nota foi liberada. Confira o rascunho e clique em Gravar caixas no BD.'});
+          }
+        }
         need(matched, 'Os valores ainda não correspondem à operação. O histórico foi preservado; nenhuma escrita foi repetida.', 409, 'PENDING');
         return reply({ operation: await deps.db.finishOperation(op.id, 'CONFIRMED', { verified: op.updates.length, reconciled: true }, actor) });
       }

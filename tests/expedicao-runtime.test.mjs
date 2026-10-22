@@ -1,10 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runtimeDependencies } from '../supabase/functions/expedicao-api/runtime.mjs';
+import {createHmac} from 'node:crypto';
+
+test('signed box payloads preserve accents and Unicode through an ASCII-only transport',async()=>{
+ for(const client of ['nokia','claro']){
+  const prefix='EXPEDICAO_'+client.toUpperCase(),env={[prefix+'_URL']:'https://script.google.com/macros/s/test-only/exec',[prefix+'_SECRET']:'test-only'};
+  const payload={actor:'operador@example.test',group:{destination:{city:'São José dos Pinhais',address:'Goiânia · Expedição 📦'},items:[{status:'02-IRREPARÁVEL'}]}};
+  let posts=0;const deps=runtimeDependencies(k=>env[k],null,async(_url,options)=>{
+   posts++;assert.match(options.body,/^[\x00-\x7f]*$/);const envelope=JSON.parse(options.body);
+   assert.equal(envelope.signature,createHmac('sha256','test-only').update(envelope.timestamp+'\n'+envelope.nonce+'\n'+envelope.data).digest('hex'));
+   assert.deepEqual(JSON.parse(envelope.data),{action:'boxes',...payload});return Response.json({ok:true,client,schemaVersion:1});
+  });
+  await deps.writeSource(client,payload);assert.equal(posts,1);
+ }
+});
 
 test('bridge failures expose only known safe diagnostics',async()=>{
  const env={EXPEDICAO_CLARO_URL:'https://script.google.com/macros/s/test-only/exec',EXPEDICAO_CLARO_SECRET:'test-only'};
- for(const [source,code] of [['AUTH','SOURCE_AUTH'],['BUSY','SOURCE_BUSY'],['private data must never escape','SOURCE_ERROR']]){
+ for(const [source,code] of [['AUTH','SOURCE_AUTH'],['BUSY','SOURCE_BUSY'],['WRITE_DISABLED','SOURCE_WRITE_DISABLED'],['CONFLICT','SOURCE_CONFLICT'],['INVALID','SOURCE_INVALID'],['DUPLICATE_ID','SOURCE_DUPLICATE_ID'],['READBACK','SOURCE_READBACK'],['private data must never escape','SOURCE_ERROR']]){
   const deps=runtimeDependencies(k=>env[k],null,async()=>Response.json({ok:false,error:source}));
   await assert.rejects(deps.readSource('claro'),e=>e.status===502&&e.code===code&&!e.message.includes('private data'));
  }

@@ -17,7 +17,9 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
     const prefix = 'EXPEDICAO_' + client.toUpperCase(), url = env(prefix + '_URL'), secret = env(prefix + '_SECRET');
     need(url && secret, 'A conexão segura desta empresa ainda não foi configurada.', 503);
     const target = new URL(url); need(target.protocol === 'https:' && target.hostname === 'script.google.com' && /^\/macros\/s\/[\w-]+\/exec$/.test(target.pathname), 'Origem não permitida.', 503);
-    const timestamp = Date.now(), nonce = crypto.randomUUID(), data = JSON.stringify(payload), input = `${timestamp}\n${nonce}\n${data}`;
+    // Apps Script may decode POST text differently for accented characters.
+    // ASCII JSON escapes preserve the exact signed bytes and the original values.
+    const timestamp = Date.now(), nonce = crypto.randomUUID(), data = JSON.stringify(payload).replace(/[^\x00-\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0')), input = `${timestamp}\n${nonce}\n${data}`;
     const hmacKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
     const signature = [...new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, new TextEncoder().encode(input)))].map(n => n.toString(16).padStart(2, '0')).join('');
     // Never retry writes after timeout, redirect failure or malformed response.
@@ -36,7 +38,8 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
       response=await fetcher(next,{method:'GET',redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(55000)});
     }
     need(response.ok, 'A origem não respondeu.', 502); const result = await response.json();
-    const failures={AUTH:'A conexão segura da origem precisa ser conferida.',BUSY:'A origem está ocupada. Aguarde e atualize a consulta.',REPLAY:'A origem recusou uma chamada repetida. Atualize a consulta.',SCHEMA:'As colunas da origem mudaram. Confira o cadastro.',CONFIG:'A origem precisa de configuração.',ERROR:'A origem encontrou uma falha ao consultar a planilha.'};
+    const failures={AUTH:'A conexão segura da origem precisa ser conferida.',BUSY:'A origem está ocupada. Aguarde e atualize a consulta.',REPLAY:'A origem recusou uma chamada repetida. Atualize a consulta.',SCHEMA:'As colunas da origem mudaram. Confira o cadastro.',CONFIG:'A origem precisa de configuração.',WRITE_DISABLED:'O serviço Google está com a gravação desabilitada. Peça ao administrador para conferir a integração.',INVALID:'O serviço Google recusou os dados da gravação antes de alterar as caixas.',DUPLICATE_ID:'O BD contém identificadores de peças duplicados. Confira a origem antes de gravar.',CONFLICT:'O serviço Google encontrou uma diferença na nota, nas peças ou nas caixas. Atualize e confira antes de gravar.',READBACK:'O Google recebeu a gravação, mas a leitura de retorno não confirmou todas as caixas. Use Conferir gravação.',ERROR:'A origem encontrou uma falha ao consultar ou gravar a planilha.'};
+    if(result.ok!==true)console.warn('expedicao_bridge_rejected',JSON.stringify({client,action:payload.action,code:Object.hasOwn(failures,result.error)?result.error:'ERROR'}));
     need(result.ok === true, failures[result.error] || 'A origem recusou a operação.', 502, Object.hasOwn(failures,result.error)?'SOURCE_'+result.error:'SOURCE_ERROR');
     need(result.client === client && result.schemaVersion === 1, 'A origem retornou formato incompatível.', 502, 'SOURCE_SCHEMA');
     return result;
@@ -84,6 +87,7 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
     },
     writeEnabled: client => env('EXPEDICAO_' + client.toUpperCase() + '_WRITE_ENABLED') === 'true',
     writeSource: (client, payload) => bridge(client, { action: 'boxes', ...payload }),
+    checkSource: (client, payload) => bridge(client, { ...payload, action: 'check-boxes' }),
     modelBytes: async model => { need(/^(nokia|claro)\/[a-f0-9]{64}\.xlsx$/.test(model.storagePath), 'Caminho do modelo inválido.', 503); const record=await first('expedicao_models?select=content_base64&id=eq.'+query(model.id)); if(record?.content_base64){const decoded=atob(record.content_base64);return Uint8Array.from(decoded,c=>c.charCodeAt(0));} const response = await fetcher(base + '/storage/v1/object/expedicao-modelos/' + model.storagePath, { headers: { apikey: key, Authorization: 'Bearer ' + key }, signal: AbortSignal.timeout(20000) }); need(response.ok, 'Modelo não disponível.', 503); return new Uint8Array(await response.arrayBuffer()); },
     generateWorkbook: (model, bytes, group, plan) => generateWorkbook(JSZip, model, bytes, group, plan),
     inspectModel:(client,bytes,name)=>inspectModel(JSZip,client,bytes,name),

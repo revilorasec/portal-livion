@@ -11,6 +11,7 @@ test('actual PostgreSQL RPCs: atomic draft revisions, one pending operation, imm
  await db.exec(await fs.readFile(new URL('../supabase/expedicao-model-management.sql',import.meta.url),'utf8'));
  await db.exec(await fs.readFile(new URL('../supabase/expedicao-settings.sql',import.meta.url),'utf8'));
  await db.exec(await fs.readFile(new URL('../supabase/expedicao-cloud.sql',import.meta.url),'utf8'));
+ await db.exec(await fs.readFile(new URL('../supabase/migrations/20261022171000_expedicao_unwritten_operations.sql',import.meta.url),'utf8'));
  const call=async(name,p)=> (await db.query('select public.'+name+'($1::jsonb) as value',[JSON.stringify(p)])).rows[0].value;
  const p={client:'nokia',groupKey:'test-note',fingerprint:'f'.repeat(64),revision:0,draft:{responsible:'Fictício'},actor:'operador@example.test'};
  const output={actor:p.actor,client:'nokia',revision:0,folder:{driveId:'test',folderId:'test-folder',path:'destino'}};
@@ -35,6 +36,15 @@ test('actual PostgreSQL RPCs: atomic draft revisions, one pending operation, imm
  for(const role of ['anon','authenticated']){await db.exec('reset role;set role '+role);await assert.rejects(()=>db.query('select * from public.expedicao_drafts'),/permission denied/);await assert.rejects(()=>call('expedicao_save_draft',p),/permission denied/);await assert.rejects(()=>call('expedicao_manage_model',first),/permission denied/);}
  for(const role of ['anon','authenticated']){await db.exec('reset role;set role '+role);await assert.rejects(()=>db.query('select * from public.expedicao_settings'),/permission denied/);await assert.rejects(()=>call('expedicao_save_settings',output),/permission denied/);}
  await db.exec('reset role;set role service_role');
+ const unwritten={...op,id:crypto.randomUUID(),groupKey:'unwritten-test-note'};await call('expedicao_begin_operation',unwritten);await db.query('select public.expedicao_claim_operation($1::uuid)',[unwritten.id]);
+ const release=proof=>db.query("select public.expedicao_finish_operation($1::uuid,'NOT_WRITTEN',$2::jsonb,'operador@example.test') as value",[unwritten.id,JSON.stringify(proof)]);
+ await assert.rejects(()=>release({readOnlyCheck:true,unchanged:1}),/CONFLICT/);
+ await db.query("update public.expedicao_operations set updated_at=now()-interval '11 minutes' where id=$1",[unwritten.id]);
+ await assert.rejects(()=>release({unchanged:1}),/CONFLICT/);await assert.rejects(()=>release({readOnlyCheck:true,unchanged:2}),/CONFLICT/);
+ assert.equal((await release({readOnlyCheck:true,unchanged:1})).rows[0].value.state,'NOT_WRITTEN');
+ assert.equal((await db.query("select public.expedicao_finish_operation($1::uuid,'CONFIRMED','{}','operador@example.test') as value",[unwritten.id])).rows[0].value.state,'NOT_WRITTEN');
+ assert.equal((await db.query("select count(*)::int n from public.expedicao_events where action='BOXES_NOT_WRITTEN' and detail->>'operationId'=$1",[unwritten.id])).rows[0].n,1);
+ await call('expedicao_begin_operation',{...unwritten,id:crypto.randomUUID()});
  const central={client:'nokia',actor:'admin@example.test',revision:0,folder:{driveId:'central',folderId:'only-admin-target',path:'central-output'}};
  assert.equal((await call('expedicao_cloud_save_folder',central)).revision,1);await assert.rejects(()=>call('expedicao_cloud_save_folder',{...central,actor:'another-admin@example.test'}),/CONFLICT/);
  const job={id:crypto.randomUUID(),client:'nokia',groupKey:'central-test-note',fingerprint:'snapshot',actor:'operator@example.test',target:central.folder};
