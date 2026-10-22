@@ -9,7 +9,7 @@ const nokia = readFileSync(path.join(root, 'painel-executivo-nokia', 'index.html
 const bonusUpgrade = readFileSync(path.join(root, 'desempenho-funcionarios', 'bonus-upgrade-v1.js'), 'utf8');
 const bonusEngine = readFileSync(path.join(root, 'desempenho-funcionarios', 'bonus-engine.js'), 'utf8');
 const desempenhoService = readFileSync(path.join(root, 'supabase', 'functions', 'desempenho-api', 'service.mjs'), 'utf8');
-const {normalizePanelReturnDate} = await import('../supabase/functions/desempenho-api/service.mjs');
+const {normalizePanelReturnDate,normalizePanelRows} = await import('../supabase/functions/desempenho-api/service.mjs');
 
 test('reparabilidade exclui Sem defeito e Sem reparo do divisor', () => {
   const source = combined.slice(combined.indexOf('function calcStats('), combined.indexOf('function techStats(')).trim();
@@ -102,6 +102,22 @@ test('a API usa AJ para Claro, W para Nokia e ignora fórmula na própria coluna
   assert.equal(nokia.dataDevolucao,'18/10/2026');
   assert.equal(nokia.dataFormula,false);
   assert.equal(nokia.devolvido,true);
+});
+
+test('a API completa a AJ da Claro pela fonte segura sem voltar para a coluna AN', () => {
+  const rows=normalizePanelRows('combined',[
+    {cliente:'Claro',id:'C-1',dataDevolucao:'22/10/2026',dataFormula:true},
+    {cliente:'Claro',id:'C-2',dataDevolucao:'22/10/2026',dataFormula:true},
+    {cliente:'Nokia',id:'N-1','Data eSmart (Devolução)':'18/10/2026'}
+  ],[
+    {ID:'C-1','Data Expedição':'20/09/2026','_formula_Data Expedição':''},
+    {ID:'C-2','Data Expedição':'22/10/2026','_formula_Data Expedição':'=HOJE()'}
+  ]);
+  assert.equal(rows[0].dataDevolucao,'20/09/2026');
+  assert.equal(rows[0].devolvido,true);
+  assert.equal(rows[1].dataFormula,true);
+  assert.equal(rows[1].devolvido,false);
+  assert.equal(rows[2].dataDevolucao,'18/10/2026');
 });
 
 test('o painel consolidado filtra somente devoluções reais pelo mês de devolução', () => {
