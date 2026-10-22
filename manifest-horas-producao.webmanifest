@@ -1,0 +1,18 @@
+{
+  "id": "./pwa/horas-producao",
+  "name": "Horas, Produção e Pagamentos · Livion",
+  "short_name": "Horas Livion",
+  "description": "Controle mensal de horas, peças e valores por funcionário.",
+  "lang": "pt-BR",
+  "start_url": "./?app=horas-producao",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#194682",
+  "icons": [
+    {"src": "./assets/icons/livion-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "./assets/icons/livion-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}
+  ]
+}

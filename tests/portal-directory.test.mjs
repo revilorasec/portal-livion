@@ -16,6 +16,7 @@ const catalog = [
   { key: 'desempenho-funcionarios', title: 'Desempenho Técnico', description: 'Técnicos' },
   { key: 'painel-executivo-nokia', title: 'Desempenho Técnico Nokia' },
   { key: 'rh', title: 'Recursos Humanos' },
+  { key: 'horas-producao', title: 'Horas, Produção e Pagamentos', description: 'Equipe e pagamentos' },
 ];
 
 function directory(allowed = ['fretes', 'vtal', 'desempenho-funcionarios', 'painel-executivo-nokia']) {
@@ -54,6 +55,17 @@ test('pesquisa por cliente em todos os grupos sem ampliar permissões', () => {
   limited.elements.appSearch.value = 'nokia';
   limited.renderCards();
   assert.doesNotMatch(limited.elements.appCards.innerHTML, /Desempenho Técnico/);
+});
+
+test('app de horas aparece em Pessoas somente para usuário autorizado', () => {
+  const limited = directory(['fretes']);
+  limited.elements.appSearch.value = 'pagamentos';
+  limited.renderCards();
+  assert.doesNotMatch(limited.elements.appCards.innerHTML, /Horas, Produção e Pagamentos/);
+  const authorized = directory(['horas-producao']);
+  authorized.elements.appSearch.value = 'pagamentos';
+  authorized.renderCards();
+  assert.match(authorized.elements.appCards.innerHTML, /Horas, Produção e Pagamentos/);
 });
 
 test('carrega só o portal na instalação e mantém o painel técnico leve', () => {

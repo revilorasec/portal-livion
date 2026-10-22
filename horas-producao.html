@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#194682">
+  <title>Horas, Produção e Pagamentos · Livion</title>
+  <link rel="stylesheet" href="./horas-producao.css?v=1">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><img src="./livion-logo.svg" alt="Livion Solutions"><div><span>CONTROLE DE EQUIPE</span><h1>Horas, Produção e Pagamentos</h1></div></div>
+    <div class="top-actions"><span id="saveStatus" role="status">Conectando ao Portal…</span><button id="reloadBtn" type="button">Atualizar</button></div>
+  </header>
+  <main>
+    <div id="error" class="error" role="alert" hidden></div>
+    <div id="app" hidden>
+      <section class="card period">
+        <div><span class="eyebrow">PERÍODO</span><h2>Fechamento mensal</h2><p>Os valores gerais e a agenda ficam guardados separadamente para cada mês.</p></div>
+        <label>Mês e ano<input id="month" type="month" required></label>
+      </section>
+
+      <section class="card settings">
+        <div class="section-title"><div><span class="eyebrow">CONFIGURAÇÕES GERAIS</span><h2>Mesmos valores para todos os funcionários</h2></div><span id="settingsUpdated" class="muted"></span></div>
+        <form id="settingsForm">
+          <div class="fields four">
+            <label>Bônus integral por 100% das horas (R$)<input id="bonus" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+            <label>Valor por peça reparada (R$)<input id="pieceRate" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+            <label>Horas previstas de segunda a sexta<input id="weekdayHours" type="number" min="0" max="24" step="0.01" inputmode="decimal" required></label>
+            <label>Horas previstas aos sábados<input id="saturdayHours" type="number" min="0" max="24" step="0.01" inputmode="decimal" required></label>
+          </div>
+          <div class="settings-foot"><p>Salvar aplica a programação às datas sem ajuste manual. Para feriados ou exceções, altere a data na tabela. Domingos ficam sempre bloqueados.</p><button class="primary" type="submit">Salvar valores e programação</button></div>
+        </form>
+      </section>
+
+      <section class="card staff">
+        <div class="section-title"><div><span class="eyebrow">FUNCIONÁRIOS</span><h2>Equipe cadastrada</h2><p>O cadastro pede somente o nome. Funcionários arquivados permanecem no histórico.</p></div><button id="addEmployee" class="primary" type="button">+ Funcionário</button></div>
+        <div id="staffList" class="staff-list"></div>
+      </section>
+
+      <nav class="tabs" aria-label="Visões do aplicativo">
+        <button id="tabTeam" class="active" type="button" aria-pressed="true">Equipe lado a lado</button>
+        <button id="tabPerson" type="button" aria-pressed="false">Por funcionário</button>
+        <button id="tabCompare" type="button" aria-pressed="false">Comparativos</button>
+      </nav>
+
+      <section id="teamView" class="view">
+        <div id="teamMetrics" class="metrics"></div>
+        <section class="card"><div class="section-title"><div><span class="eyebrow">LANÇAMENTOS DIÁRIOS</span><h2>Equipe lado a lado</h2></div><span class="muted">1,5 hora = 1h30</span></div>
+          <div class="legend"><span><i class="saturday-dot"></i>Sábado: preenchimento liberado</span><span><i class="sunday-dot"></i>Domingo: bloqueado</span></div>
+          <p class="muted">Horas previstas são compartilhadas. Horas realizadas e peças são individuais. Deslize a tabela para ver toda a equipe.</p>
+          <div class="table-wrap"><table id="matrix" class="matrix"></table></div>
+        </section>
+        <section class="card"><div class="section-title"><div><span class="eyebrow">FECHAMENTO</span><h2>Valores por funcionário</h2></div><span id="teamState"></span></div>
+          <div class="table-wrap"><table id="teamTable" class="summary-table"></table></div>
+          <div id="teamTotal" class="team-total"></div>
+        </section>
+      </section>
+
+      <section id="personView" class="view" hidden>
+        <section class="card person-top"><div><span class="eyebrow">DETALHAMENTO INDIVIDUAL</span><h2>Por funcionário</h2></div><label>Funcionário<select id="selectedEmployee"></select></label></section>
+        <div id="personMetrics" class="metrics"></div>
+        <section class="card">
+          <div class="section-title"><div><span class="eyebrow">CONTADOR</span><h2>Horas extras oficiais</h2></div><span id="overtimeState"></span></div>
+          <p>Informe o <strong>valor total mensal em reais</strong> calculado pelo contador. Não é a quantidade de horas nem o valor por hora. Deixe vazio enquanto aguarda; digite 0 para registrar zero conferido.</p>
+          <form id="overtimeForm" class="overtime-form">
+            <label>Valor oficial do mês (R$)<input id="overtimeAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Aguardando contador"></label>
+            <label>Observação<input id="overtimeNote" maxlength="500" placeholder="Referência ou conferência do contador"></label>
+            <button class="primary" type="submit">Salvar valor oficial</button>
+          </form>
+        </section>
+        <section class="card"><div class="section-title"><div><span class="eyebrow">CALENDÁRIO INDIVIDUAL</span><h2>Horas, peças e observações</h2></div><span class="muted">1,5 hora = 1h30</span></div>
+          <div class="table-wrap"><table id="personTable" class="day-table"></table></div>
+        </section>
+      </section>
+
+      <section id="compareView" class="view" hidden>
+        <section class="card"><span class="eyebrow">COMPARATIVOS</span><h2>Desempenho da equipe</h2>
+          <div class="fields compare-fields">
+            <label>Até o dia<input id="compareDay" type="number" min="1" max="31" step="1"></label>
+            <label>Mínimo de horas realizadas<input id="compareMinimum" type="number" min="0" step="0.01" value="0"></label>
+            <label>Ordenar por<select id="compareOrder"><option value="productivity">Produtividade</option><option value="pieces">Volume de peças</option><option value="attendance">Cumprimento de horas</option></select></label>
+          </div>
+          <div id="compareStaff" class="staff-chips"></div>
+          <div id="compareAlert" class="notice"></div>
+        </section>
+        <div id="compareMetrics" class="metrics"></div>
+        <div class="charts">
+          <section class="card"><h2>Peças por hora realizada</h2><div id="productivityChart"></div></section>
+          <section class="card"><h2>Volume total de peças</h2><div id="piecesChart"></div></section>
+          <section class="card"><h2>Cumprimento das horas previstas</h2><div id="attendanceChart"></div></section>
+          <section class="card"><h2>Evolução das peças acumuladas</h2><div class="chart-scroll"><div id="trendChart"></div></div></section>
+        </div>
+        <section class="card"><h2>Comparação detalhada</h2><div class="table-wrap"><table id="comparisonTable" class="summary-table"></table></div>
+          <p class="muted">A produtividade do grupo divide as peças dos funcionários com horas realizadas e sem lançamentos inconsistentes pela soma dessas horas. Valores pagos e horas extras oficiais não entram neste comparativo. Complexidade, qualidade e retornos de peças não são medidos aqui.</p>
+        </section>
+      </section>
+    </div>
+  </main>
+  <dialog id="employeeDialog"><form id="employeeForm" method="dialog"><h2 id="employeeDialogTitle">Novo funcionário</h2><label>Nome<input id="employeeName" maxlength="120" required autocomplete="off"></label><div class="dialog-actions"><button id="cancelEmployee" type="button">Cancelar</button><button class="primary" type="submit">Salvar</button></div></form></dialog>
+  <dialog id="archiveDialog"><div><h2>Arquivar funcionário</h2><p id="archiveImpact"></p><p>Os registros existentes serão preservados para consulta histórica. Não será possível fazer novos lançamentos para este funcionário.</p><div class="dialog-actions"><button id="cancelArchive" type="button">Cancelar</button><button id="confirmArchive" class="danger" type="button">Arquivar funcionário</button></div></div></dialog>
+  <script type="module" src="./horas-producao.js?v=1"></script>
+</body>
+</html>

@@ -16,7 +16,7 @@ function page(key,{userAgent='Windows Chrome',platform='Win32',touch=0,standalon
  return{elements,element,events,writes,scope};
 }
 
-test('each of the ten Portal apps has a distinct identity, launch route and valid icons',()=>{
+test('each Portal app has a distinct identity, launch route and valid icons',()=>{
  const groups=runInNewContext(portal.match(/const APP_GROUP_BY_KEY=(\{[^\n]+\});/)[0]+';APP_GROUP_BY_KEY');
  assert.deepEqual(Object.keys(registry).sort(),Object.keys(groups).sort());
  const identities=new Set();

@@ -3,6 +3,7 @@ const APP_INSTALLERS={
   'olv-fiscal':{name:'OLV Fiscal · Testes',short:'OLV Fiscal',manifest:'./manifest-olv-fiscal.webmanifest',key:'olv-fiscal',icon:'./olv-fiscal/assets/icone-app-192.png',touch:'./olv-fiscal/assets/icone-app-192.png'},
   expedicao:{name:'Expedição e Romaneios',short:'Expedição Livion',manifest:'./manifest-expedicao.webmanifest',key:'expedicao',icon:'./assets/app-icons/expedicao-192.png',touch:'./assets/app-icons/expedicao-180.png'},
   'desempenho-funcionarios':{name:'Desempenho Técnico',short:'Desempenho Livion',manifest:'./manifest-desempenho-funcionarios.webmanifest',key:'desempenho-funcionarios',icon:'./assets/app-icons/desempenho-funcionarios-192.png',touch:'./assets/app-icons/desempenho-funcionarios-180.png'},
+  'horas-producao':{name:'Horas, Produção e Pagamentos',short:'Horas Livion',manifest:'./manifest-horas-producao.webmanifest',key:'horas-producao',icon:'./assets/icons/livion-192.png',touch:'./assets/icons/livion-180.png'},
   rh:{name:'Recursos Humanos',short:'RH Livion',manifest:'./manifest-rh.webmanifest',key:'rh',icon:'./assets/app-icons/rh-192.png',touch:'./assets/app-icons/rh-180.png'},
   fretes:{name:'Transportadora',short:'Transportadora',manifest:'./manifest-fretes.webmanifest',key:'fretes',icon:'./assets/app-icons/fretes-192.png',touch:'./assets/app-icons/fretes-180.png'},
   'reparos-claro':{name:'Status de Reparos',short:'Reparos',manifest:'./manifest-reparos-claro.webmanifest',key:'reparos-claro',icon:'./assets/app-icons/reparos-claro-192.png',touch:'./assets/app-icons/reparos-claro-180.png'},
