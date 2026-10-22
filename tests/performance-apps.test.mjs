@@ -9,6 +9,7 @@ const nokia = readFileSync(path.join(root, 'painel-executivo-nokia', 'index.html
 const bonusUpgrade = readFileSync(path.join(root, 'desempenho-funcionarios', 'bonus-upgrade-v1.js'), 'utf8');
 const bonusEngine = readFileSync(path.join(root, 'desempenho-funcionarios', 'bonus-engine.js'), 'utf8');
 const desempenhoService = readFileSync(path.join(root, 'supabase', 'functions', 'desempenho-api', 'service.mjs'), 'utf8');
+const {normalizePanelReturnDate} = await import('../supabase/functions/desempenho-api/service.mjs');
 
 test('reparabilidade exclui Sem defeito e Sem reparo do divisor', () => {
   const source = combined.slice(combined.indexOf('function calcStats('), combined.indexOf('function techStats(')).trim();
@@ -73,8 +74,9 @@ test('o Portal mantém o painel consolidado e retira o painel Nokia da navegaç�
 });
 
 test('o bônus usa devolução real, exclui fórmulas e permite editar todas as regras', () => {
-  assert.match(combined, /Claro coluna AN e Nokia coluna W/);
-  assert.match(combined, /Qualquer célula com fórmula nessa coluna fica fora/);
+  assert.match(combined, /Claro coluna AJ \(Data Expedição\) e Nokia coluna W/);
+  assert.match(combined, /Qualquer célula com fórmula nessas colunas fica fora/);
+  assert.doesNotMatch(combined, /Data Entrega na Claro/);
   assert.doesNotMatch(combined, /A medição não participa deste filtro/);
   assert.doesNotMatch(combined, /id="bonusStartPct"/);
   assert.doesNotMatch(combined, /id="bonusHighPct"/);
@@ -86,6 +88,20 @@ test('o bônus usa devolução real, exclui fórmulas e permite editar todas as 
   assert.match(combined, /r\.devolvido&&!r\.dataFormula&&returnMonth\(r\.dataDevolucao\)===month/);
   assert.match(combined, /Complexidade por Part Number/);
   assert.match(combined, /x\.levels\[pnLevel\(r,c\)\]\+\+/);
+});
+
+test('a API usa AJ para Claro, W para Nokia e ignora fórmula na própria coluna', () => {
+  const claro=normalizePanelReturnDate({cliente:'Claro','Data Expedição':'20/10/2026','Data Entrega na Claro':'22/10/2026',dataFormula:true});
+  assert.equal(claro.dataDevolucao,'20/10/2026');
+  assert.equal(claro.dataFormula,false);
+  assert.equal(claro.devolvido,true);
+  const claroFormula=normalizePanelReturnDate({cliente:'Claro','Data Expedição':'22/10/2026','_formula_Data Expedição':'=HOJE()'});
+  assert.equal(claroFormula.dataFormula,true);
+  assert.equal(claroFormula.devolvido,false);
+  const nokia=normalizePanelReturnDate({cliente:'Nokia','Data eSmart (Devolução)':'18/10/2026','_formula_Data eSmart (Devolução)':''});
+  assert.equal(nokia.dataDevolucao,'18/10/2026');
+  assert.equal(nokia.dataFormula,false);
+  assert.equal(nokia.devolvido,true);
 });
 
 test('o painel consolidado filtra somente devoluções reais pelo mês de devolução', () => {

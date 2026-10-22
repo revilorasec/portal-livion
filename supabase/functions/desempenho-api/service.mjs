@@ -12,6 +12,24 @@ export function includeSourceRow(row,client){
  const pending=sourceNorm(status)==='01-EM REPARO'&&sourceNorm(location)==='LIVION'&&!String(received??'').trim();
  return !pending;
 }
+const firstDefined=(row,keys)=>{for(const key of keys)if(row?.[key]!==undefined&&row?.[key]!==null)return row[key];return '';};
+const isFormula=value=>typeof value==='string'?value.trim().startsWith('='):value===true;
+export function normalizePanelReturnDate(row){
+ const client=sourceNorm(row?.cliente??row?.client);
+ if(client!=='CLARO'&&client!=='NOKIA')return row;
+ const isClaro=client==='CLARO';
+ const date=firstDefined(row,isClaro
+  ?['Data Expedição','dataExpedicao','shippedAt']
+  :['Data eSmart (Devolução)','dataDevolucao','returnedAt']);
+ const formula=firstDefined(row,isClaro
+  ?['_formula_Data Expedição','formulaDataExpedicao','dataExpedicaoFormula','shippedFormula']
+  :['_formula_Data eSmart (Devolução)','formulaDataDevolucao','dataFormula','returnedFormulaToday']);
+ const dataFormula=isFormula(formula);
+ return {...row,dataDevolucao:date,returnedAt:date,dataFormula,returnedFormulaToday:dataFormula,devolvido:!dataFormula&&Boolean(String(date??'').trim())};
+}
+export function normalizePanelRows(panel,rows){
+ return panel==='combined'?rows.map(normalizePanelReturnDate):rows;
+}
 export function authorizedClients(user,grant,registered=CLIENTS.map(c=>c.key)){
  if(!user?.active||user.user_type!=='INTERNO'||!['SOCIO','ADMINISTRADOR'].includes(user.profile))throw new ApiError(403,'Acesso restrito a sócios e administradores internos.');
  if(user.profile!=='ADMINISTRADOR'&&!(user.apps||[]).includes(APP_KEY))throw new ApiError(403,'Aplicativo não liberado no Portal.');
@@ -45,7 +63,7 @@ export function createService(deps){
    const source=await fetchPanelSource(panel,{force:new URL(req.url).searchParams.get('refresh')==='1'});
    const current=await db.userByEmail(identity.email.toLowerCase());
    if(!current||current.id!==user.id||(current.microsoft_id&&current.microsoft_id!==identity.id)||!current.active||(current.profile!=='ADMINISTRADOR'&&!(current.apps||[]).includes(appKey))||!(await db.app(appKey))?.active)throw new ApiError(403,'Acesso alterado. Atualize a sessão.');
-   return out(200,{panel,rows:source.rows,updatedAt:source.updatedAt,stale:source.stale===true});
+   return out(200,{panel,rows:normalizePanelRows(panel,source.rows),updatedAt:source.updatedAt,stale:source.stale===true});
   }
   if(path==='/bonus-settings'){
    const appKey='desempenho-funcionarios';
