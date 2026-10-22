@@ -86,7 +86,7 @@ values
   ('horas-producao','Horas, Produção e Pagamentos',
    'Controle mensal de horas, peças reparadas e valores calculados por funcionário.',
    '◷','Pessoas & Gestão',
-   'https://portal.livionsolutions.com.br/horas-producao.html?v=1',
+   'https://portal.livionsolutions.com.br/horas-producao.html?v=2',
    true,'INTERNO','["INTERNO"]'::jsonb,'["LIVION"]'::jsonb,
    '[{"key":"horas-producao.visualizar","label":"Visualizar horas, produção e valores"},{"key":"horas-producao.editar","label":"Cadastrar e editar lançamentos e configurações"},{"key":"horas-producao.excluir","label":"Arquivar funcionários preservando histórico"}]'::jsonb,
    74,now())

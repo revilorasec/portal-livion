@@ -66,6 +66,20 @@ test('peças sem horas recebem alerta e não entram na produtividade; grupo usa 
   assert.equal(closing('a', days, config, overrides, entries, official, 1).pieces, 8);
 });
 
+test('bônus e valor por peça são compartilhados, sem dividir o bônus entre pessoas', () => {
+  const overrides = new Map([['2026-07-01', 4]]);
+  const entries = new Map([
+    ['a|2026-07-01', { actual_hours: 4, pieces: 2 }],
+    ['b|2026-07-01', { actual_hours: 2, pieces: 1 }]
+  ]);
+  const a = closing('a', days, config, overrides, entries, { amount_cents: 0 });
+  const b = closing('b', days, config, overrides, entries, { amount_cents: 0 });
+  assert.equal(a.bonus, 50000);
+  assert.equal(b.bonus, 25000);
+  assert.equal(a.production, 400);
+  assert.equal(b.production, 200);
+});
+
 test('app usa sessão do Portal, armazenamento remoto e arquivamento com histórico', () => {
   const ui = readFileSync(new URL('../horas-producao.js', import.meta.url), 'utf8');
   const api = readFileSync(new URL('../supabase/functions/hours-api/index.ts', import.meta.url), 'utf8');

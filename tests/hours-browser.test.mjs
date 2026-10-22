@@ -79,6 +79,9 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     await app.locator('#app').waitFor({ state: 'visible' });
     assert.equal(await app.locator('#staffList').getByText('Gian Luca').count(), 1);
     assert.equal(await app.locator('#matrix [data-entry-id]').first().inputValue(), '2');
+    assert.match(await app.locator('#teamTable').innerText(), /Pendências/);
+    await app.locator('#tabCompare').click();
+    assert.match(await app.locator('#comparisonTable').innerText(), /Diferença para o grupo/);
     await app.locator('#tabPerson').click();
     assert.equal(await app.locator('#overtimeAmount').inputValue(), '0.00');
     await app.locator('[data-employee-archive]').click();

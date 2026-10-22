@@ -139,9 +139,9 @@ function renderTeam(m) {
     return `<td>${entryInput(row, day, item, 'actual_hours')}</td><td>${entryInput(row, day, item, 'pieces')}</td>`;
   }).join('')}</tr>`).join('');
   $('matrix').innerHTML = header + `<tbody>${body}</tbody>`;
-  $('teamTable').innerHTML = `<thead><tr><th>Funcionário</th><th>Previstas</th><th>Feitas</th><th>% horas</th><th>Peças</th><th>Bônus</th><th>Produção</th><th>Subtotal</th><th>Extras oficiais</th><th>Total</th></tr></thead><tbody>${m.rows.map(row => {
+  $('teamTable').innerHTML = `<thead><tr><th>Funcionário</th><th>Previstas</th><th>Feitas</th><th>% horas</th><th>Peças</th><th>Bônus</th><th>Produção</th><th>Subtotal</th><th>Extras oficiais</th><th>Total</th><th>Pendências</th></tr></thead><tbody>${m.rows.map(row => {
     const value = m.results.get(row.id);
-    return `<tr><td>${esc(row.name)}</td><td>${fmtNum(value.planned)} h</td><td>${fmtNum(value.actual)} h</td><td>${value.attendance === null ? '—' : fmtNum(value.attendance, 1) + '%'}</td><td>${value.pieces}</td><td>${fmtMoney(value.bonus)}</td><td>${fmtMoney(value.production)}</td><td>${fmtMoney(value.subtotal)}</td><td>${fmtMoney(value.official)}</td><td class="${value.total === null ? 'pending-text' : ''}">${value.total === null ? 'Parcial ' + fmtMoney(value.known) : fmtMoney(value.total)}</td></tr>`;
+    return `<tr><td>${esc(row.name)}</td><td>${fmtNum(value.planned)} h</td><td>${fmtNum(value.actual)} h</td><td>${value.attendance === null ? '—' : fmtNum(value.attendance, 1) + '%'}</td><td>${value.pieces}</td><td>${fmtMoney(value.bonus)}</td><td>${fmtMoney(value.production)}</td><td>${fmtMoney(value.subtotal)}</td><td>${fmtMoney(value.official)}</td><td class="${value.total === null ? 'pending-text' : ''}">${value.total === null ? 'Parcial ' + fmtMoney(value.known) : fmtMoney(value.total)}</td><td class="${value.pending.length ? 'pending-text' : ''}">${esc(value.pending.join('; ') || '—')}</td></tr>`;
   }).join('')}</tbody>`;
   $('teamTotal').textContent = sum.complete ? `Total fechado da equipe: ${fmtMoney(sum.known)}` : `Valor conhecido da equipe: ${fmtMoney(sum.known)} · ${sum.pending} fechamento(s) pendente(s). Não representa o valor final a pagar.`;
 }
@@ -208,7 +208,7 @@ function renderCompare(m) {
   barChart('piecesChart', filtered, 'pieces', '', 0);
   barChart('attendanceChart', filtered, 'attendance', '%', 1);
   $('trendChart').innerHTML = trendChart(filtered, m.days.slice(0, cutOff), m);
-  $('comparisonTable').innerHTML = `<thead><tr><th>Funcionário</th><th>Horas previstas</th><th>Horas feitas</th><th>Cumprimento</th><th>Peças</th><th>Peças/h</th><th>Alerta</th></tr></thead><tbody>${filtered.map(row => `<tr><td>${esc(row.name)}</td><td>${fmtNum(row.value.planned)} h</td><td>${fmtNum(row.value.actual)} h</td><td>${row.value.attendance === null ? '—' : fmtNum(row.value.attendance, 1) + '%'}</td><td>${row.value.pieces}</td><td>${row.value.productivity === null ? '—' : fmtNum(row.value.productivity)}</td><td>${row.value.piecesWithoutHours ? 'Peças sem horas' : ''}</td></tr>`).join('')}</tbody>`;
+  $('comparisonTable').innerHTML = `<thead><tr><th>Funcionário</th><th>Horas previstas</th><th>Horas feitas</th><th>Cumprimento</th><th>Peças</th><th>Peças/h</th><th>Diferença para o grupo</th><th>Alerta</th></tr></thead><tbody>${filtered.map(row => `<tr><td>${esc(row.name)}</td><td>${fmtNum(row.value.planned)} h</td><td>${fmtNum(row.value.actual)} h</td><td>${row.value.attendance === null ? '—' : fmtNum(row.value.attendance, 1) + '%'}</td><td>${row.value.pieces}</td><td>${row.value.productivity === null ? '—' : fmtNum(row.value.productivity)}</td><td>${row.value.productivity === null || group.groupProductivity === null ? '—' : `${row.value.productivity >= group.groupProductivity ? '+' : ''}${fmtNum(row.value.productivity - group.groupProductivity)} p/h`}</td><td>${row.value.piecesWithoutHours ? 'Peças sem horas' : ''}</td></tr>`).join('')}</tbody>`;
 }
 function render() {
   if (!state.data) return;
