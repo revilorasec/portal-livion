@@ -12,9 +12,10 @@ export function permissions(user, client) {
   return { access, view: can('visualizar'), edit: can('editar_rascunho'), write: can('gravar_caixas'), generate: can('gerar_romaneio') };
 }
 export function authorize(user, client, action) { need(permissions(user, client)[action], 'Seu usuário não tem permissão para esta operação.', 403, 'FORBIDDEN'); }
-export async function sourceGroups(client, source, models = []) {
+export async function sourceGroups(client, source, models = [], selectedKey) {
   const adapter = ADAPTERS[client]; need(adapter, 'Empresa inválida.');
   const result = adapter.normalizeSource(source);
+  if(selectedKey!==undefined)result.groups=result.groups.filter(g=>g.key===selectedKey);
   for (const g of result.groups) {
     const candidates = models.filter(m => m.active !== false && adapter.modelMatches(m, g));
     g.errors = [...(g.errors || [])];

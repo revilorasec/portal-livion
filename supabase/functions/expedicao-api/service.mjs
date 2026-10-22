@@ -71,7 +71,12 @@ export function createService(deps) {
         const saved=await deps.db.manageModel({client,action:'save',model,center:selected.center,contentBase64:deps.base64(bytes),expectedActiveIds:selected.activeIds,sourceId:body.sourceId,sourceRevision:body.sourceRevision,actor});
         return reply(saved);
       }
-      const actor = user.email, source = await deps.readSource(client), models = await deps.db.models(client), loaded = await sourceGroups(client, source, models);
+      if(route==='draft-archive'&&req.method==='POST'){
+        authorize(user,client,'edit');
+        need(typeof body.groupKey==='string'&&body.groupKey.length>0&&body.groupKey.length<=1000&&Number.isSafeInteger(body.revision)&&body.revision>0,'Atualize a lista de rascunhos antes de remover.');
+        return reply(await deps.db.archiveDraft({client,groupKey:body.groupKey,revision:body.revision,actor:user.email}));
+      }
+      const actor = user.email, source = await deps.readSource(client), models = await deps.db.models(client), loaded = await sourceGroups(client, source, models, req.method==='POST'?body.groupKey:undefined);
       const states = await deps.db.dispatches(client);
       for (const group of loaded.groups) { const state = states.find(s => s.group_key === group.key); group.dispatch = state || null; group.dispatchState = state?.fingerprint === group.dispatchFingerprint ? 'EXPEDIDO' : group.active ? 'EM_EXPEDICAO' : 'FINALIZADO_BD'; group.changedSinceDispatch = Boolean(state && state.fingerprint !== group.dispatchFingerprint); }
       if (route === 'load' && req.method === 'GET') return reply({ ...loaded, client, permissions: permissions(user, client), writeEnabled: deps.writeEnabled(client), drafts: await deps.db.drafts(client), pendingOperations: await deps.db.pending(client),pendingCloudJobs:deps.cloud?await deps.cloud.pending(client):[] });
@@ -102,7 +107,7 @@ export function createService(deps) {
         // A lost Google response is not proof that the write failed. Always read
         // the actual cells once, without resending the write, before marking pending.
         try {
-          const reread = await sourceGroups(client, await deps.readSource(client), models), current = reread.groups.find(g => g.key === group.key);
+          const reread = await sourceGroups(client, await deps.readSource(client), models, group.key), current = reread.groups.find(g => g.key === group.key);
           if(!(current && updates.every(u => current.items.some(i => i.id === u.id && text(i.box) === u.box && (client !== 'nokia' || i.expeditionDate)))))throw writeError||new ExpeditionError(409,'A gravação ainda não foi confirmada por leitura de retorno.','PENDING');
           const saved = await deps.db.finishOperation(op.id, 'CONFIRMED', { verified: updates.length }, actor); return reply({ operation: saved, verified: updates.length });
         } catch(error) {
@@ -148,7 +153,7 @@ export function createService(deps) {
             const result=await deps.generateWorkbook(model,bytes,group,plan);
             const record=await deps.db.recordExport({client,groupKey:group.key,fingerprint:group.fingerprint,dispatchFingerprint:group.dispatchFingerprint,actor,modelId:model.id,modelHash:model.sha256,fileHash:result.sha256,output:plan.output,ids:group.items.map(i=>i.id),draft:plan.draft});
             const receipt=await deps.cloud.save(job,record,result,plan.output);
-            const fresh=await sourceGroups(client,await deps.readSource(client),await deps.db.models(client)),current=fresh.groups.find(g=>g.key===group.key);
+            const fresh=await sourceGroups(client,await deps.readSource(client),await deps.db.models(client),group.key),current=fresh.groups.find(g=>g.key===group.key);
             need(current?.fingerprint===group.fingerprint,'O Excel foi salvo, mas o BD ou modelo mudou. Use Conferir salvamento para revisar a conclusão.',409,'CLOUD_PENDING');
             await deps.db.completeDispatch({exportId:record.id,groupKey:group.key,client,fingerprint:group.dispatchFingerprint,actor,savedPath:receipt.path,fileHash:result.sha256});
             await deps.cloud.complete(job.id);
@@ -175,10 +180,12 @@ export function createService(deps) {
         need(job&&job.client===client&&job.group_key===group.key&&(job.actor_email===actor||user.profile==='ADMINISTRADOR'),'Salvamento não disponível para este usuário e nota.',403);
         need(job.export_id,'O salvamento não chegou à criação do arquivo. Peça ao administrador para conferir.',409);
         const exp=await deps.db.export(job.export_id);
-        need(exp&&exp.client===client&&exp.group_key===group.key&&exp.fingerprint===group.fingerprint,'O BD ou modelo mudou desde a geração. Confira antes de concluir.',409);
+        need(exp&&exp.client===client&&exp.group_key===group.key,'O comprovante desta geração não corresponde à nota.',409);
+        const receipt=await deps.cloud.verify(job,exp,actor);
+        if(receipt.notSaved)return reply({notSaved:true,message:'A pasta central está acessível, mas esta tentativa não salvou o Excel. A nota foi liberada. Clique em Gerar Excel e concluir expedição para iniciar um novo salvamento.'});
+        need(exp.fingerprint===group.fingerprint,'O BD ou modelo mudou desde a geração. Confira antes de concluir.',409);
         need(group.items.every(i=>text(i.box)===text(exp.draft.assignments[i.id])),'As caixas não correspondem ao arquivo gerado.',409);
         need(!(await deps.db.pending(client)).some(op=>op.group_key===group.key),'Há gravação de caixas pendente de conferência.',409);
-        const receipt=await deps.cloud.verify(job,exp);
         await deps.db.completeDispatch({exportId:exp.id,groupKey:group.key,client,fingerprint:group.dispatchFingerprint,actor:exp.actor_email,savedPath:receipt.path,fileHash:exp.file_hash});
         await deps.cloud.complete(job.id);return reply({central:true,dispatchState:'EXPEDIDO'});
       }

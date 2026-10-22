@@ -44,7 +44,16 @@ export function centralCloud({env,rest,rpc,fetcher=fetch,now=()=>Date.now()}){
   async save(job,record,result,output){const token=await getToken();await patchJob(job.id,{state:'UPLOADING',export_id:record.id});
    try{const receipt=await saveCentralFile(token,job.target,output,record.id,result.bytes,result.sha256,fetcher);await patchJob(job.id,{state:'VERIFIED',receipt});return receipt;}catch(e){await patchJob(job.id,{state:'PENDING'});throw new ExpeditionError(502,'O salvamento central ficou pendente. Use Conferir salvamento; a gravação não será repetida automaticamente.','CLOUD_PENDING');}
   },
-  async verify(job,record){const token=await getToken();const receipt=job.receipt?await verifyCentralFile(token,job.receipt,record.file_hash,fetcher):await findCentralFile(token,job.target,record.output,record.id,record.file_hash,fetcher);await patchJob(job.id,{state:'VERIFIED',receipt});return receipt;},
+  async inspect(job,record){const token=await getToken();return job.receipt?verifyCentralFile(token,job.receipt,record.file_hash,fetcher):findCentralFile(token,job.target,record.output,record.id,record.file_hash,fetcher);},
+  async verify(job,record,actor){const receipt=await this.inspect(job,record);
+   if(receipt.missing){
+    need(!job.receipt&&['PREPARED','UPLOADING','PENDING'].includes(job.state)&&now()-Date.parse(job.updated_at)>=600000,'O arquivo desta tentativa ainda não foi encontrado. Aguarde e use Conferir salvamento; nenhum envio será repetido.',409,'CLOUD_PENDING');
+    const released=await rpc('cloud_release_missing_job',{p:{id:job.id,updatedAt:job.updated_at,exportId:record.id,actor}});
+    need(released?.state==='FAILED','O salvamento mudou durante a conferência. Atualize a nota.',409,'CLOUD_PENDING');
+    return {notSaved:true};
+   }
+   await patchJob(job.id,{state:'VERIFIED',receipt});return receipt;
+  },
   job:id=>first('expedicao_cloud_jobs?select=*&id=eq.'+enc(id)),
   pending:client=>rest('expedicao_cloud_jobs?select=id,group_key,state,actor_email&client=eq.'+enc(client)+'&state=in.(PREPARED,UPLOADING,VERIFIED,PENDING)&order=created_at'),
   complete:id=>patchJob(id,{state:'COMPLETED'}),

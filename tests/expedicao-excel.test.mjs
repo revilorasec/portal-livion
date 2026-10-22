@@ -11,6 +11,13 @@ import { source,draftFor,harness } from './expedicao-fixtures.mjs';
 import {inspectModel,editModel} from '../supabase/functions/expedicao-api/models.mjs';
 const dir=path.resolve(import.meta.dirname,'../../../EXPEDIÇÃO E ROMANEIOS/Modelos-Homologacao');
 let manifest,JSZip;try{manifest=JSON.parse(await fs.readFile(path.join(dir,'modelos.json'),'utf8'));const req=createRequire(pathToFileURL((process.env.EXPEDICAO_NODE_MODULES||'C:/Users/cesar/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules')+'/_loader.cjs'));JSZip=req('jszip');}catch{}
+
+test('optimized workbook readback detects altered bytes in any unauthorized ZIP part',{skip:!manifest||!JSZip},async()=>{
+ const m=manifest.models[0],bytes=await fs.readFile(path.join(dir,m.filename));let loads=0;
+ const wrapped={loadAsync:async(...args)=>{const zip=await JSZip.loadAsync(...args);if(++loads===2){const generate=zip.generateAsync.bind(zip);zip.generateAsync=async options=>{const key=Object.keys(zip.files).find(k=>k.startsWith('docProps/')&&!zip.files[k].dir);assert.ok(key);zip.file(key,'<unauthorized-change/>');return generate(options);};}return zip;}};
+ const {Book}=createWorkbookEngine(wrapped),book=await Book.open(bytes,m.name);
+ await assert.rejects(book.writeCopy({}),/Parte Excel divergente na leitura de retorno/);assert.equal(loads,3);
+});
 test('every approved model generates isolated copies; status is right of STATUS, unused labels cleared, all formulas/ZIP parts preserved',{skip:!manifest||!JSZip},async()=>{
  const {Book,hash}=createWorkbookEngine(JSZip),output=path.resolve(dir,'../Validacao');await fs.mkdir(output,{recursive:true});const results=[];
  for(const m of manifest.models){

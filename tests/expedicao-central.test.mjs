@@ -11,7 +11,7 @@ function cloudHarness(){
  const h={tables,puts:0,posts:0,failUpload:false,account:OWNER,bytes:new Uint8Array([1]),calls:[]};
  const rest=async(path,o={})=>{const u=new URL('https://isolated.test/'+path),rows=tables[u.pathname.slice(1)];assert.ok(rows,path);const selected=rows.filter(row=>[...u.searchParams].every(([k,v])=>['select','order'].includes(k)||v.startsWith('eq.')&&String(row[k])===v.slice(3)||v.startsWith('in.(')&&v.slice(4,-1).split(',').includes(row[k])));
   if(o.method==='POST'){const row=JSON.parse(o.body);rows.push(row);return [structuredClone(row)];}if(o.method==='PATCH'){const patch=JSON.parse(o.body);selected.forEach(row=>Object.assign(row,patch));}return structuredClone(selected);};
- const rpc=async(name,{p})=>{if(name==='cloud_claim_session'){const s=tables.expedicao_cloud_sessions.find(s=>s.id===p.id&&s.actor_email===p.actor);if(!s||s.state!=='OPEN'||new Date(s.expires_at)<=clock)return null;if(new Date(s.next_poll_at)>clock)return {waiting:true};s.next_poll_at=new Date(clock+s.interval_seconds*1000).toISOString();return structuredClone(s);}
+ const rpc=async(name,{p})=>{if(name==='cloud_release_missing_job'){const j=tables.expedicao_cloud_jobs.find(j=>j.id===p.id);assert.ok(j);if(j.updated_at!==p.updatedAt||j.export_id!==p.exportId||j.receipt||clock-Date.parse(j.updated_at)<600000)throw new ExpeditionError(409,'CONFLICT');j.state='FAILED';return structuredClone(j);}if(name==='cloud_claim_session'){const s=tables.expedicao_cloud_sessions.find(s=>s.id===p.id&&s.actor_email===p.actor);if(!s||s.state!=='OPEN'||new Date(s.expires_at)<=clock)return null;if(new Date(s.next_poll_at)>clock)return {waiting:true};s.next_poll_at=new Date(clock+s.interval_seconds*1000).toISOString();return structuredClone(s);}
   if(name==='cloud_save_folder'){let s=tables.expedicao_cloud_settings.find(s=>s.client===p.client);if((s?.revision||0)!==p.revision)throw new ExpeditionError(409,'CONFLICT');if(!s){s={client:p.client,revision:0};tables.expedicao_cloud_settings.push(s);}Object.assign(s,{folder:p.folder,revision:s.revision+1,updated_by:p.actor});return structuredClone(s);}
   if(name==='cloud_begin_job'){let j=tables.expedicao_cloud_jobs.find(j=>j.id===p.id);if(j)return {created:false,job:structuredClone(j)};if(tables.expedicao_cloud_jobs.some(j=>j.group_key===p.groupKey&&['PREPARED','UPLOADING','VERIFIED','PENDING'].includes(j.state)))throw new ExpeditionError(409,'PENDING');j={id:p.id,client:p.client,group_key:p.groupKey,actor_email:p.actor,fingerprint:p.fingerprint,target:p.target,state:'PREPARED'};tables.expedicao_cloud_jobs.push(j);return {created:true,job:structuredClone(j)};}throw Error(name);};
  const fetcher=async(url,o={})=>{url=String(url);h.calls.push({url,method:o.method||'GET'});
@@ -20,12 +20,12 @@ function cloudHarness(){
   if(url.includes('graph.microsoft.com'))assert.equal(o.headers.Authorization,'Bearer private-central-access-token');
   if(url.includes('/me?'))return Response.json({id:'central-owner',mail:h.account});
   if(url.includes('/root:/'))return Response.json({id:'central-root',name:'Expedição',folder:{},parentReference:{driveId:'central-drive'}});
-  if(url.includes('/central-root?'))return Response.json({id:'central-root',folder:{}});
+  if(url.includes('/central-root?'))return h.rootMissing?new Response('{}',{status:404}):Response.json({id:'central-root',folder:{}});
   if(o.method==='POST'){h.posts++;return Response.json({id:'note-folder',folder:{}});}
   if(o.method==='PUT'){h.puts++;if(h.failUpload)throw Error('timeout after upload');return Response.json({id:'saved-file'});}
   if(url.endsWith('/saved-file'))return Response.json({id:'saved-file',size:1,'@microsoft.graph.downloadUrl':'https://tenant.sharepoint.com/private-download'});
   if(url==='https://tenant.sharepoint.com/private-download'){assert.equal(o.headers?.Authorization,undefined);return new Response(h.bytes);}
-  if(url.includes('central-root:/')&&url.includes('.xlsx'))return Response.json({id:'saved-file'});
+  if(url.includes('central-root:/')&&url.includes('.xlsx'))return h.fileMissing?new Response('{}',{status:404}):Response.json({id:'saved-file'});
   return new Response('{}',{status:404});
  };
  h.cloud=centralCloud({env:()=> 'isolated-test-master-secret-32-characters',rest,rpc,fetcher,now:()=>clock});
@@ -75,4 +75,14 @@ test('folder errors distinguish missing path from sign-in; central download cann
  await assert.rejects(cloudGraph('test','/missing',{},async()=>new Response('{}',{status:404})),e=>e.code==='CLOUD_404'&&!e.message.includes('Reconecte'));
  let calls=0;await assert.rejects(verifyCentralFile('test',{driveId:'d',itemId:'f'},'hash',async()=>{calls++;return Response.json({id:'f',size:1,'@microsoft.graph.downloadUrl':'https://other.example/private'});}));assert.equal(calls,1);
  const ui=readFileSync(new URL('../expedicao/output-settings.mjs',import.meta.url),'utf8');assert.equal(ui.includes('__PORTAL_GET_EXPEDICAO_GRAPH_TOKEN__'),false);assert.equal(ui.includes('graphToken'),false);assert.ok(ui.includes('canManage'));
+});
+
+test('a stale interrupted upload with an accessible root and missing exact file is released without upload or false dispatch',async()=>{
+ const cloud=cloudHarness();await cloud.connect();await cloud.cloud.saveFolder('nokia','Empresa/Expedição',0,OWNER);cloud.failUpload=true;
+ const h=harness();h.deps.cloud=cloud.cloud;h.models.nokia[0].sha256=await sha256(new Uint8Array([1]));h.deps.generateWorkbook=async()=>({bytes:new Uint8Array([1]),sha256:await sha256(new Uint8Array([1]))});h.sources.nokia.rows.forEach((r,i)=>{r.V=String(i+1);r.U='21/10/2026';});
+ const g=(await h.call('load')).body.groups[0],body={client:'nokia',groupKey:g.key,fingerprint:g.fingerprint,draft:draftFor(g),operationId:crypto.randomUUID()};await h.call('generate',body);
+ const job=cloud.tables.expedicao_cloud_jobs[0];job.state='UPLOADING';cloud.fileMissing=true;
+ assert.equal((await h.call('cloud-reconcile',body)).status,409);assert.equal(job.state,'UPLOADING');assert.equal(cloud.puts,1);
+ job.updated_at=new Date(Date.now()-660000).toISOString();cloud.rootMissing=true;assert.equal((await h.call('cloud-reconcile',body)).status,502);assert.equal(job.state,'UPLOADING');cloud.rootMissing=false;
+ const result=await h.call('cloud-reconcile',body);assert.equal(result.status,200);assert.equal(result.body.notSaved,true);assert.equal(job.state,'FAILED');assert.equal(h.dispatches.length,0);assert.equal(cloud.puts,1);assert.equal((await h.call('load')).body.pendingCloudJobs.length,0);
 });

@@ -25,9 +25,12 @@ export async function verifyCentralFile(token,receipt,expectedHash,fetcher=fetch
  return receipt;
 }
 export async function findCentralFile(token,target,output,exportId,hash,fetcher=fetch){
- const base='/drives/'+enc(target.driveId)+'/items/'+enc(target.folderId)+':/';
+ const base='/drives/'+enc(target.driveId)+'/items/';
+ const root=await cloudGraph(token,base+enc(target.folderId)+'?$select=id,folder',{},fetcher);
+ need(root.id===target.folderId&&root.folder,'A pasta central configurada não está disponível. Peça ao administrador para conferir.',502,'CLOUD_ROOT');
  const filename=output.filename.replace(/\.xlsx$/i,' ('+exportId+').xlsx');
- const file=await cloudGraph(token,base+segment(output.folder)+'/'+segment(filename)+'?$select=id',{},fetcher);
+ const file=await cloudGraph(token,base+enc(target.folderId)+':/'+segment(output.folder)+'/'+segment(filename)+'?$select=id',{allowMissing:true},fetcher);
+ if(!file)return {missing:true};
  return verifyCentralFile(token,{driveId:target.driveId,itemId:file.id,path:'OneDrive/'+target.path+'/'+output.folder+'/'+filename},hash,fetcher);
 }
 export async function saveCentralFile(token,target,output,exportId,bytes,hash,fetcher=fetch){

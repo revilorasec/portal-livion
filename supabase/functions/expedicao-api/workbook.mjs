@@ -21,7 +21,7 @@ function decimal(v,label,positive=false){let s=text(v);if(s.includes(','))s=s.re
 function partPath(base,target){if(target.startsWith('/'))return target.slice(1);const chunks=base.split('/');chunks.pop();for(const p of target.split('/')){if(p==='..')chunks.pop();else if(p&&p!=='.')chunks.push(p);}return chunks.join('/');}
 class Book{
  static async open(data,name='modelo.xlsx'){
-  const book=new Book();book.name=name;book.hash=await hash(data);book.zip=await root.JSZip.loadAsync(data,{checkCRC32:true,createFolders:false});book.parts={};
+  const book=new Book();book.name=name;book.hash=await hash(data);book.originalBytes=data;book.zip=await root.JSZip.loadAsync(data,{checkCRC32:true,createFolders:false});book.parts={};
   for(const [k,entry]of Object.entries(book.zip.files)){if(!entry.dir)book.parts[k]=await entry.async('uint8array');}
   book.xml=k=>{if(!book.parts[k])fail('Parte Excel ausente: '+k);return new TextDecoder().decode(book.parts[k]);};
   const links=Object.fromEntries(nodes(book.xml('xl/_rels/workbook.xml.rels'),'Relationship').map(x=>{const a=attrs(x);return[a.Id,partPath('xl/workbook.xml',a.Target)];}));
@@ -49,20 +49,30 @@ class Book{
   return {name:this.name,sha256:this.hash,cnpj,uf:norm(this.value(ABAS[0],'D5')),city:this.value(ABAS[0],'D6'),address:this.value(ABAS[0],'B11'),capacity,box_capacity:labelRows.length,formula_counts:Object.fromEntries(Object.entries(forms).map(([s,f])=>[s,Object.keys(f).length])),inherited_error_cells:errors,ok:true};
  }
  async writeCopy(changes){
-  const zip=await root.JSZip.loadAsync(await this.zip.generateAsync({type:'uint8array'}),{createFolders:false}),allowed=new Set(['xl/workbook.xml']);
+  // Clone from the original bytes. Repacking and inflating the entire template
+  // before editing consumed the Edge Function CPU budget without adding validation.
+  const zip=await root.JSZip.loadAsync(this.originalBytes,{createFolders:false}),expectedParts=new Map();
   const rx=()=>/<(?:(\w+):)?c\b[^>]*?(?:\/>|>[\s\S]*?<\/(?:\w+:)?c>)/g;
   for(const [sheet,updates]of Object.entries(changes)){
-   const part=this.sheets[sheet];if(!part)fail('Aba de destino ausente.');allowed.add(part);
+   const part=this.sheets[sheet];if(!part)fail('Aba de destino ausente.');
    for(const addr of Object.keys(updates)){const c=this.cells[sheet][addr];if(!c||c.formula||c.attrs.vm||c.attrs.cm)fail('Célula não permitida: '+sheet+'!'+addr);}
    const original=this.xml(part),seen={};const after=original.replace(rx(),(raw,prefix)=>{const addr=attrs(raw.split('>')[0]).r;if(!Object.hasOwn(updates,addr))return raw;seen[addr]=(seen[addr]||0)+1;let tag=raw.slice(0,raw.indexOf('>')).replace(/\/$/,'').replace(/\s+t="[^"]*"/,'');const {value,kind}=updates[addr];prefix=prefix?prefix+':':'';if(value==null||value==='')return tag+'/>';if(kind==='number')return tag+'><'+prefix+'v>'+decimal(value,addr)+'</'+prefix+'v></'+prefix+'c>';if(/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(String(value)))fail('Texto inválido: '+addr);return tag+' t="inlineStr"><'+prefix+'is><'+prefix+'t xml:space="preserve">'+encode(value)+'</'+prefix+'t></'+prefix+'is></'+prefix+'c>';});
    if(Object.keys(updates).some(a=>seen[a]!==1))fail('Célula não localizada exclusivamente no modelo.');
-   const mask=xml=>xml.replace(rx(),raw=>{const a=attrs(raw.split('>')[0]).r;return Object.hasOwn(updates,a)?'{CELL:'+a+'}':raw;});if(mask(original)!==mask(after))fail('Alteração fora das células permitidas.');zip.file(part,after,{createFolders:false});
+   const mask=xml=>xml.replace(rx(),raw=>{const a=raw.match(/\br="([^"]+)"/)?.[1];return Object.hasOwn(updates,a)?'{CELL:'+a+'}':raw;});if(mask(original)!==mask(after))fail('Alteração fora das células permitidas.');expectedParts.set(part,new TextEncoder().encode(after));zip.file(part,after,{createFolders:false});
   }
-  const wb=this.xml('xl/workbook.xml');let found=false;zip.file('xl/workbook.xml',wb.replace(/<(?:\w+:)?calcPr\b[^>]*\/>/,raw=>{found=true;for(const [key,v]of Object.entries({calcMode:'auto',fullCalcOnLoad:'1',forceFullCalc:'1',calcOnSave:'1'})){raw=raw.replace(new RegExp('\\s'+key+'="[^"]*"'),'');raw=raw.slice(0,-2)+' '+key+'="'+v+'"/>';}return raw;}),{createFolders:false});if(!found)fail('Configuração de cálculo não reconhecida.');
-  const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}}),result=await Book.open(bytes,this.name);
-  if(!same(this.formulas(),result.formulas()))fail('Verificação falhou: fórmulas alteradas.');if(!same(Object.keys(this.parts).sort(),Object.keys(result.parts).sort()))fail('Partes Excel alteradas.');for(const k of Object.keys(this.parts))if(!allowed.has(k)&&!bytesSame(this.parts[k],result.parts[k]))fail('Parte Excel não autorizada alterada: '+k);
-  for(const [s,updates]of Object.entries(changes))for(const [a,u]of Object.entries(updates))if(result.value(s,a)!==(u.value==null?'':u.kind==='number'&&u.value!==''?decimal(u.value,a):String(u.value)))fail('Leitura de volta divergente: '+s+'!'+a);
-  return {bytes,validation:{sha256:result.hash,model_sha256:this.hash,verified_formulas:Object.fromEntries(Object.entries(this.formulas()).map(([s,f])=>[s,Object.keys(f).length])),recalculate_on_open:true}};
+  const wb=this.xml('xl/workbook.xml');let found=false;const newWb=wb.replace(/<(?:\w+:)?calcPr\b[^>]*\/>/,raw=>{found=true;for(const [key,v]of Object.entries({calcMode:'auto',fullCalcOnLoad:'1',forceFullCalc:'1',calcOnSave:'1'})){raw=raw.replace(new RegExp('\\s'+key+'="[^"]*"'),'');raw=raw.slice(0,-2)+' '+key+'="'+v+'"/>';}return raw;});zip.file('xl/workbook.xml',newWb,{createFolders:false});expectedParts.set('xl/workbook.xml',new TextEncoder().encode(newWb));if(!found)fail('Configuração de cálculo não reconhecida.');
+  const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}}),reread=await root.JSZip.loadAsync(bytes,{createFolders:false}),parts=Object.fromEntries(await Promise.all(Object.entries(reread.files).filter(([,e])=>!e.dir).map(async([k,e])=>[k,await e.async('uint8array')])));
+  if(!same(Object.keys(this.parts).sort(),Object.keys(parts).sort()))fail('Partes Excel alteradas.');
+  // Verify every decompressed output byte. For edited XML, the expected XML was
+  // already checked against the original with only authorized cells masked.
+  // This proves formula/other-cell preservation without reparsing every cell twice.
+  for(const k of Object.keys(this.parts))if(!bytesSame(expectedParts.get(k)||this.parts[k],parts[k]))fail('Parte Excel divergente na leitura de retorno: '+k);
+  const values={};for(const [s,updates]of Object.entries(changes)){
+   values[s]={};const xml=new TextDecoder().decode(parts[this.sheets[s]]);
+   for(const match of xml.matchAll(rx())){const raw=match[0],a=raw.match(/\br="([^"]+)"/)?.[1];if(!Object.hasOwn(updates,a))continue;const ca=attrs(raw.split('>')[0]),vt=nodes(raw,'v')[0];values[s][a]=ca.t==='inlineStr'?strings(raw):vt?decode(inner(vt)):'';}
+   for(const [a,u]of Object.entries(updates))if(values[s][a]!==(u.value==null?'':u.kind==='number'&&u.value!==''?decimal(u.value,a):String(u.value)))fail('Leitura de volta divergente: '+s+'!'+a);
+  }
+  return {bytes,book:{value:(s,a)=>values[s]?.[a]??this.value(s,a)},validation:{sha256:await hash(bytes),model_sha256:this.hash,verified_formulas:Object.fromEntries(Object.entries(this.formulas()).map(([s,f])=>[s,Object.keys(f).length])),recalculate_on_open:true}};
  }
 }
 

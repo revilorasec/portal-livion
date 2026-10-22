@@ -67,6 +67,7 @@ export function runtimeDependencies(env, JSZip, fetcher = fetch) {
       dispatches: client => all('expedicao_dispatches?select=*&client=eq.' + query(client) + '&order=group_key'),
       pending: client => all('expedicao_operations?select=id,client,group_key,state,created_at&state=in.(PREPARED,DISPATCHED,PENDING)&client=eq.' + query(client) + '&order=created_at'),
       saveDraft: p => rpc('save_draft', { p }), beginOperation: p => rpc('begin_operation', { p }),
+      archiveDraft: p => rpc('archive_draft', { p }),
       claimOperation: id => rpc('claim_operation', { p_id: id }),
       finishOperation: (id, state, result, actor) => rpc('finish_operation', { p_id: id, p_state: state, p_result: result, p_actor: actor }),
       operation: id => first('expedicao_operations?select=*&id=eq.' + query(id)),

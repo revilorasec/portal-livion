@@ -30,7 +30,7 @@ export async function generateWorkbook(JSZip, model, bytes, group, plan) {
   }
   for (const t of targets) setCell(cells, '03 Etiquetas', t.target, plan.boxes[t.index]?.status || '');
   const result = await book.writeCopy(cells);
-  const reread = await Book.open(result.bytes, model.name);
+  const reread = result.book;
   for (const t of targets) need(reread.value('03 Etiquetas', t.target) === (plan.boxes[t.index]?.status || ''), 'A conferência do status nas etiquetas falhou.');
   return { bytes: result.bytes, sha256: result.validation.sha256, labelCells: targets.map(t=>t.target), validation: result.validation };
 }
