@@ -29,6 +29,7 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
   let browser;
   const employees = [], entries = [], plans = [], overtime = [];
   let settings = null;
+  let entryGate = null, nextEntryError = '', bootstrapCalls = 0;
   const id = '11111111-1111-4111-8111-111111111111';
   const otherId = '22222222-2222-4222-8222-222222222222';
   try {
@@ -39,6 +40,7 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     const input = request.postDataJSON?.() || {};
     let result, status = 200;
     if (path.startsWith('bootstrap')) {
+      bootstrapCalls++;
       const month = new URL(request.url()).searchParams.get('month');
       result = { month, employees, settings: settings || { month: month + '-01', bonus_cents: 0, piece_cents: 0, weekday_hours: 0, saturday_hours: 0, revision: 0 }, plans, entries, overtime: overtime.filter(row => row.month === month), permissions: { edit: true, delete: true } };
     } else if (path === 'employees' && request.method() === 'POST') {
@@ -48,9 +50,21 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
       settings = { ...input, month: input.month + '-01', revision: (settings?.revision || 0) + 1 };
       result = settings;
     } else if (path === 'entry') {
-      result = { ...input, revision: 1 };
+      if (entryGate) await entryGate;
       const index = entries.findIndex(row => row.employee_id === input.employee_id && row.day === input.day);
+      if (nextEntryError || input.revision !== (entries[index]?.revision || 0)) {
+        const error = nextEntryError || 'CONFLICT';
+        nextEntryError = '';
+        await route.fulfill({ status: error === 'CONFLICT' ? 409 : 500, contentType: 'application/json', body: JSON.stringify({ error }) });
+        return;
+      }
+      result = { ...input, revision: (entries[index]?.revision || 0) + 1 };
       if (index < 0) entries.push(result); else entries[index] = result;
+    } else if (path === 'plan') {
+      const index = plans.findIndex(row => row.day === input.day);
+      assert.equal(input.revision, plans[index]?.revision || 0);
+      result = { ...input, revision: (plans[index]?.revision || 0) + 1 };
+      if (index < 0) plans.push(result); else plans[index] = result;
     } else if (path === 'overtime') {
       result = { ...input, revision: 1 };
       const index = overtime.findIndex(row => row.employee_id === input.employee_id && row.month === input.month);
@@ -72,6 +86,8 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     const app = page.frameLocator('iframe');
     await app.locator('#app').waitFor({ state: 'visible' });
     assert.equal(await app.locator('#configView').isVisible(), false);
+    assert.equal(await app.locator('#personView').isVisible(), true);
+    assert.equal(await app.locator('#tabTeam, #matrix').count(), 0);
     await app.locator('#configBtn').click();
     assert.equal(await app.locator('#configView').isVisible(), true);
     await app.locator('#addEmployee').click();
@@ -146,46 +162,100 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
     assert.equal(settings.bonus_cents, 50000);
     assert.equal(settings.piece_cents, 200);
-    await app.locator('#tabTeam').click();
+    await app.locator('#tabPayments').click();
     assert.equal(await gianPayment.isVisible(), true);
     assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300));
     assert.equal(await anaPayment.locator('[data-payment-total]').textContent(), money(0));
-    const planned = await app.locator('#matrix [data-plan-day]').evaluateAll(elements => elements.reduce((sum, element) => sum + Number(element.value), 0));
+    await app.locator('#tabPerson').click();
+    const planned = await app.locator('#personTable [data-plan-day]').evaluateAll(elements => elements.reduce((sum, element) => sum + Number(element.value), 0));
     const bonus = Math.round(50000 * 2 / planned);
-    await app.locator('#matrix [data-entry-id]').first().fill('2');
+    const hours = app.locator('#personTable [data-field="actual_hours"]').first();
+    const pieces = app.locator('#personTable [data-field="pieces"]').first();
+    const note = app.locator('#personTable [data-field="note"]').first();
+    const readsBeforeEntries = bootstrapCalls;
+    let releaseEntry;
+    entryGate = new Promise(resolve => { releaseEntry = resolve; });
+    await hours.fill('2');
     assert.equal(entries.length, 0, 'prévia não grava enquanto o campo está sendo digitado');
     assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300 + bonus));
     assert.match(await app.locator('#paymentStatus').textContent(), /Prévia/);
-    await app.locator('#matrix [data-entry-id]').first().dispatchEvent('change');
-    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
-    await app.locator('#matrix [data-entry-id][data-field="pieces"]').first().fill('3');
-    assert.equal(entries[0].pieces, 0);
+    await pieces.focus();
+    await pieces.fill('3');
     assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300 + bonus + 600));
     assert.equal(await anaPayment.locator('[data-payment-total]').textContent(), money(0));
-    await app.locator('#matrix [data-entry-id][data-field="pieces"]').first().dispatchEvent('change');
+    await note.focus();
+    await note.fill('Observação em digitação');
+    await note.evaluate(element => {
+      window.__editingNote = element;
+      window.__appWasHidden = false;
+      new MutationObserver(() => { if (document.querySelector('#app').hidden) window.__appWasHidden = true; }).observe(document.querySelector('#app'), { attributes: true, attributeFilter: ['hidden'] });
+    });
+    const scrollBefore = await note.evaluate(() => window.scrollY);
+    entryGate = null; releaseEntry();
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    assert.equal(bootstrapCalls, readsBeforeEntries, 'salvar lançamentos não deve recarregar os dados da tela');
+    assert.equal(await note.evaluate(element => document.activeElement === element && window.__editingNote === element && !window.__appWasHidden), true, 'o campo deve manter identidade e foco durante a gravação de outros campos');
+    assert.equal(await note.evaluate(() => window.scrollY), scrollBefore);
+    assert.equal(await note.inputValue(), 'Observação em digitação');
+    assert.equal(entries[0].actual_hours, 2);
     assert.equal(entries[0].pieces, 3);
     assert.match(await app.locator('#paymentStatus').textContent(), /salvos/);
-    await app.locator('#tabPerson').click();
     assert.match(await app.locator('#personOfficial').innerText(), /2\.043,00/);
     assert.match(await app.locator('#personMetrics').textContent(), /Hora extra informada/);
     assert.equal(await app.locator('#personMetrics .metric').last().locator('strong').textContent(), money(204300 + bonus + 600));
-    // A mesma soma deve acompanhar o lançamento individual sem perder o foco.
-    await app.locator('#personTable [data-field="pieces"]').first().fill('4');
+    await note.press('End');
+    await note.pressSequentially(' e mantida');
+    await pieces.focus();
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    assert.equal(entries[0].note, 'Observação em digitação e mantida');
+    nextEntryError = 'SERVER_ERROR';
+    await pieces.fill('4');
     assert.equal(await app.locator('#personMetrics .metric').last().locator('strong').textContent(), money(204300 + bonus + 800));
-    await app.locator('#personTable [data-field="pieces"]').first().dispatchEvent('change');
+    await note.focus();
+    await app.locator('#retryGrid').waitFor({ state: 'visible' });
+    assert.equal(await pieces.inputValue(), '4');
+    assert.equal(entries[0].pieces, 3);
+    assert.equal(bootstrapCalls, readsBeforeEntries);
+    await app.locator('#retryGrid').click();
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    assert.equal(entries[0].pieces, 4);
+    // Conflito: conserva o rascunho e só usa a nova revisão após atualização explícita.
+    entries[0].revision++;
+    entries[0].note = 'Observação de outra sessão';
+    await pieces.fill('5');
+    await note.focus();
+    await app.locator('#retryGrid').waitFor({ state: 'visible' });
+    assert.equal(await pieces.inputValue(), '5');
+    assert.equal(entries[0].pieces, 4);
+    assert.equal(bootstrapCalls, readsBeforeEntries);
+    await app.locator('#reloadBtn').click();
+    await app.locator('#app').waitFor({ state: 'visible' });
+    assert.equal(await pieces.inputValue(), '5');
+    assert.equal(await note.inputValue(), 'Observação de outra sessão');
+    await app.locator('#retryGrid').click();
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    assert.equal(entries[0].pieces, 5);
+    assert.equal(entries[0].note, 'Observação de outra sessão');
+    const plan = app.locator('#personTable [data-plan-day]').first();
+    await plan.fill('5');
+    await pieces.focus();
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    assert.equal(plans[0].planned_hours, 5);
+    assert.equal(await app.locator('#personMetrics .metric').last().locator('strong').textContent(), money(204300 + Math.round(50000 * 2 / (planned + 1)) + 1000));
+    await plan.fill('4');
+    await pieces.focus();
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
     await page.reload();
     await app.locator('#app').waitFor({ state: 'visible' });
-    assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300 + bonus + 800));
+    assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300 + bonus + 1000));
     await app.locator('#tabConfig').click();
     assert.equal(await app.locator('#staffList').getByText('Gian Luca').count(), 1);
     assert.equal(await gianExtra.locator('[data-overtime-amount]').inputValue(), '2.043,00');
     assert.equal(await anaExtra.locator('[data-overtime-amount]').inputValue(), '0,00');
     assert.equal(await app.locator('#bonus').inputValue(), '500,00');
     assert.equal(await app.locator('#pieceRate').inputValue(), '2,00');
-    assert.equal(await app.locator('#matrix [data-entry-id]').first().inputValue(), '2');
-    assert.match(await app.locator('#teamTable').innerText(), /Pendências/);
+    assert.equal(await hours.inputValue(), '2');
+    assert.equal(await pieces.inputValue(), '5');
     await app.locator('#tabCompare').click();
     assert.match(await app.locator('#comparisonTable').innerText(), /Diferença para o grupo/);
     await app.locator('#tabPerson').click();
@@ -215,11 +285,14 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     assert.equal(entries.length, 0);
     assert.equal(overtime.length, 1);
     await page.locator('iframe').evaluate(frame => { frame.style.width = '375px'; });
-    await app.locator('#tabTeam').click();
-    const cardBounds = await anaPayment.evaluate(card => ({ left: card.getBoundingClientRect().left, right: card.getBoundingClientRect().right, viewport: document.documentElement.clientWidth }));
-    assert.ok(cardBounds.left >= 0 && cardBounds.right <= cardBounds.viewport, `payment card overflows: ${JSON.stringify(cardBounds)}`);
-    const mobile = await app.locator('html').evaluate(html => ({ page: html.scrollWidth, viewport: html.clientWidth, matrix: document.querySelector('#matrix').scrollWidth, wrap: document.querySelector('#matrix').parentElement.clientWidth }));
+    await app.locator('#tabPayments').click();
+    assert.equal(await app.locator('#paymentTable thead th').count(), 7);
+    const paymentBounds = await app.locator('#paymentTable').evaluate(table => ({ page: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth, table: table.scrollWidth, wrap: table.parentElement.clientWidth }));
+    assert.ok(paymentBounds.page <= paymentBounds.viewport + 1, `payment page overflows: ${JSON.stringify(paymentBounds)}`);
+    assert.ok(paymentBounds.table > paymentBounds.wrap, `payment table should scroll inside its container: ${JSON.stringify(paymentBounds)}`);
+    await app.locator('#tabPerson').click();
+    const mobile = await app.locator('html').evaluate(html => ({ page: html.scrollWidth, viewport: html.clientWidth, table: document.querySelector('#personTable').scrollWidth, wrap: document.querySelector('#personTable').parentElement.clientWidth }));
     assert.ok(mobile.page <= mobile.viewport + 1, `Mobile page overflows: ${JSON.stringify(mobile)}`);
-    assert.ok(mobile.matrix > mobile.wrap, `wide table should scroll inside its container: ${JSON.stringify(mobile)}`);
+    assert.ok(mobile.table > mobile.wrap, `wide table should scroll inside its container: ${JSON.stringify(mobile)}`);
   } finally { if (browser) await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 });

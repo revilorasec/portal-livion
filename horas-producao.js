@@ -7,7 +7,9 @@ const fmtNum = (number, digits = 2) => new Intl.NumberFormat('pt-BR', { maximumF
 const moneyInputFormat = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const moneyValue = cents => cents === null || cents === undefined ? '' : moneyInputFormat.format(cents / 100);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const state = { data: null, month: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7), selected: '', tab: 'team', excluded: new Set(), editEmployee: null, deleteEmployee: null, deleteImpact: null, busy: false };
+const state = { data: null, month: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7), selected: '', tab: 'person', excluded: new Set(), editEmployee: null, deleteEmployee: null, deleteImpact: null, busy: false };
+const gridDrafts = new Map();
+let gridQueue = Promise.resolve(), pendingGrid = 0, gridFailed = false;
 const errors = {
   UNAUTHENTICATED: 'Sua sessão terminou. Abra o aplicativo novamente pelo Portal Livion.',
   FORBIDDEN: 'Este aplicativo ainda não foi liberado para sua conta no Portal.',
@@ -105,13 +107,22 @@ function employeeRows() {
 }
 function maps() {
   const data = state.data;
-  return {
+  const m = {
     days: monthDays(state.month),
     plans: new Map(data.plans.map(row => [row.day, row])),
     overrides: new Map(data.plans.map(row => [row.day, row.planned_hours])),
     entries: new Map(data.entries.map(row => [`${row.employee_id}|${row.day}`, row])),
     overtime: new Map(data.overtime.map(row => [row.employee_id, row]))
   };
+  for (const draft of gridDrafts.values()) {
+    if (draft.month !== state.month) continue;
+    if (draft.path === '/plan') m.overrides.set(draft.day, draft.value);
+    else {
+      const key = `${draft.employee_id}|${draft.day}`;
+      m.entries.set(key, { ...m.entries.get(key), [draft.field]: draft.value });
+    }
+  }
+  return m;
 }
 function calculated(grid = null) {
   const m = maps();
@@ -181,37 +192,24 @@ function renderStaff() {
   $('selectedEmployee').innerHTML = selectable.map(row => `<option value="${row.id}">${esc(row.name)}${row.archived_at ? ' (registro antigo)' : ''}</option>`).join('');
   $('selectedEmployee').value = state.selected;
 }
-function renderTeamSummary(m, preview = false) {
+function renderPayments(m, preview = false) {
   const all = [...m.results.values()];
   const sum = teamClosing(all);
   $('teamMetrics').innerHTML = metric('Funcionários no período', m.rows.length) + metric('Horas realizadas', `${fmtNum(sum.actual)} h`) + metric('Peças reparadas', sum.pieces, '') + metric(sum.complete ? 'Total acumulado da equipe' : 'Total acumulado · parcial', fmtMoney(sum.known), sum.complete ? 'total' : 'pending');
-  $('teamState').textContent = !m.rows.length ? 'Aguardando cadastro da equipe' : sum.pending ? `${sum.pending} fechamento(s) pendente(s)` : 'Valores acumulados no mês';
   $('paymentStatus').textContent = preview ? 'Prévia do lançamento · saia do campo para salvar' : 'Valores dos lançamentos salvos';
-  $('paymentCards').innerHTML = m.rows.length ? m.rows.map(row => {
+  $('paymentRows').innerHTML = m.rows.length ? m.rows.map(row => {
     const value = m.results.get(row.id);
-    return `<article class="payment-card" data-payment-employee="${row.id}">
-      <h3>${esc(row.name)}</h3>
-      <dl><div><dt>Hora extra informada</dt><dd>${fmtMoney(value.official)}</dd></div>
-      <div><dt>Bônus · ${fmtNum(value.actual)} h trabalhadas</dt><dd>${fmtMoney(value.bonus)}</dd></div>
-      <div><dt>Reparos · ${value.pieces} peça(s)</dt><dd>${fmtMoney(value.production)}</dd></div></dl>
-      <div class="payment-total"><span>${value.pending.length ? 'Total acumulado · parcial' : 'Total a pagar até agora'}</span><strong data-payment-total>${fmtMoney(value.known)}</strong></div>
-      ${value.pending.length ? `<p class="pending-text">${esc(value.pending.join(' · '))}</p>` : ''}
-    </article>`;
-  }).join('') : '<p class="empty">Cadastre os funcionários em Configurações para acompanhar os valores.</p>';
-  $('teamTable').innerHTML = `<thead><tr><th>Funcionário</th><th>Previstas</th><th>Feitas</th><th>% horas</th><th>Peças</th><th>Bônus</th><th>Produção</th><th>Subtotal</th><th>Extras oficiais</th><th>Total</th><th>Pendências</th></tr></thead><tbody>${m.rows.map(row => {
-    const value = m.results.get(row.id);
-    return `<tr><td>${esc(row.name)}</td><td>${fmtNum(value.planned)} h</td><td>${fmtNum(value.actual)} h</td><td>${value.attendance === null ? '—' : fmtNum(value.attendance, 1) + '%'}</td><td>${value.pieces}</td><td>${fmtMoney(value.bonus)}</td><td>${fmtMoney(value.production)}</td><td>${fmtMoney(value.subtotal)}</td><td>${fmtMoney(value.official)}</td><td class="${value.total === null ? 'pending-text' : ''}">${value.total === null ? 'Parcial ' + fmtMoney(value.known) : fmtMoney(value.total)}</td><td class="${value.pending.length ? 'pending-text' : ''}">${esc(value.pending.join('; ') || '—')}</td></tr>`;
-  }).join('')}</tbody>`;
+    return `<tr data-payment-employee="${row.id}">
+      <th scope="row">${esc(row.name)}${value.pending.length ? `<small class="pending-text">${esc(value.pending.join(' · '))}</small>` : ''}</th>
+      <td>${fmtNum(value.actual)} h<small>${fmtNum(value.planned)} h previstas</small></td>
+      <td>${fmtNum(value.pieces, 0)}</td>
+      <td>${fmtMoney(value.official)}</td>
+      <td>${fmtMoney(value.bonus)}</td>
+      <td>${fmtMoney(value.production)}</td>
+      <td class="payment-total"><strong data-payment-total>${fmtMoney(value.known)}</strong>${value.pending.length ? '<small class="pending-text">Parcial · há pendências</small>' : '<small>Acumulado até agora</small>'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Cadastre os funcionários em Configurações para acompanhar os valores.</td></tr>';
   $('teamTotal').textContent = !m.rows.length ? 'Cadastre um funcionário para iniciar o fechamento.' : sum.complete ? `Total acumulado da equipe: ${fmtMoney(sum.known)}` : `Valor conhecido da equipe: ${fmtMoney(sum.known)} · ${sum.pending} fechamento(s) pendente(s). Não representa o valor final a pagar.`;
-}
-function renderTeam(m) {
-  renderTeamSummary(m);
-  const header = `<thead><tr><th rowspan="2">Data</th><th rowspan="2">Horas previstas</th>${m.rows.map(row => `<th class="employee-head" colspan="2">${esc(row.name)}${row.archived_at ? ' · arquivado' : ''}</th>`).join('')}</tr><tr>${m.rows.map(() => '<th>Horas feitas</th><th>Peças</th>').join('')}</tr></thead>`;
-  const body = m.days.map(day => `<tr class="${day.weekday === 0 ? 'sunday' : day.weekday === 6 ? 'saturday' : ''}"><td>${dayLabel(day)}</td><td>${plannedInput(day, m)}</td>${m.rows.map(row => {
-    const item = m.entries.get(`${row.id}|${day.date}`);
-    return `<td>${entryInput(row, day, item, 'actual_hours')}</td><td>${entryInput(row, day, item, 'pieces')}</td>`;
-  }).join('')}</tr>`).join('');
-  $('matrix').innerHTML = header + `<tbody>${body}</tbody>`;
 }
 function renderPersonSummary(m) {
   const row = m.rows.find(item => item.id === state.selected);
@@ -287,8 +285,8 @@ function render() {
   $('app').hidden = false;
   renderSettings(); renderStaff();
   const m = calculated();
-  renderTeam(m); renderPerson(m); renderCompare(m);
-  for (const tab of ['team', 'person', 'compare', 'config']) {
+  renderPayments(m, gridDrafts.size > 0); renderPerson(m); renderCompare(m);
+  for (const tab of ['person', 'payments', 'compare', 'config']) {
     $(`${tab}View`).hidden = state.tab !== tab;
     $(`tab${tab[0].toUpperCase() + tab.slice(1)}`).classList.toggle('active', state.tab === tab);
     $(`tab${tab[0].toUpperCase() + tab.slice(1)}`).setAttribute('aria-pressed', String(state.tab === tab));
@@ -296,12 +294,14 @@ function render() {
   $('configBtn').setAttribute('aria-pressed', String(state.tab === 'config'));
 }
 async function load() {
+  await gridQueue;
   clearError(); status('Carregando dados…');
   state.data = null;
   $('app').hidden = true;
   try {
     state.data = await api(`/bootstrap?month=${encodeURIComponent(state.month)}`);
-    render(); status('Dados atualizados');
+    render(); updateGridControls();
+    status(gridDrafts.size ? 'Confira os lançamentos pendentes antes de salvar' : 'Dados atualizados');
     return true;
   } catch (error) { showError(error); return false; }
 }
@@ -326,6 +326,8 @@ function restoreStaffValues(drafts) {
   }
 }
 async function save(path, method, payload) {
+  await gridQueue;
+  if (gridDrafts.size) { showError(new Error('Confira e salve os lançamentos pendentes antes desta ação.')); return; }
   if (state.busy) { status('Aguarde o salvamento atual'); return; }
   state.busy = true; clearError(); status('Salvando…');
   const staffForm = path === '/overtime' ? [...$('staffList').querySelectorAll('[data-overtime-employee]')].find(item => item.dataset.overtimeEmployee === payload.employee_id) : null;
@@ -340,7 +342,7 @@ async function save(path, method, payload) {
     showError(error);
   } finally {
     state.busy = false;
-    $('month').disabled = false;
+    updateGridControls();
     for (const control of staffForm?.querySelectorAll('input,button') || []) control.disabled = false;
   }
 }
@@ -371,7 +373,10 @@ document.addEventListener('beforeinput', event => {
 });
 $('reloadBtn').addEventListener('click', load);
 $('configBtn').addEventListener('click', () => { state.tab = 'config'; render(); $('configView').scrollIntoView({ block: 'start' }); });
-$('month').addEventListener('change', event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) { state.month = event.target.value; load(); } });
+$('month').addEventListener('change', event => {
+  if (pendingGrid || gridDrafts.size) { event.target.value = state.month; return; }
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) { state.month = event.target.value; load(); }
+});
 $('settingsForm').addEventListener('submit', event => {
   event.preventDefault();
   try { save('/settings', 'PUT', { month: state.month, bonus_cents: cents($('bonus').value), piece_cents: cents($('pieceRate').value), weekday_hours: decimal($('weekdayHours').value), saturday_hours: decimal($('saturdayHours').value), revision: state.data.settings.revision }); } catch (error) { showError(error); }
@@ -418,38 +423,84 @@ $('confirmDelete').addEventListener('click', () => {
   $('deleteDialog').close();
   if (row && impact) save(`/employees/${row.id}`, 'DELETE', { revision: row.revision, expected_entries: impact.entries, expected_overtime: impact.overtime });
 });
-for (const tab of ['team', 'person', 'compare', 'config']) $(`tab${tab[0].toUpperCase() + tab.slice(1)}`).addEventListener('click', () => { state.tab = tab; render(); });
+for (const tab of ['person', 'payments', 'compare', 'config']) $(`tab${tab[0].toUpperCase() + tab.slice(1)}`).addEventListener('click', () => { state.tab = tab; render(); });
 $('selectedEmployee').addEventListener('change', event => { state.selected = event.target.value; renderPerson(calculated()); });
 $('editOfficial').addEventListener('click', () => {
   state.tab = 'config'; render();
   const form = [...$('staffList').querySelectorAll('[data-overtime-employee]')].find(item => item.dataset.overtimeEmployee === state.selected);
   if (form) { form.scrollIntoView({ block: 'center' }); form.querySelector('[data-overtime-amount]').focus(); }
 });
-async function editGrid(event) {
-  const element = event.target;
-  if (element.matches('[data-plan-day]')) {
-    const row = state.data.plans.find(item => item.day === element.dataset.planDay);
-    try { await save('/plan', 'PUT', { month: state.month, day: element.dataset.planDay, planned_hours: decimal(element.value), revision: row?.revision || 0 }); } catch (error) { showError(error); }
-  }
-  if (element.matches('[data-entry-id]')) {
-    const { entryId, day, field } = element.dataset;
-    const row = state.data.entries.find(item => item.employee_id === entryId && item.day === day);
-    const actual_hours = field === 'actual_hours' ? decimal(element.value) : Number(row?.actual_hours || 0);
-    const pieces = field === 'pieces' ? Number(element.value) : Number(row?.pieces || 0);
-    const note = field === 'note' ? element.value : row?.note || '';
-    if (!Number.isInteger(pieces) || pieces < 0) { showError(new Error('INVALID_VALUE')); return; }
-    await save('/entry', 'PUT', { month: state.month, day, employee_id: entryId, actual_hours, pieces, note, revision: row?.revision || 0 });
-  }
+function updateGridControls() {
+  $('month').disabled = state.busy || pendingGrid > 0 || gridDrafts.size > 0;
+  $('reloadBtn').disabled = state.busy || pendingGrid > 0;
+  $('retryGrid').hidden = !gridFailed;
+  $('retryGrid').disabled = pendingGrid > 0;
+  $('gridSaveStatus').textContent = gridFailed ? 'Há lançamentos não salvos. Seus dados continuam nos campos.' : pendingGrid ? 'Salvando em segundo plano. Você pode continuar preenchendo.' : 'Os lançamentos são salvos ao sair do campo.';
 }
-for (const id of ['matrix', 'personTable']) {
-  $(id).addEventListener('change', event => editGrid(event).catch(showError));
-  $(id).addEventListener('input', event => {
-    if (!event.target.matches('[data-plan-day], [data-entry-id]') || !event.target.validity.valid) return;
-    const m = calculated($(id));
-    renderTeamSummary(m, true);
-    renderPersonSummary(m);
+function queueGridEdit(task) {
+  const key = `${task.path}|${task.month}|${task.employee_id || ''}|${task.day}|${task.field}`;
+  gridDrafts.set(key, task);
+  pendingGrid++;
+  updateGridControls();
+  gridQueue = gridQueue.then(async () => {
+    if (gridFailed) return;
+    clearError(); status('Salvando lançamento…');
+    try {
+      // A revisão e os demais campos são lidos quando chega a vez desta gravação.
+      const row = task.path === '/plan'
+        ? state.data.plans.find(item => item.day === task.day)
+        : state.data.entries.find(item => item.employee_id === task.employee_id && item.day === task.day);
+      const payload = { month: task.month, day: task.day, revision: row?.revision || 0,
+        ...(task.path === '/entry' ? { employee_id: task.employee_id, actual_hours: Number(row?.actual_hours || 0), pieces: Number(row?.pieces || 0), note: row?.note || '' } : {}),
+        [task.field]: task.value };
+      const result = await api(task.path, { method: 'PUT', body: JSON.stringify(payload) });
+      const rows = task.path === '/plan' ? state.data.plans : state.data.entries;
+      const index = rows.findIndex(item => item.day === task.day && (task.path === '/plan' || item.employee_id === task.employee_id));
+      const saved = { ...payload, ...result };
+      if (index < 0) rows.push(saved); else rows[index] = saved;
+      if (gridDrafts.get(key) === task) gridDrafts.delete(key);
+      const m = calculated(state.tab === 'person' ? $('personTable') : null);
+      renderPayments(m, gridDrafts.size > 0);
+      renderPersonSummary(m);
+    } catch (error) {
+      gridFailed = true;
+      showError(error.message === 'CONFLICT' ? new Error('Alguém alterou este registro. Seus dados digitados foram mantidos. Use Atualizar para conferir os dados atuais antes de salvar os pendentes.') : error);
+    }
+  }).finally(() => {
+    pendingGrid--;
+    updateGridControls();
+    if (!pendingGrid && !gridFailed) status('Salvo no Portal');
   });
+  return gridQueue;
 }
+function editGrid(event) {
+  const element = event.target;
+  try {
+    if (!element.validity.valid) throw new Error('INVALID_VALUE');
+    if (element.matches('[data-plan-day]')) return queueGridEdit({ path: '/plan', month: state.month, day: element.dataset.planDay, field: 'planned_hours', value: decimal(element.value) });
+    if (!element.matches('[data-entry-id]')) return;
+    const { entryId, day, field } = element.dataset;
+    const value = field === 'actual_hours' ? decimal(element.value) : field === 'pieces' ? Number(element.value) : element.value;
+    if (field === 'pieces' && (!Number.isInteger(value) || value < 0 || value > 100000)) throw new Error('INVALID_VALUE');
+    return queueGridEdit({ path: '/entry', month: state.month, day, employee_id: entryId, field, value });
+  } catch (error) { showError(error); }
+}
+$('personTable').addEventListener('change', editGrid);
+$('personTable').addEventListener('input', event => {
+  if (!event.target.matches('[data-plan-day], [data-entry-id]') || !event.target.validity.valid) return;
+  const m = calculated($('personTable'));
+  renderPayments(m, true);
+  renderPersonSummary(m);
+});
+$('retryGrid').addEventListener('click', () => {
+  if (pendingGrid) return;
+  const drafts = [...gridDrafts.values()];
+  gridFailed = false;
+  for (const draft of drafts) queueGridEdit({ ...draft });
+});
+window.addEventListener('beforeunload', event => {
+  if (pendingGrid || gridDrafts.size) { event.preventDefault(); event.returnValue = ''; }
+});
 for (const id of ['compareDay', 'compareMinimum', 'compareOrder']) $(id).addEventListener('change', () => renderCompare(calculated()));
 $('compareStaff').addEventListener('change', event => {
   const id = event.target.dataset.compareId;
