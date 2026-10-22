@@ -43,7 +43,7 @@ export function validateClaims(c,now=Date.now()/1000){
  if(c.tid!==TENANT||!c.exp||c.exp<=now||(c.nbf&&c.nbf>now+60)||(c.azp||c.appid)!==PORTAL_CLIENT)throw new ApiError(401,'Sessão inválida.');
 }
 export function createService(deps){
- const {db,fetchSource,fetchPanelSource,identify}=deps;
+ const {db,fetchSource,fetchPanelSource,fetchClaroPanelSource,identify}=deps;
  const headers=origin=>({'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store, max-age=0','Pragma':'no-cache','Vary':'Origin','Access-Control-Allow-Origin':ORIGINS.has(origin)?origin:'https://portal.livionsolutions.com.br','Access-Control-Allow-Headers':'authorization, content-type','Access-Control-Allow-Methods':'GET, PUT, OPTIONS','X-Content-Type-Options':'nosniff'});
  return async req=>{
  const origin=req.headers.get('origin');const out=(status,body)=>new Response(JSON.stringify(body),{status,headers:headers(origin)});
@@ -65,7 +65,7 @@ export function createService(deps){
    if(!(await db.app(appKey))?.active)throw new ApiError(403,'Aplicativo não liberado.');
    const force=new URL(req.url).searchParams.get('refresh')==='1';
    const [source,claroSource]=panel==='combined'
-    ?await Promise.all([fetchPanelSource(panel,{force}),fetchSource('claro',{force})])
+    ?await Promise.all([fetchPanelSource(panel,{force}),fetchClaroPanelSource({force})])
     :[await fetchPanelSource(panel,{force}),{rows:[]}];
    const current=await db.userByEmail(identity.email.toLowerCase());
    if(!current||current.id!==user.id||(current.microsoft_id&&current.microsoft_id!==identity.id)||!current.active||(current.profile!=='ADMINISTRADOR'&&!(current.apps||[]).includes(appKey))||!(await db.app(appKey))?.active)throw new ApiError(403,'Acesso alterado. Atualize a sessão.');
@@ -134,6 +134,7 @@ export function createService(deps){
 export function runtimeDependencies(env,fetcher=fetch){
  const base=env('SUPABASE_URL'),key=env('SUPABASE_SERVICE_ROLE_KEY');
  const sourceCache=new Map(),panelCache=new Map(),sourceTtl=25*1000;
+ const claroPanelSource='https://script.google.com/macros/s/AKfycbzjKSmVCIHSPx2exz41wG42-oC-wkW6Hrzr5Axw_F2krNtjHEZH5G-j4hOLb58nSjcxyg/exec';
  const rest=async(path,options={})=>{const response=await fetcher(base+'/rest/v1/'+path,{...options,headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json',...(options.headers||{})},signal:AbortSignal.timeout(15000)});if(!response.ok){if(response.status===409)throw new ApiError(409,'Permissões alteradas por outra pessoa. Recarregue antes de salvar.');throw new ApiError(503,'Configuração de acesso indisponível.');}return response.status===204?null:response.json()};
  const first=async path=>(await rest(path))[0]||null;
  const userFields='id,email,name,active,profile,user_type,apps,microsoft_id';
@@ -169,6 +170,18 @@ export function runtimeDependencies(env,fetcher=fetch){
    if(!payload){if(cached)return {rows:cached.rows,updatedAt:cached.updatedAt,stale:true};throw lastError||new ApiError(502,'A origem do painel não respondeu.');}
    const rows=Array.isArray(payload)?payload:(payload.rows||payload.data||payload.combined||payload.nokia||[]);if(!Array.isArray(rows)||!rows.length)throw new ApiError(502,'A origem do painel retornou uma resposta vazia.');
    const updatedAt=payload.updatedAt||payload.generatedAt||new Date().toISOString();panelCache.set(panel,{at:Date.now(),rows,updatedAt});return {rows,updatedAt,stale:false};
+  },
+  fetchClaroPanelSource:async(options={})=>{
+   const cacheKey='claro-panel',cached=panelCache.get(cacheKey);if(!options.force&&cached&&Date.now()-cached.at<sourceTtl)return {rows:cached.rows,updatedAt:cached.updatedAt,stale:false};
+   const target=new URL(claroPanelSource);target.searchParams.set('cliente','claro');target.searchParams.set('_',String(Date.now()));
+   let payload,lastError;
+   for(let attempt=0;attempt<2;attempt++){
+    try{const response=await fetcher(target,{method:'GET',redirect:'follow',cache:'no-store',signal:AbortSignal.timeout(55000)});if(!response.ok)throw new ApiError(502,'A base da Claro recusou a leitura.');payload=await response.json();break}
+    catch(error){lastError=error;if(attempt===0)await new Promise(resolve=>setTimeout(resolve,700));}
+   }
+   if(!payload){if(cached)return {rows:cached.rows,updatedAt:cached.updatedAt,stale:true};throw lastError||new ApiError(502,'A base da Claro não respondeu.');}
+   const rows=Array.isArray(payload)?payload:(payload.rows||payload.data||[]);if(!Array.isArray(rows)||!rows.length)throw new ApiError(502,'A base da Claro retornou uma resposta vazia.');
+   const updatedAt=payload.updatedAt||payload.generatedAt||new Date().toISOString();panelCache.set(cacheKey,{at:Date.now(),rows,updatedAt});return {rows,updatedAt,stale:false};
   },
   fetchSource:async(client,options={})=>{
    const label=client==='claro'?'Claro':'Nokia';

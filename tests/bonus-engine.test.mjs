@@ -52,6 +52,18 @@ test('a quantidade reparada define a faixa e o acréscimo começa exatamente em 
   const [next]=Engine.calculateMonth(five,'2026-05',config(),{returnMonth:month});assert.equal(next.repaired,5);assert.equal(next.bandIndex,2);
 });
 
+test('o mês e a quantidade usam somente a devolução efetiva, nunca a medição',()=>{
+  const rows=[
+    {...row('ANA','REPARADO','LOW','Claro','2026-05-03'),medicao:'2026-01'},
+    {...row('ANA','REPARADO','LOW','Claro','2026-05-20'),medicao:'2026-09'},
+    {...row('ANA','REPARADO','LOW','Claro','2026-06-01'),medicao:'2026-05'},
+    {...row('ANA','REPARADO','LOW','Claro','2026-05-22'),medicao:'2026-05',dataFormula:true}
+  ];
+  const [result]=Engine.calculateMonth(rows,'2026-05',config(),{returnMonth:month});
+  assert.equal(result.repaired,2);
+  assert.equal(result.bandIndex,1);
+});
+
 test('Faixa 0 explica bônus zero e PN não classificado usa o valor da Baixa',()=>{
   const zero=Engine.calculateMonth([row('ANA','IRREPARÁVEL','X')],'2026-05',config(),{returnMonth:month})[0];
   assert.equal(zero.bonus,0);assert.match(zero.reasons.join(' '),/Faixa 0/);
