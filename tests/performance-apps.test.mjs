@@ -120,6 +120,12 @@ test('a API completa a AJ da Claro pela fonte segura sem voltar para a coluna AN
   assert.equal(rows[2].dataDevolucao,'18/10/2026');
 });
 
+test('o painel consolidado usa uma leitura GET dedicada para completar a AJ da Claro', () => {
+  assert.match(desempenhoService, /fetchClaroPanelSource\(\{force\}\)/);
+  assert.match(desempenhoService, /searchParams\.set\('cliente','claro'\)/);
+  assert.doesNotMatch(desempenhoService, /fetchSource\('claro',\{force\}\)/);
+});
+
 test('o painel consolidado filtra somente devoluções reais pelo mês de devolução', () => {
   assert.match(combined, /id="fReturnMonth"/);
   assert.match(combined, /fillSelect\('fClient',\['Claro','Nokia'\],'Todos os clientes'\)/);
