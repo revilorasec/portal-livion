@@ -123,7 +123,21 @@ function renderSettings() {
 }
 function renderStaff() {
   const rows = employeeRows();
-  $('staffList').innerHTML = rows.length ? rows.map(row => `<div class="staff-item ${row.archived_at ? 'archived' : ''}"><strong>${esc(row.name)}</strong>${row.archived_at ? '<small>Arquivado</small>' : ''}${editable(row) ? `<button class="outline" type="button" data-employee-edit="${row.id}">Editar</button>` : ''}${state.data.permissions.archive && !row.archived_at ? `<button class="danger" type="button" data-employee-archive="${row.id}">Arquivar</button>` : ''}</div>`).join('') : '<p class="empty">Nenhum funcionário cadastrado. Use “+ Funcionário” para começar.</p>';
+  const overtime = new Map(state.data.overtime.map(item => [item.employee_id, item]));
+  $('staffList').innerHTML = rows.length ? rows.map(row => {
+    const item = overtime.get(row.id);
+    const informed = item?.amount_cents !== null && item?.amount_cents !== undefined;
+    const value = informed ? (item.amount_cents / 100).toFixed(2) : '';
+    const disabled = editable(row) ? '' : 'disabled';
+    return `<article class="staff-item ${row.archived_at ? 'archived' : ''}">
+      <div class="staff-heading"><strong>${esc(row.name)}</strong>${row.archived_at ? '<small>Arquivado</small>' : ''}<div class="staff-actions"><button class="outline" type="button" data-employee-open="${row.id}">Detalhes</button>${editable(row) ? `<button class="outline" type="button" data-employee-edit="${row.id}">Editar</button>` : ''}${state.data.permissions.archive && !row.archived_at ? `<button class="danger" type="button" data-employee-archive="${row.id}">Arquivar</button>` : ''}</div></div>
+      <form class="staff-overtime" data-overtime-employee="${row.id}" aria-label="Horas extras de ${esc(row.name)}">
+        <label>Valor total da hora extra no mês (R$)<input data-overtime-amount type="number" min="0" step="0.01" inputmode="decimal" placeholder="Aguardando contador" value="${value}" ${disabled}></label>
+        <label>Observação<input data-overtime-note maxlength="500" placeholder="Opcional" value="${esc(item?.note || '')}" ${disabled}></label>
+        <div class="staff-overtime-foot"><span class="${informed ? 'confirmed-text' : 'pending-text'}">${informed ? `${fmtMoney(item.amount_cents)} registrado` : 'Pendente'}</span>${editable(row) ? '<button class="primary" type="submit">Salvar valor</button>' : ''}</div>
+      </form>
+    </article>`;
+  }).join('') : '<p class="empty">Nenhum funcionário cadastrado. Use “+ Funcionário” para começar.</p>';
   if (!rows.some(row => row.id === state.selected)) state.selected = rows.find(row => !row.archived_at)?.id || rows[0]?.id || '';
   $('selectedEmployee').innerHTML = rows.map(row => `<option value="${row.id}">${esc(row.name)}${row.archived_at ? ' (arquivado)' : ''}</option>`).join('');
   $('selectedEmployee').value = state.selected;
@@ -266,7 +280,19 @@ $('employeeForm').addEventListener('submit', event => {
   $('employeeDialog').close();
   save(row ? `/employees/${row.id}` : '/employees', row ? 'PATCH' : 'POST', payload);
 });
+$('staffList').addEventListener('submit', event => {
+  const form = event.target.closest('[data-overtime-employee]');
+  if (!form) return;
+  event.preventDefault();
+  const id = form.dataset.overtimeEmployee;
+  const row = state.data.employees.find(item => item.id === id);
+  if (!row || !editable(row)) return;
+  const current = state.data.overtime.find(item => item.employee_id === id);
+  try { save('/overtime', 'PUT', { month: state.month, employee_id: id, amount_cents: cents(form.querySelector('[data-overtime-amount]').value), note: form.querySelector('[data-overtime-note]').value, revision: current?.revision || 0 }); } catch (error) { showError(error); }
+});
 $('staffList').addEventListener('click', async event => {
+  const open = event.target.closest('[data-employee-open]');
+  if (open) { state.selected = open.dataset.employeeOpen; state.tab = 'person'; render(); $('personView').scrollIntoView({ block: 'start' }); return; }
   const edit = event.target.closest('[data-employee-edit]');
   if (edit) { openEmployee(state.data.employees.find(row => row.id === edit.dataset.employeeEdit)); return; }
   const archive = event.target.closest('[data-employee-archive]');

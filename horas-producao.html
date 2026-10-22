@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#194682">
   <title>Hora Extra · Livion</title>
-  <link rel="stylesheet" href="./horas-producao.css?v=1">
+  <link rel="stylesheet" href="./horas-producao.css?v=2">
 </head>
 <body>
   <header class="top">
@@ -34,7 +34,7 @@
       </section>
 
       <section class="card staff">
-        <div class="section-title"><div><span class="eyebrow">FUNCIONÁRIOS</span><h2>Equipe cadastrada</h2><p>O cadastro pede somente o nome. Funcionários arquivados permanecem no histórico.</p></div><button id="addEmployee" class="primary" type="button">+ Funcionário</button></div>
+        <div class="section-title"><div><span class="eyebrow">FUNCIONÁRIOS E HORAS EXTRAS</span><h2>Cadastro e valor individual</h2><p>Cadastre cada funcionário e informe o valor total de suas horas extras no mês selecionado. Deixe vazio enquanto aguarda o contador; informe 0 para confirmar que não houve valor. Funcionários arquivados permanecem no histórico.</p></div><button id="addEmployee" class="primary" type="button">+ Funcionário</button></div>
         <div id="staffList" class="staff-list"></div>
       </section>
 
@@ -99,6 +99,6 @@
   </main>
   <dialog id="employeeDialog"><form id="employeeForm" method="dialog"><h2 id="employeeDialogTitle">Novo funcionário</h2><label>Nome<input id="employeeName" maxlength="120" required autocomplete="off"></label><div class="dialog-actions"><button id="cancelEmployee" type="button">Cancelar</button><button class="primary" type="submit">Salvar</button></div></form></dialog>
   <dialog id="archiveDialog"><div><h2>Arquivar funcionário</h2><p id="archiveImpact"></p><p>Os registros existentes serão preservados para consulta histórica. Não será possível fazer novos lançamentos para este funcionário.</p><div class="dialog-actions"><button id="cancelArchive" type="button">Cancelar</button><button id="confirmArchive" class="danger" type="button">Arquivar funcionário</button></div></div></dialog>
-  <script type="module" src="./horas-producao.js?v=3"></script>
+  <script type="module" src="./horas-producao.js?v=4"></script>
 </body>
 </html>
