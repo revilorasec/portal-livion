@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#194682">
   <title>Hora Extra · Livion</title>
-  <link rel="stylesheet" href="./horas-producao.css?v=3">
+  <link rel="stylesheet" href="./horas-producao.css?v=4">
 </head>
 <body>
   <header class="top">
@@ -49,6 +49,11 @@
 
       <section id="teamView" class="view">
         <div id="teamMetrics" class="metrics"></div>
+        <section class="card">
+          <div class="section-title"><div><span class="eyebrow">A PAGAR POR FUNCIONÁRIO</span><h2>Valores acumulados no mês</h2><p>Hora extra informada + bônus proporcional às horas trabalhadas + valor dos reparos. Os totais acompanham os lançamentos abaixo.</p></div></div>
+          <p id="paymentStatus" class="muted" role="status"></p>
+          <div id="paymentCards" class="payment-cards"></div>
+        </section>
         <section class="card"><div class="section-title"><div><span class="eyebrow">LANÇAMENTOS DIÁRIOS</span><h2>Equipe lado a lado</h2></div><span class="muted">1,5 hora = 1h30</span></div>
           <div class="legend"><span><i class="saturday-dot"></i>Sábado: preenchimento liberado</span><span><i class="sunday-dot"></i>Domingo: bloqueado</span></div>
           <p class="muted">Horas previstas são compartilhadas. Horas realizadas e peças são individuais. Deslize a tabela para ver toda a equipe.</p>
@@ -98,6 +103,6 @@
   </main>
   <dialog id="employeeDialog"><form id="employeeForm" method="dialog"><h2 id="employeeDialogTitle">Novo funcionário</h2><label>Nome<input id="employeeName" maxlength="120" required autocomplete="off"></label><div class="dialog-actions"><button id="cancelEmployee" type="button">Cancelar</button><button class="primary" type="submit">Salvar</button></div></form></dialog>
   <dialog id="deleteDialog"><div><h2>Excluir funcionário?</h2><p id="deleteImpact"></p><p>O funcionário e todos os seus lançamentos de horas, peças e valores oficiais de todos os meses serão excluídos definitivamente. Essa ação não pode ser desfeita.</p><div class="dialog-actions"><button id="cancelDelete" type="button">Cancelar</button><button id="confirmDelete" class="danger" type="button">Excluir definitivamente</button></div></div></dialog>
-  <script type="module" src="./horas-producao.js?v=7"></script>
+  <script type="module" src="./horas-producao.js?v=8"></script>
 </body>
 </html>

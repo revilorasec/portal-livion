@@ -113,8 +113,19 @@ function maps() {
     overtime: new Map(data.overtime.map(row => [row.employee_id, row]))
   };
 }
-function calculated() {
+function calculated(grid = null) {
   const m = maps();
+  if (grid) {
+    for (const element of grid.querySelectorAll('[data-plan-day], [data-entry-id]')) {
+      if (!element.validity.valid) continue;
+      if (element.matches('[data-plan-day]')) m.overrides.set(element.dataset.planDay, Number(element.value));
+      else {
+        const { entryId, day, field } = element.dataset;
+        const key = `${entryId}|${day}`;
+        m.entries.set(key, { ...m.entries.get(key), [field]: field === 'note' ? element.value : Number(element.value) });
+      }
+    }
+  }
   const rows = employeeRows();
   return { ...m, rows, results: new Map(rows.map(row => [row.id, closing(row.id, m.days, state.data.settings, m.overrides, m.entries, m.overtime.get(row.id))])) };
 }
@@ -170,33 +181,53 @@ function renderStaff() {
   $('selectedEmployee').innerHTML = selectable.map(row => `<option value="${row.id}">${esc(row.name)}${row.archived_at ? ' (registro antigo)' : ''}</option>`).join('');
   $('selectedEmployee').value = state.selected;
 }
-function renderTeam(m) {
+function renderTeamSummary(m, preview = false) {
   const all = [...m.results.values()];
   const sum = teamClosing(all);
-  $('teamMetrics').innerHTML = metric('Funcionários no período', m.rows.length) + metric('Horas realizadas', `${fmtNum(sum.actual)} h`) + metric('Peças reparadas', sum.pieces, '') + metric(sum.complete ? 'Total da equipe' : 'Valor conhecido · parcial', fmtMoney(sum.known), sum.complete ? 'total' : 'pending');
-  $('teamState').textContent = !m.rows.length ? 'Aguardando cadastro da equipe' : sum.pending ? `${sum.pending} fechamento(s) pendente(s)` : 'Fechamentos completos';
+  $('teamMetrics').innerHTML = metric('Funcionários no período', m.rows.length) + metric('Horas realizadas', `${fmtNum(sum.actual)} h`) + metric('Peças reparadas', sum.pieces, '') + metric(sum.complete ? 'Total acumulado da equipe' : 'Total acumulado · parcial', fmtMoney(sum.known), sum.complete ? 'total' : 'pending');
+  $('teamState').textContent = !m.rows.length ? 'Aguardando cadastro da equipe' : sum.pending ? `${sum.pending} fechamento(s) pendente(s)` : 'Valores acumulados no mês';
+  $('paymentStatus').textContent = preview ? 'Prévia do lançamento · saia do campo para salvar' : 'Valores dos lançamentos salvos';
+  $('paymentCards').innerHTML = m.rows.length ? m.rows.map(row => {
+    const value = m.results.get(row.id);
+    return `<article class="payment-card" data-payment-employee="${row.id}">
+      <h3>${esc(row.name)}</h3>
+      <dl><div><dt>Hora extra informada</dt><dd>${fmtMoney(value.official)}</dd></div>
+      <div><dt>Bônus · ${fmtNum(value.actual)} h trabalhadas</dt><dd>${fmtMoney(value.bonus)}</dd></div>
+      <div><dt>Reparos · ${value.pieces} peça(s)</dt><dd>${fmtMoney(value.production)}</dd></div></dl>
+      <div class="payment-total"><span>${value.pending.length ? 'Total acumulado · parcial' : 'Total a pagar até agora'}</span><strong data-payment-total>${fmtMoney(value.known)}</strong></div>
+      ${value.pending.length ? `<p class="pending-text">${esc(value.pending.join(' · '))}</p>` : ''}
+    </article>`;
+  }).join('') : '<p class="empty">Cadastre os funcionários em Configurações para acompanhar os valores.</p>';
+  $('teamTable').innerHTML = `<thead><tr><th>Funcionário</th><th>Previstas</th><th>Feitas</th><th>% horas</th><th>Peças</th><th>Bônus</th><th>Produção</th><th>Subtotal</th><th>Extras oficiais</th><th>Total</th><th>Pendências</th></tr></thead><tbody>${m.rows.map(row => {
+    const value = m.results.get(row.id);
+    return `<tr><td>${esc(row.name)}</td><td>${fmtNum(value.planned)} h</td><td>${fmtNum(value.actual)} h</td><td>${value.attendance === null ? '—' : fmtNum(value.attendance, 1) + '%'}</td><td>${value.pieces}</td><td>${fmtMoney(value.bonus)}</td><td>${fmtMoney(value.production)}</td><td>${fmtMoney(value.subtotal)}</td><td>${fmtMoney(value.official)}</td><td class="${value.total === null ? 'pending-text' : ''}">${value.total === null ? 'Parcial ' + fmtMoney(value.known) : fmtMoney(value.total)}</td><td class="${value.pending.length ? 'pending-text' : ''}">${esc(value.pending.join('; ') || '—')}</td></tr>`;
+  }).join('')}</tbody>`;
+  $('teamTotal').textContent = !m.rows.length ? 'Cadastre um funcionário para iniciar o fechamento.' : sum.complete ? `Total acumulado da equipe: ${fmtMoney(sum.known)}` : `Valor conhecido da equipe: ${fmtMoney(sum.known)} · ${sum.pending} fechamento(s) pendente(s). Não representa o valor final a pagar.`;
+}
+function renderTeam(m) {
+  renderTeamSummary(m);
   const header = `<thead><tr><th rowspan="2">Data</th><th rowspan="2">Horas previstas</th>${m.rows.map(row => `<th class="employee-head" colspan="2">${esc(row.name)}${row.archived_at ? ' · arquivado' : ''}</th>`).join('')}</tr><tr>${m.rows.map(() => '<th>Horas feitas</th><th>Peças</th>').join('')}</tr></thead>`;
   const body = m.days.map(day => `<tr class="${day.weekday === 0 ? 'sunday' : day.weekday === 6 ? 'saturday' : ''}"><td>${dayLabel(day)}</td><td>${plannedInput(day, m)}</td>${m.rows.map(row => {
     const item = m.entries.get(`${row.id}|${day.date}`);
     return `<td>${entryInput(row, day, item, 'actual_hours')}</td><td>${entryInput(row, day, item, 'pieces')}</td>`;
   }).join('')}</tr>`).join('');
   $('matrix').innerHTML = header + `<tbody>${body}</tbody>`;
-  $('teamTable').innerHTML = `<thead><tr><th>Funcionário</th><th>Previstas</th><th>Feitas</th><th>% horas</th><th>Peças</th><th>Bônus</th><th>Produção</th><th>Subtotal</th><th>Extras oficiais</th><th>Total</th><th>Pendências</th></tr></thead><tbody>${m.rows.map(row => {
-    const value = m.results.get(row.id);
-    return `<tr><td>${esc(row.name)}</td><td>${fmtNum(value.planned)} h</td><td>${fmtNum(value.actual)} h</td><td>${value.attendance === null ? '—' : fmtNum(value.attendance, 1) + '%'}</td><td>${value.pieces}</td><td>${fmtMoney(value.bonus)}</td><td>${fmtMoney(value.production)}</td><td>${fmtMoney(value.subtotal)}</td><td>${fmtMoney(value.official)}</td><td class="${value.total === null ? 'pending-text' : ''}">${value.total === null ? 'Parcial ' + fmtMoney(value.known) : fmtMoney(value.total)}</td><td class="${value.pending.length ? 'pending-text' : ''}">${esc(value.pending.join('; ') || '—')}</td></tr>`;
-  }).join('')}</tbody>`;
-  $('teamTotal').textContent = !m.rows.length ? 'Cadastre um funcionário para iniciar o fechamento.' : sum.complete ? `Total fechado da equipe: ${fmtMoney(sum.known)}` : `Valor conhecido da equipe: ${fmtMoney(sum.known)} · ${sum.pending} fechamento(s) pendente(s). Não representa o valor final a pagar.`;
 }
-function renderPerson(m) {
+function renderPersonSummary(m) {
   const row = m.rows.find(item => item.id === state.selected);
   if (!row) { $('personMetrics').innerHTML = ''; $('personTable').innerHTML = ''; $('overtimeState').textContent = 'Selecione um funcionário'; $('personOfficial').textContent = 'Pendente'; $('personOfficialNote').textContent = ''; $('editOfficial').hidden = true; return; }
   const result = m.results.get(row.id);
   const official = m.overtime.get(row.id);
-  $('personMetrics').innerHTML = metric('Bônus de horas', fmtMoney(result.bonus)) + metric('Produção', fmtMoney(result.production)) + metric('Subtotal', fmtMoney(result.subtotal)) + metric(result.total === null ? 'Parcial conhecido' : 'Total a pagar', fmtMoney(result.total ?? result.known), result.total === null ? 'pending' : 'total');
+  $('personMetrics').innerHTML = metric('Hora extra informada', fmtMoney(result.official)) + metric('Bônus pelas horas trabalhadas', fmtMoney(result.bonus)) + metric(`Reparos · ${result.pieces} peça(s)`, fmtMoney(result.production)) + metric(result.total === null ? 'Total acumulado · parcial' : 'Total a pagar até agora', fmtMoney(result.known), result.total === null ? 'pending' : 'total');
   $('overtimeState').textContent = result.official === null ? 'Aguardando contador' : 'Valor oficial registrado';
   $('personOfficial').textContent = fmtMoney(result.official);
   $('personOfficialNote').textContent = official?.note || '';
   $('editOfficial').hidden = !editable(row);
+}
+function renderPerson(m) {
+  renderPersonSummary(m);
+  const row = m.rows.find(item => item.id === state.selected);
+  if (!row) return;
   $('personTable').innerHTML = `<thead><tr><th>Data</th><th>Horas previstas</th><th>Horas feitas</th><th>Peças</th><th>Observações</th></tr></thead><tbody>${m.days.map(day => {
     const item = m.entries.get(`${row.id}|${day.date}`);
     return `<tr class="${day.weekday === 0 ? 'sunday' : day.weekday === 6 ? 'saturday' : ''}"><td>${dayLabel(day)}</td><td>${plannedInput(day, m)}</td><td>${entryInput(row, day, item, 'actual_hours')}</td><td>${entryInput(row, day, item, 'pieces')}</td><td>${entryInput(row, day, item, 'note', 'text')}</td></tr>`;
@@ -410,7 +441,15 @@ async function editGrid(event) {
     await save('/entry', 'PUT', { month: state.month, day, employee_id: entryId, actual_hours, pieces, note, revision: row?.revision || 0 });
   }
 }
-for (const id of ['matrix', 'personTable']) $(id).addEventListener('change', event => editGrid(event).catch(showError));
+for (const id of ['matrix', 'personTable']) {
+  $(id).addEventListener('change', event => editGrid(event).catch(showError));
+  $(id).addEventListener('input', event => {
+    if (!event.target.matches('[data-plan-day], [data-entry-id]') || !event.target.validity.valid) return;
+    const m = calculated($(id));
+    renderTeamSummary(m, true);
+    renderPersonSummary(m);
+  });
+}
 for (const id of ['compareDay', 'compareMinimum', 'compareOrder']) $(id).addEventListener('change', () => renderCompare(calculated()));
 $('compareStaff').addEventListener('change', event => {
   const id = event.target.dataset.compareId;

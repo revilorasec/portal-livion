@@ -49,7 +49,8 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
       result = settings;
     } else if (path === 'entry') {
       result = { ...input, revision: 1 };
-      entries.push(result);
+      const index = entries.findIndex(row => row.employee_id === input.employee_id && row.day === input.day);
+      if (index < 0) entries.push(result); else entries[index] = result;
     } else if (path === 'overtime') {
       result = { ...input, revision: 1 };
       const index = overtime.findIndex(row => row.employee_id === input.employee_id && row.month === input.month);
@@ -112,6 +113,12 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     await gianExtra.locator('button[type=submit]').click();
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
     assert.equal(overtime.find(row => row.employee_id === id).amount_cents, 204300);
+    const gianPayment = app.locator(`[data-payment-employee="${id}"]`);
+    const anaPayment = app.locator(`[data-payment-employee="${otherId}"]`);
+    const money = cents => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
+    assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300));
+    assert.match(await gianPayment.textContent(), /Definir horas previstas/);
+    assert.match(await anaPayment.textContent(), /Aguardando valor do contador/);
     assert.equal(await anaExtra.locator('[data-overtime-amount]').inputValue(), '725,50');
     await anaExtra.locator('[data-overtime-amount]').fill('0');
     await anaExtra.locator('button[type=submit]').click();
@@ -140,12 +147,37 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     assert.equal(settings.bonus_cents, 50000);
     assert.equal(settings.piece_cents, 200);
     await app.locator('#tabTeam').click();
+    assert.equal(await gianPayment.isVisible(), true);
+    assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300));
+    assert.equal(await anaPayment.locator('[data-payment-total]').textContent(), money(0));
+    const planned = await app.locator('#matrix [data-plan-day]').evaluateAll(elements => elements.reduce((sum, element) => sum + Number(element.value), 0));
+    const bonus = Math.round(50000 * 2 / planned);
     await app.locator('#matrix [data-entry-id]').first().fill('2');
+    assert.equal(entries.length, 0, 'prévia não grava enquanto o campo está sendo digitado');
+    assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300 + bonus));
+    assert.match(await app.locator('#paymentStatus').textContent(), /Prévia/);
     await app.locator('#matrix [data-entry-id]').first().dispatchEvent('change');
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    await app.locator('#matrix [data-entry-id][data-field="pieces"]').first().fill('3');
+    assert.equal(entries[0].pieces, 0);
+    assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300 + bonus + 600));
+    assert.equal(await anaPayment.locator('[data-payment-total]').textContent(), money(0));
+    await app.locator('#matrix [data-entry-id][data-field="pieces"]').first().dispatchEvent('change');
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    assert.equal(entries[0].pieces, 3);
+    assert.match(await app.locator('#paymentStatus').textContent(), /salvos/);
     await app.locator('#tabPerson').click();
     assert.match(await app.locator('#personOfficial').innerText(), /2\.043,00/);
+    assert.match(await app.locator('#personMetrics').textContent(), /Hora extra informada/);
+    assert.equal(await app.locator('#personMetrics .metric').last().locator('strong').textContent(), money(204300 + bonus + 600));
+    // A mesma soma deve acompanhar o lançamento individual sem perder o foco.
+    await app.locator('#personTable [data-field="pieces"]').first().fill('4');
+    assert.equal(await app.locator('#personMetrics .metric').last().locator('strong').textContent(), money(204300 + bonus + 800));
+    await app.locator('#personTable [data-field="pieces"]').first().dispatchEvent('change');
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
     await page.reload();
     await app.locator('#app').waitFor({ state: 'visible' });
+    assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300 + bonus + 800));
     await app.locator('#tabConfig').click();
     assert.equal(await app.locator('#staffList').getByText('Gian Luca').count(), 1);
     assert.equal(await gianExtra.locator('[data-overtime-amount]').inputValue(), '2.043,00');
@@ -184,6 +216,8 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     assert.equal(overtime.length, 1);
     await page.locator('iframe').evaluate(frame => { frame.style.width = '375px'; });
     await app.locator('#tabTeam').click();
+    const cardBounds = await anaPayment.evaluate(card => ({ left: card.getBoundingClientRect().left, right: card.getBoundingClientRect().right, viewport: document.documentElement.clientWidth }));
+    assert.ok(cardBounds.left >= 0 && cardBounds.right <= cardBounds.viewport, `payment card overflows: ${JSON.stringify(cardBounds)}`);
     const mobile = await app.locator('html').evaluate(html => ({ page: html.scrollWidth, viewport: html.clientWidth, matrix: document.querySelector('#matrix').scrollWidth, wrap: document.querySelector('#matrix').parentElement.clientWidth }));
     assert.ok(mobile.page <= mobile.viewport + 1, `Mobile page overflows: ${JSON.stringify(mobile)}`);
     assert.ok(mobile.matrix > mobile.wrap, `wide table should scroll inside its container: ${JSON.stringify(mobile)}`);
