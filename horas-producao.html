@@ -32,8 +32,8 @@
         <div class="section-title"><div><span class="eyebrow">CONFIGURAÇÕES GERAIS</span><h2>Mesmos valores para todos os funcionários</h2></div><span id="settingsUpdated" class="muted"></span></div>
         <form id="settingsForm">
           <div class="fields four">
-            <label>Bônus integral por 100% das horas (R$)<input id="bonus" type="number" min="0" step="0.01" inputmode="decimal" required></label>
-            <label>Valor por peça reparada (R$)<input id="pieceRate" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+            <label>Bônus integral por 100% das horas (R$)<input id="bonus" data-money type="text" inputmode="numeric" autocomplete="off" required></label>
+            <label>Valor por peça reparada (R$)<input id="pieceRate" data-money type="text" inputmode="numeric" autocomplete="off" required></label>
             <label>Horas previstas de segunda a sexta<input id="weekdayHours" type="number" min="0" max="24" step="0.01" inputmode="decimal" required></label>
             <label>Horas previstas aos sábados<input id="saturdayHours" type="number" min="0" max="24" step="0.01" inputmode="decimal" required></label>
           </div>
@@ -98,6 +98,6 @@
   </main>
   <dialog id="employeeDialog"><form id="employeeForm" method="dialog"><h2 id="employeeDialogTitle">Novo funcionário</h2><label>Nome<input id="employeeName" maxlength="120" required autocomplete="off"></label><div class="dialog-actions"><button id="cancelEmployee" type="button">Cancelar</button><button class="primary" type="submit">Salvar</button></div></form></dialog>
   <dialog id="deleteDialog"><div><h2>Excluir funcionário?</h2><p id="deleteImpact"></p><p>O funcionário e todos os seus lançamentos de horas, peças e valores oficiais de todos os meses serão excluídos definitivamente. Essa ação não pode ser desfeita.</p><div class="dialog-actions"><button id="cancelDelete" type="button">Cancelar</button><button id="confirmDelete" class="danger" type="button">Excluir definitivamente</button></div></div></dialog>
-  <script type="module" src="./horas-producao.js?v=6"></script>
+  <script type="module" src="./horas-producao.js?v=7"></script>
 </body>
 </html>

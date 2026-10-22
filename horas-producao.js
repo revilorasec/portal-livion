@@ -4,6 +4,8 @@ const BASE = 'https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/hours-api';
 const $ = id => document.getElementById(id);
 const fmtMoney = cents => cents === null || cents === undefined ? 'Pendente' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
 const fmtNum = (number, digits = 2) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: digits }).format(number);
+const moneyInputFormat = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const moneyValue = cents => cents === null || cents === undefined ? '' : moneyInputFormat.format(cents / 100);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const state = { data: null, month: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7), selected: '', tab: 'team', excluded: new Set(), editEmployee: null, deleteEmployee: null, deleteImpact: null, busy: false };
 const errors = {
@@ -62,9 +64,33 @@ function showError(error) {
 function clearError() { $('error').hidden = true; $('error').textContent = ''; }
 function cents(value) {
   if (value === '') return null;
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < 0) throw new Error('INVALID_VALUE');
-  return Math.round(number * 100);
+  if (!/^(?:\d{1,3}(?:\.\d{3})*|\d+),\d{2}$/.test(value)) throw new Error('INVALID_VALUE');
+  const number = Number(value.replace(/\D/g, ''));
+  if (!Number.isSafeInteger(number)) throw new Error('INVALID_VALUE');
+  return number;
+}
+function formatMoneyInput(element, inputType = '') {
+  const raw = element.value;
+  const digits = raw.replace(/\D/g, '');
+  const right = raw.slice(element.selectionStart ?? raw.length).replace(/\D/g, '').length;
+  if (!digits || (inputType.startsWith('delete') && /^0+$/.test(digits))) {
+    element.value = '';
+    element.setCustomValidity('');
+    return;
+  }
+  const amount = Number(digits);
+  if (!Number.isSafeInteger(amount)) {
+    element.setCustomValidity('Verifique o valor informado.');
+    return;
+  }
+  element.setCustomValidity('');
+  element.value = moneyValue(amount);
+  let cursor = element.value.length, remaining = right;
+  while (cursor > 0 && remaining > 0) {
+    cursor--;
+    if (/\d/.test(element.value[cursor])) remaining--;
+  }
+  element.setSelectionRange(cursor, cursor);
 }
 function decimal(value) {
   const number = Number(value);
@@ -113,8 +139,8 @@ function entryInput(row, day, item, field, type = 'number') {
 function renderSettings() {
   const s = state.data.settings;
   $('month').value = state.month;
-  $('bonus').value = Number(s.bonus_cents || 0) / 100;
-  $('pieceRate').value = Number(s.piece_cents || 0) / 100;
+  $('bonus').value = moneyValue(s.bonus_cents || 0);
+  $('pieceRate').value = moneyValue(s.piece_cents || 0);
   $('weekdayHours').value = s.weekday_hours;
   $('saturdayHours').value = s.saturday_hours;
   $('settingsUpdated').textContent = s.revision ? `Revisão ${s.revision}` : 'Ainda não configurado';
@@ -129,12 +155,12 @@ function renderStaff() {
   $('staffList').innerHTML = rows.length ? rows.map(row => {
     const item = overtime.get(row.id);
     const informed = item?.amount_cents !== null && item?.amount_cents !== undefined;
-    const value = informed ? (item.amount_cents / 100).toFixed(2) : '';
+    const value = moneyValue(item?.amount_cents);
     const disabled = editable(row) ? '' : 'disabled';
     return `<article class="staff-item ${row.archived_at ? 'archived' : ''}">
       <div class="staff-heading"><strong>${esc(row.name)}</strong>${row.archived_at ? '<small>Registro antigo arquivado</small>' : ''}<div class="staff-actions">${selectableIds.has(row.id) ? `<button class="outline" type="button" data-employee-open="${row.id}">Detalhes</button>` : ''}${editable(row) ? `<button class="outline" type="button" data-employee-edit="${row.id}">Editar</button>` : ''}${state.data.permissions.delete ? `<button class="danger" type="button" data-employee-delete="${row.id}">Excluir</button>` : ''}</div></div>
       <form class="staff-overtime" data-overtime-employee="${row.id}" aria-label="Horas extras de ${esc(row.name)}">
-        <label>Valor total da hora extra no mês (R$)<input data-overtime-amount type="number" min="0" step="0.01" inputmode="decimal" placeholder="Aguardando contador" value="${value}" ${disabled}></label>
+        <label>Valor total da hora extra no mês (R$)<input data-overtime-amount data-money type="text" inputmode="numeric" autocomplete="off" placeholder="Aguardando contador" value="${value}" ${disabled}></label>
         <label>Observação<input data-overtime-note maxlength="500" placeholder="Opcional" value="${esc(item?.note || '')}" ${disabled}></label>
         <div class="staff-overtime-foot"><span class="${informed ? 'confirmed-text' : 'pending-text'}">${informed ? `${fmtMoney(item.amount_cents)} registrado` : 'Pendente'}</span>${editable(row) ? '<button class="primary" type="submit">Salvar valor</button>' : ''}</div>
       </form>
@@ -256,7 +282,7 @@ function unsavedStaffValues(exceptId) {
     const amount = form.querySelector('[data-overtime-amount]').value;
     const note = form.querySelector('[data-overtime-note]').value;
     const saved = existing.get(id);
-    const savedAmount = saved?.amount_cents === null || saved?.amount_cents === undefined ? '' : (saved.amount_cents / 100).toFixed(2);
+    const savedAmount = moneyValue(saved?.amount_cents);
     return amount !== savedAmount || note !== (saved?.note || '') ? [{ id, amount, note }] : [];
   });
 }
@@ -295,6 +321,23 @@ function openEmployee(row = null) {
   $('employeeName').focus();
 }
 
+document.addEventListener('input', event => {
+  if (event.target.matches('[data-money]')) formatMoneyInput(event.target, event.inputType || '');
+});
+document.addEventListener('beforeinput', event => {
+  const element = event.target;
+  if (!element.matches('[data-money]') || element.selectionStart !== element.selectionEnd) return;
+  const cursor = element.selectionStart;
+  const backward = event.inputType === 'deleteContentBackward';
+  if (!backward && event.inputType !== 'deleteContentForward') return;
+  let index = backward ? cursor - 1 : cursor;
+  if (index < 0 || index >= element.value.length || /\d/.test(element.value[index])) return;
+  while (index >= 0 && index < element.value.length && !/\d/.test(element.value[index])) index += backward ? -1 : 1;
+  if (index < 0 || index >= element.value.length) return;
+  event.preventDefault();
+  element.setRangeText('', backward ? index : cursor, backward ? cursor : index + 1, 'end');
+  formatMoneyInput(element, event.inputType);
+});
 $('reloadBtn').addEventListener('click', load);
 $('configBtn').addEventListener('click', () => { state.tab = 'config'; render(); $('configView').scrollIntoView({ block: 'start' }); });
 $('month').addEventListener('change', event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) { state.month = event.target.value; load(); } });
