@@ -174,7 +174,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers(origin) });
   const path = new URL(req.url).pathname.replace(/^.*\/hours-api\/?/, '');
   if (req.method === 'GET' && path === 'health')
-    return reply(origin, 200, { ok: true, service: 'hours-api', version: 2 });
+    return reply(origin, 200, { ok: true, service: 'hours-api', version: 3 });
   try {
     const actor = await access(req);
     const url = new URL(req.url);
@@ -262,10 +262,17 @@ Deno.serve(async (req: Request) => {
       need(actor.edit);
       const input = await body(req), month = monthKey(input.month), id = uuid(input.employee_id);
       await employee(id, true);
-      const result = await saveVersioned('hours_overtime', { month, employee_id: id }, {
-        amount_cents: input.amount_cents === null ? null : integer(input.amount_cents, 1000000000),
-        note: note(input.note)
-      }, revision(input.revision), actor.email);
+      const values: Record<string, unknown> = {};
+      for (const field of ['amount_cents', 'mon_sat_cents', 'mon_fri_cents', 'saturday_cents']) {
+        if (Object.hasOwn(input, field)) values[field] = input[field] === null ? null : integer(input[field], 1000000000);
+      }
+      if (Object.hasOwn(input, 'active_option')) {
+        if (input.active_option !== null && !['mon_sat','mon_fri','saturday'].includes(input.active_option)) fail('INVALID_VALUE');
+        values.active_option = input.active_option;
+      }
+      if (Object.hasOwn(input, 'note')) values.note = note(input.note);
+      if (!Object.keys(values).length) fail('INVALID_VALUE');
+      const result = await saveVersioned('hours_overtime', { month, employee_id: id }, values, revision(input.revision), actor.email);
       await audited(actor.email, 'HOURS_OFFICIAL_OVERTIME', id, { month, informed: result.amount_cents !== null });
       return reply(origin, 200, result);
     }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#194682">
   <title>Hora Extra · Livion</title>
-  <link rel="stylesheet" href="./horas-producao.css?v=5">
+  <link rel="stylesheet" href="./horas-producao.css?v=6">
 </head>
 <body>
   <header class="top">
@@ -23,6 +23,7 @@
       <nav class="tabs" aria-label="Áreas do aplicativo">
         <button id="tabPerson" class="active" type="button" aria-pressed="true">Por funcionário</button>
         <button id="tabPayments" type="button" aria-pressed="false">Valores a pagar</button>
+        <button id="tabSimulate" type="button" aria-pressed="false">Simular opções</button>
         <button id="tabCompare" type="button" aria-pressed="false">Comparativos</button>
         <button id="tabConfig" type="button" aria-pressed="false">⚙ Configurações</button>
       </nav>
@@ -42,7 +43,7 @@
       </section>
 
       <section class="card staff">
-        <div class="section-title"><div><span class="eyebrow">FUNCIONÁRIOS</span><h2>Cadastrar funcionários</h2><p>Adicione um funcionário pelo nome. Cada um aparece abaixo com o valor oficial total de suas horas extras no mês selecionado. Campo vazio significa pendente; 0 significa zero confirmado.</p></div><button id="addEmployee" class="primary" type="button">+ Adicionar funcionário</button></div>
+        <div class="section-title"><div><span class="eyebrow">FUNCIONÁRIOS · VALORES DO MÊS</span><h2>Cadastrar funcionários e valores oficiais</h2><p>Informe os três valores e escolha a opção ativa de cada funcionário. Segunda a sexta: 2h após o expediente. Sábados: 8h. Os campos são salvos ao sair deles; aguarde a confirmação “Salvo no Portal”. Vazio = pendente; 0 = zero confirmado.</p></div><button id="addEmployee" class="primary" type="button">+ Adicionar funcionário</button></div>
         <div id="staffList" class="staff-list"></div>
       </section>
       </section>
@@ -75,6 +76,17 @@
         </section>
       </section>
 
+      <section id="simulateView" class="view" hidden>
+        <section class="card">
+          <div class="section-title"><div><span class="eyebrow">SIMULAÇÃO PARA O TÉCNICO</span><h2>Compare as três opções</h2><p>Esta simulação não altera os lançamentos, a opção ativa ou os valores salvos.</p></div><label>Técnico<select id="simulationEmployee"></select></label></div>
+          <div id="simulationRates" class="fields three"></div>
+          <p class="muted">Os valores iniciais vêm das configurações deste técnico no mês selecionado. Você pode alterar os valores abaixo apenas para simular.</p>
+          <div class="simulation-actions"><button id="simulationRatesReset" type="button">Usar valores das configurações</button><button id="simulationFullMonth" type="button">Marcar mês completo</button><button id="simulationClear" type="button">Limpar presenças</button></div>
+          <div class="table-wrap"><table class="payment-table"><thead><tr><th>Opção</th><th>Horas simuladas</th><th>Reparos</th><th>Hora extra</th><th>Bônus</th><th>Valor dos reparos</th><th>Total simulado</th></tr></thead><tbody id="simulationResults"></tbody></table></div>
+          <p class="muted">Cada opção considera somente os dias de sua jornada. O bônus é proporcional às horas previstas dessa opção; o valor oficial mensal informado é somado integralmente.</p>
+        </section>
+        <section class="card"><h2>Presença e reparos simulados por dia</h2><p>Marque a presença e preencha horas e reparos. Domingos ficam bloqueados.</p><div class="table-wrap"><table id="simulationDays" class="day-table"></table></div></section>
+      </section>
       <section id="compareView" class="view" hidden>
         <section class="card"><span class="eyebrow">COMPARATIVOS</span><h2>Desempenho da equipe</h2>
           <div class="fields compare-fields">
@@ -100,6 +112,6 @@
   </main>
   <dialog id="employeeDialog"><form id="employeeForm" method="dialog"><h2 id="employeeDialogTitle">Novo funcionário</h2><label>Nome<input id="employeeName" maxlength="120" required autocomplete="off"></label><div class="dialog-actions"><button id="cancelEmployee" type="button">Cancelar</button><button class="primary" type="submit">Salvar</button></div></form></dialog>
   <dialog id="deleteDialog"><div><h2>Excluir funcionário?</h2><p id="deleteImpact"></p><p>O funcionário e todos os seus lançamentos de horas, peças e valores oficiais de todos os meses serão excluídos definitivamente. Essa ação não pode ser desfeita.</p><div class="dialog-actions"><button id="cancelDelete" type="button">Cancelar</button><button id="confirmDelete" class="danger" type="button">Excluir definitivamente</button></div></div></dialog>
-  <script type="module" src="./horas-producao.js?v=9"></script>
+  <script type="module" src="./horas-producao.js?v=10"></script>
 </body>
 </html>

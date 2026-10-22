@@ -29,12 +29,13 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
   let browser;
   const employees = [], entries = [], plans = [], overtime = [];
   let settings = null;
-  let entryGate = null, nextEntryError = '', bootstrapCalls = 0;
+  let entryGate = null, nextEntryError = '', nextOvertimeError = '', bootstrapCalls = 0;
   const id = '11111111-1111-4111-8111-111111111111';
   const otherId = '22222222-2222-4222-8222-222222222222';
   try {
   browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_EXECUTABLE ? { executablePath: process.env.CHROMIUM_EXECUTABLE } : {}) });
   const page = await browser.newPage();
+  page.on('dialog', dialog => dialog.accept());
   await page.route('**/functions/v1/hours-api/**', async route => {
     const request = route.request(), path = new URL(request.url()).pathname.split('/hours-api/')[1];
     const input = request.postDataJSON?.() || {};
@@ -66,8 +67,12 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
       result = { ...input, revision: (plans[index]?.revision || 0) + 1 };
       if (index < 0) plans.push(result); else plans[index] = result;
     } else if (path === 'overtime') {
-      result = { ...input, revision: 1 };
       const index = overtime.findIndex(row => row.employee_id === input.employee_id && row.month === input.month);
+      if (nextOvertimeError || input.revision !== (overtime[index]?.revision || 0)) {
+        const error = nextOvertimeError || 'CONFLICT'; nextOvertimeError = '';
+        await route.fulfill({ status: error === 'CONFLICT' ? 409 : 500, contentType: 'application/json', body: JSON.stringify({ error }) }); return;
+      }
+      result = { amount_cents: null, mon_sat_cents: null, mon_fri_cents: null, saturday_cents: null, active_option: null, note: '', ...overtime[index], ...input, revision: (overtime[index]?.revision || 0) + 1 };
       if (index < 0) overtime.push(result); else overtime[index] = result;
     } else if (path.endsWith('/impact')) {
       const employeeId = path.split('/')[1];
@@ -100,6 +105,9 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     const gianExtra = app.locator(`[data-overtime-employee="${id}"]`);
     const anaExtra = app.locator(`[data-overtime-employee="${otherId}"]`);
     await anaExtra.waitFor();
+    assert.equal(await gianExtra.locator('[data-overtime-field$="_cents"]').count(), 3);
+    await gianExtra.locator('[data-overtime-field="active_option"]').selectOption('mon_sat');
+    await anaExtra.locator('[data-overtime-field="active_option"]').selectOption('mon_sat');
     const amount = gianExtra.locator('[data-overtime-amount]');
     await amount.fill('');
     for (const [digit, expected] of [['2', '0,02'], ['0', '0,20'], ['4', '2,04'], ['3', '20,43'], ['0', '204,30'], ['0', '2.043,00']]) {
@@ -128,22 +136,22 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     await anaExtra.locator('[data-overtime-amount]').fill('72550');
     await gianExtra.locator('button[type=submit]').click();
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
-    assert.equal(overtime.find(row => row.employee_id === id).amount_cents, 204300);
+    assert.equal(overtime.find(row => row.employee_id === id).mon_sat_cents, 204300);
     const gianPayment = app.locator(`[data-payment-employee="${id}"]`);
     const anaPayment = app.locator(`[data-payment-employee="${otherId}"]`);
     const money = cents => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
     assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300));
     assert.match(await gianPayment.textContent(), /Definir horas previstas/);
-    assert.match(await anaPayment.textContent(), /Aguardando valor do contador/);
+    assert.match(await anaPayment.textContent(), /Informar valor|Hora extra|725,50/);
     assert.equal(await anaExtra.locator('[data-overtime-amount]').inputValue(), '725,50');
     await anaExtra.locator('[data-overtime-amount]').fill('0');
     await anaExtra.locator('button[type=submit]').click();
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
-    assert.equal(overtime.find(row => row.employee_id === otherId).amount_cents, 0);
+    assert.equal(overtime.find(row => row.employee_id === otherId).mon_sat_cents, 0);
     await anaExtra.locator('[data-overtime-amount]').fill('');
     await anaExtra.locator('button[type=submit]').click();
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
-    assert.equal(overtime.find(row => row.employee_id === otherId).amount_cents, null);
+    assert.equal(overtime.find(row => row.employee_id === otherId).mon_sat_cents, null);
     await page.reload();
     await app.locator('#app').waitFor({ state: 'visible' });
     await app.locator('#configBtn').click();
@@ -156,12 +164,45 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     await app.locator('#pieceRate').fill('200');
     assert.equal(await app.locator('#bonus').inputValue(), '500,00');
     assert.equal(await app.locator('#pieceRate').inputValue(), '2,00');
-    await app.locator('#weekdayHours').fill('4');
-    await app.locator('#saturdayHours').fill('0');
+    await app.locator('#weekdayHours').fill('2');
+    await app.locator('#saturdayHours').fill('8');
     await app.locator('#settingsForm button[type=submit]').click();
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
     assert.equal(settings.bonus_cents, 50000);
     assert.equal(settings.piece_cents, 200);
+    await gianExtra.locator('[data-overtime-field="mon_fri_cents"]').fill('100000');
+    await gianExtra.locator('[data-overtime-field="saturday_cents"]').fill('50000');
+    await gianExtra.locator('button[type=submit]').click();
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    const realBeforeSimulation = JSON.stringify({ entries, overtime, settings });
+    await app.locator('#tabSimulate').click();
+    await app.locator('#simulationEmployee').selectOption(id);
+    assert.equal(await app.locator('[data-simulation-rate="mon_sat_cents"]').inputValue(), '2.043,00');
+    assert.equal(await app.locator('[data-simulation-rate="mon_fri_cents"]').inputValue(), '1.000,00');
+    assert.equal(await app.locator('[data-simulation-rate="saturday_cents"]').inputValue(), '500,00');
+    await app.locator('#simulationFullMonth').click();
+    await app.locator('#simulationDays tr:not(.sunday):not(.saturday) [data-simulation-field="pieces"]').first().fill('3');
+    await app.locator('#simulationDays tr.saturday [data-simulation-field="pieces"]').first().fill('2');
+    assert.equal(await app.locator('[data-simulation-option="mon_sat"] .payment-total strong').textContent(), money(255300));
+    assert.equal(await app.locator('[data-simulation-option="mon_fri"] .payment-total strong').textContent(), money(150600));
+    assert.equal(await app.locator('[data-simulation-option="saturday"] .payment-total strong').textContent(), money(100400));
+    await app.locator('[data-simulation-rate="mon_sat_cents"]').fill('90000');
+    assert.equal(await app.locator('[data-simulation-option="mon_sat"] .payment-total strong').textContent(), money(141000));
+    assert.equal(JSON.stringify({ entries, overtime, settings }), realBeforeSimulation, 'simulação não deve gravar dados reais');
+    await app.locator('#tabConfig').click();
+    nextOvertimeError = 'SERVER_ERROR';
+    await gianExtra.locator('[data-overtime-field="mon_fri_cents"]').fill('350000');
+    await gianExtra.locator('[data-overtime-field="saturday_cents"]').focus();
+    await gianExtra.locator('[data-staff-status]').getByText(/Não salvo/).waitFor();
+    await app.locator('#tabPayments').click();
+    await app.locator('#tabConfig').click();
+    assert.equal(await gianExtra.locator('[data-overtime-field="mon_fri_cents"]').inputValue(), '3.500,00');
+    assert.equal(overtime.find(row => row.employee_id === id).mon_fri_cents, 100000);
+    await gianExtra.locator('button[type=submit]').click();
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    assert.equal(overtime.find(row => row.employee_id === id).mon_fri_cents, 350000);
+    assert.equal(overtime.find(row => row.employee_id === id).mon_sat_cents, 204300);
+    assert.equal(overtime.find(row => row.employee_id === id).saturday_cents, 50000);
     await app.locator('#tabPayments').click();
     assert.equal(await gianPayment.isVisible(), true);
     assert.equal(await gianPayment.locator('[data-payment-total]').textContent(), money(204300));
@@ -237,12 +278,13 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     assert.equal(entries[0].pieces, 5);
     assert.equal(entries[0].note, 'Observação de outra sessão');
     const plan = app.locator('#personTable [data-plan-day]').first();
-    await plan.fill('5');
+    const originalPlan = Number(await plan.inputValue());
+    await plan.fill(String(originalPlan + 1));
     await pieces.focus();
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
-    assert.equal(plans[0].planned_hours, 5);
+    assert.equal(plans[0].planned_hours, originalPlan + 1);
     assert.equal(await app.locator('#personMetrics .metric').last().locator('strong').textContent(), money(204300 + Math.round(50000 * 2 / (planned + 1)) + 1000));
-    await plan.fill('4');
+    await plan.fill(String(originalPlan));
     await pieces.focus();
     await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
     await page.reload();
@@ -256,6 +298,14 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     assert.equal(await app.locator('#pieceRate').inputValue(), '2,00');
     assert.equal(await hours.inputValue(), '2');
     assert.equal(await pieces.inputValue(), '5');
+    assert.equal(await gianExtra.locator('[data-overtime-field="mon_fri_cents"]').inputValue(), '3.500,00');
+    assert.equal(await gianExtra.locator('[data-overtime-field="saturday_cents"]').inputValue(), '500,00');
+    assert.equal(await gianExtra.locator('[data-overtime-field="active_option"]').inputValue(), 'mon_sat');
+    await gianExtra.locator('[data-overtime-field="active_option"]').selectOption('saturday');
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
+    assert.match(await app.locator('#personOfficial').textContent(), /500,00/);
+    await gianExtra.locator('[data-overtime-field="active_option"]').selectOption('mon_sat');
+    await app.locator('#saveStatus').getByText('Salvo no Portal', { exact: true }).waitFor();
     await app.locator('#tabCompare').click();
     assert.match(await app.locator('#comparisonTable').innerText(), /Diferença para o grupo/);
     await app.locator('#tabPerson').click();

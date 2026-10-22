@@ -46,7 +46,11 @@ input:disabled,select:disabled{background:#e4e9ee;color:#8996a6}
 .staff-item small{color:var(--muted)}
 .staff-item button{font-size:11px;padding:5px 8px}
 .staff-actions{display:flex;flex-wrap:wrap;gap:5px}
-.staff-overtime{display:grid;grid-template-columns:minmax(170px,260px) minmax(180px,1fr) auto;align-items:end;gap:9px}
+.staff-overtime{display:grid;grid-template-columns:minmax(0,1fr);align-items:end;gap:12px}
+.official-fields,.fields.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.simulation-actions{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}
+#simulationDays input[type=checkbox]{width:20px;height:20px}
+@media(max-width:650px){.official-fields,.fields.three{grid-template-columns:1fr}}
 .staff-overtime-foot{display:grid;justify-items:end;gap:6px}
 .confirmed-text{color:#21683c;font-size:12px;font-weight:700}
 .staff-item button.outline{background:white;color:var(--navy);border-color:#b2c9e0}
