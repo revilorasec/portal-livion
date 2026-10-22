@@ -21,7 +21,7 @@ test('each Portal app has a distinct identity, launch route and valid icons',()=
  assert.deepEqual(Object.keys(registry).sort(),Object.keys(groups).sort());
  const identities=new Set();
  for(const [key,info] of Object.entries(registry)){
-  const manifest=JSON.parse(read(info.manifest));
+  const manifest=JSON.parse(read(info.manifest.split('?')[0]));
   assert.equal(manifest.start_url,'./?app='+key);
   assert.equal(manifest.scope,'./');
   assert.equal(manifest.display,'standalone');
@@ -72,7 +72,7 @@ test('launching an installed app keeps its manifest and Apple name instead of ad
  for(const [key,info] of Object.entries(registry)){
   const writes=[],scope={URLSearchParams,location:{search:'?app='+key},document:{write:s=>writes.push(s)}};
   runInNewContext(registrySource+'\n'+inline(portal)[0],scope);
-  assert.match(writes.join(''),new RegExp(info.manifest.replaceAll('.','\\.')));
+  assert.ok(writes.join('').includes(info.manifest));
   assert.ok(writes.join('').includes('apple-mobile-web-app-title" content="'+info.short+'"'));
  }
 });

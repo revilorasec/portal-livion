@@ -1,7 +1,7 @@
 {
   "id": "./pwa/horas-producao",
-  "name": "Horas, Produção e Pagamentos · Livion",
-  "short_name": "Horas Livion",
+  "name": "Hora Extra · Livion",
+  "short_name": "Hora Extra",
   "description": "Controle mensal de horas, peças e valores por funcionário.",
   "lang": "pt-BR",
   "start_url": "./?app=horas-producao",

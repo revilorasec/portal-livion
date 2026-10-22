@@ -16,7 +16,7 @@ const catalog = [
   { key: 'desempenho-funcionarios', title: 'Desempenho Técnico', description: 'Técnicos' },
   { key: 'painel-executivo-nokia', title: 'Desempenho Técnico Nokia' },
   { key: 'rh', title: 'Recursos Humanos' },
-  { key: 'horas-producao', title: 'Horas, Produção e Pagamentos', description: 'Equipe e pagamentos' },
+  { key: 'horas-producao', title: 'Hora Extra', description: 'Equipe e pagamentos' },
 ];
 
 function directory(allowed = ['fretes', 'vtal', 'desempenho-funcionarios', 'painel-executivo-nokia']) {
@@ -61,11 +61,11 @@ test('app de horas aparece em Pessoas somente para usuário autorizado', () => {
   const limited = directory(['fretes']);
   limited.elements.appSearch.value = 'pagamentos';
   limited.renderCards();
-  assert.doesNotMatch(limited.elements.appCards.innerHTML, /Horas, Produção e Pagamentos/);
+  assert.doesNotMatch(limited.elements.appCards.innerHTML, /Hora Extra/);
   const authorized = directory(['horas-producao']);
   authorized.elements.appSearch.value = 'pagamentos';
   authorized.renderCards();
-  assert.match(authorized.elements.appCards.innerHTML, /Horas, Produção e Pagamentos/);
+  assert.match(authorized.elements.appCards.innerHTML, /Hora Extra/);
 });
 
 test('carrega só o portal na instalação e mantém o painel técnico leve', () => {
