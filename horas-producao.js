@@ -132,7 +132,7 @@ function renderTeam(m) {
   const all = [...m.results.values()];
   const sum = teamClosing(all);
   $('teamMetrics').innerHTML = metric('Funcionários no período', m.rows.length) + metric('Horas realizadas', `${fmtNum(sum.actual)} h`) + metric('Peças reparadas', sum.pieces, '') + metric(sum.complete ? 'Total da equipe' : 'Valor conhecido · parcial', fmtMoney(sum.known), sum.complete ? 'total' : 'pending');
-  $('teamState').textContent = sum.pending ? `${sum.pending} fechamento(s) pendente(s)` : 'Fechamentos completos';
+  $('teamState').textContent = !m.rows.length ? 'Aguardando cadastro da equipe' : sum.pending ? `${sum.pending} fechamento(s) pendente(s)` : 'Fechamentos completos';
   const header = `<thead><tr><th rowspan="2">Data</th><th rowspan="2">Horas previstas</th>${m.rows.map(row => `<th class="employee-head" colspan="2">${esc(row.name)}${row.archived_at ? ' · arquivado' : ''}</th>`).join('')}</tr><tr>${m.rows.map(() => '<th>Horas feitas</th><th>Peças</th>').join('')}</tr></thead>`;
   const body = m.days.map(day => `<tr class="${day.weekday === 0 ? 'sunday' : day.weekday === 6 ? 'saturday' : ''}"><td>${dayLabel(day)}</td><td>${plannedInput(day, m)}</td>${m.rows.map(row => {
     const item = m.entries.get(`${row.id}|${day.date}`);
@@ -143,7 +143,7 @@ function renderTeam(m) {
     const value = m.results.get(row.id);
     return `<tr><td>${esc(row.name)}</td><td>${fmtNum(value.planned)} h</td><td>${fmtNum(value.actual)} h</td><td>${value.attendance === null ? '—' : fmtNum(value.attendance, 1) + '%'}</td><td>${value.pieces}</td><td>${fmtMoney(value.bonus)}</td><td>${fmtMoney(value.production)}</td><td>${fmtMoney(value.subtotal)}</td><td>${fmtMoney(value.official)}</td><td class="${value.total === null ? 'pending-text' : ''}">${value.total === null ? 'Parcial ' + fmtMoney(value.known) : fmtMoney(value.total)}</td><td class="${value.pending.length ? 'pending-text' : ''}">${esc(value.pending.join('; ') || '—')}</td></tr>`;
   }).join('')}</tbody>`;
-  $('teamTotal').textContent = sum.complete ? `Total fechado da equipe: ${fmtMoney(sum.known)}` : `Valor conhecido da equipe: ${fmtMoney(sum.known)} · ${sum.pending} fechamento(s) pendente(s). Não representa o valor final a pagar.`;
+  $('teamTotal').textContent = !m.rows.length ? 'Cadastre um funcionário para iniciar o fechamento.' : sum.complete ? `Total fechado da equipe: ${fmtMoney(sum.known)}` : `Valor conhecido da equipe: ${fmtMoney(sum.known)} · ${sum.pending} fechamento(s) pendente(s). Não representa o valor final a pagar.`;
 }
 function renderPerson(m) {
   const row = m.rows.find(item => item.id === state.selected);
