@@ -122,6 +122,7 @@ test('a API completa a AJ da Claro pela fonte segura sem voltar para a coluna AN
 
 test('o painel consolidado filtra somente devoluções reais pelo mês de devolução', () => {
   assert.match(combined, /id="fReturnMonth"/);
+  assert.match(combined, /fillSelect\('fClient',\['Claro','Nokia'\],'Todos os clientes'\)/);
   assert.match(combined, /Todos os meses de devolução/);
   assert.doesNotMatch(combined, /id="fMeasurement"/);
   assert.doesNotMatch(combined, /Todas as medições/);
