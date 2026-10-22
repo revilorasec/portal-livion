@@ -75,8 +75,9 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     const anaExtra = app.locator(`[data-overtime-employee="${otherId}"]`);
     await anaExtra.waitFor();
     await gianExtra.locator('[data-overtime-amount]').fill('150.25');
-    await gianExtra.locator('button[type=submit]').click();
     await anaExtra.locator('[data-overtime-amount]').fill('0');
+    await gianExtra.locator('button[type=submit]').click();
+    assert.equal(await anaExtra.locator('[data-overtime-amount]').inputValue(), '0');
     await anaExtra.locator('button[type=submit]').click();
     await app.locator('#bonus').fill('500');
     await app.locator('#pieceRate').fill('2');

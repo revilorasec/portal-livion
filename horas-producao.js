@@ -246,16 +246,44 @@ async function load() {
     return true;
   } catch (error) { showError(error); return false; }
 }
+function unsavedStaffValues(exceptId) {
+  const existing = new Map(state.data.overtime.map(item => [item.employee_id, item]));
+  return [...$('staffList').querySelectorAll('[data-overtime-employee]')].flatMap(form => {
+    const id = form.dataset.overtimeEmployee;
+    if (id === exceptId) return [];
+    const amount = form.querySelector('[data-overtime-amount]').value;
+    const note = form.querySelector('[data-overtime-note]').value;
+    const saved = existing.get(id);
+    const savedAmount = saved?.amount_cents === null || saved?.amount_cents === undefined ? '' : (saved.amount_cents / 100).toFixed(2);
+    return amount !== savedAmount || note !== (saved?.note || '') ? [{ id, amount, note }] : [];
+  });
+}
+function restoreStaffValues(drafts) {
+  for (const draft of drafts) {
+    const form = [...$('staffList').querySelectorAll('[data-overtime-employee]')].find(item => item.dataset.overtimeEmployee === draft.id);
+    if (!form) continue;
+    form.querySelector('[data-overtime-amount]').value = draft.amount;
+    form.querySelector('[data-overtime-note]').value = draft.note;
+  }
+}
 async function save(path, method, payload) {
-  if (state.busy) return;
+  if (state.busy) { status('Aguarde o salvamento atual'); return; }
   state.busy = true; clearError(); status('Salvando…');
+  const staffForm = path === '/overtime' ? [...$('staffList').querySelectorAll('[data-overtime-employee]')].find(item => item.dataset.overtimeEmployee === payload.employee_id) : null;
+  for (const control of staffForm?.querySelectorAll('input,button') || []) control.disabled = true;
+  $('month').disabled = true;
   try {
     await api(path, { method, body: JSON.stringify(payload) });
-    if (await load()) status('Salvo no Portal');
+    const drafts = unsavedStaffValues(path === '/overtime' ? payload.employee_id : '');
+    if (await load()) { restoreStaffValues(drafts); status('Salvo no Portal'); }
   } catch (error) {
     if (error.message === 'CONFLICT') await load();
     showError(error);
-  } finally { state.busy = false; }
+  } finally {
+    state.busy = false;
+    $('month').disabled = false;
+    for (const control of staffForm?.querySelectorAll('input,button') || []) control.disabled = false;
+  }
 }
 function openEmployee(row = null) {
   state.editEmployee = row;
