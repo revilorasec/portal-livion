@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#194682">
   <title>Hora Extra · Livion</title>
-  <link rel="stylesheet" href="./horas-producao.css?v=2">
+  <link rel="stylesheet" href="./horas-producao.css?v=3">
 </head>
 <body>
   <header class="top">
     <div class="brand"><img src="./livion-logo.svg" alt="Livion Solutions"><div><span>CONTROLE DE EQUIPE</span><h1>Hora Extra</h1></div></div>
-    <div class="top-actions"><span id="saveStatus" role="status">Conectando ao Portal…</span><button id="reloadBtn" type="button">Atualizar</button></div>
+    <div class="top-actions"><span id="saveStatus" role="status">Conectando ao Portal…</span><button id="configBtn" type="button" aria-pressed="false">⚙ Configurações</button><button id="reloadBtn" type="button">Atualizar</button></div>
   </header>
   <main>
     <div id="error" class="error" role="alert" hidden></div>
@@ -20,6 +20,14 @@
         <label>Mês e ano<input id="month" type="month" required></label>
       </section>
 
+      <nav class="tabs" aria-label="Áreas do aplicativo">
+        <button id="tabTeam" class="active" type="button" aria-pressed="true">Equipe lado a lado</button>
+        <button id="tabPerson" type="button" aria-pressed="false">Por funcionário</button>
+        <button id="tabCompare" type="button" aria-pressed="false">Comparativos</button>
+        <button id="tabConfig" type="button" aria-pressed="false">⚙ Configurações</button>
+      </nav>
+
+      <section id="configView" class="view" hidden>
       <section class="card settings">
         <div class="section-title"><div><span class="eyebrow">CONFIGURAÇÕES GERAIS</span><h2>Mesmos valores para todos os funcionários</h2></div><span id="settingsUpdated" class="muted"></span></div>
         <form id="settingsForm">
@@ -34,15 +42,10 @@
       </section>
 
       <section class="card staff">
-        <div class="section-title"><div><span class="eyebrow">FUNCIONÁRIOS E HORAS EXTRAS</span><h2>Cadastro e valor individual</h2><p>Cadastre cada funcionário e informe o valor total de suas horas extras no mês selecionado. Deixe vazio enquanto aguarda o contador; informe 0 para confirmar que não houve valor. Funcionários arquivados permanecem no histórico.</p></div><button id="addEmployee" class="primary" type="button">+ Funcionário</button></div>
+        <div class="section-title"><div><span class="eyebrow">FUNCIONÁRIOS</span><h2>Cadastrar funcionários</h2><p>Adicione um funcionário pelo nome. Cada um aparece abaixo com o valor oficial total de suas horas extras no mês selecionado. Campo vazio significa pendente; 0 significa zero confirmado.</p></div><button id="addEmployee" class="primary" type="button">+ Adicionar funcionário</button></div>
         <div id="staffList" class="staff-list"></div>
       </section>
-
-      <nav class="tabs" aria-label="Visões do aplicativo">
-        <button id="tabTeam" class="active" type="button" aria-pressed="true">Equipe lado a lado</button>
-        <button id="tabPerson" type="button" aria-pressed="false">Por funcionário</button>
-        <button id="tabCompare" type="button" aria-pressed="false">Comparativos</button>
-      </nav>
+      </section>
 
       <section id="teamView" class="view">
         <div id="teamMetrics" class="metrics"></div>
@@ -62,12 +65,8 @@
         <div id="personMetrics" class="metrics"></div>
         <section class="card">
           <div class="section-title"><div><span class="eyebrow">CONTADOR</span><h2>Horas extras oficiais</h2></div><span id="overtimeState"></span></div>
-          <p>Informe o <strong>valor total mensal em reais</strong> calculado pelo contador. Não é a quantidade de horas nem o valor por hora. Deixe vazio enquanto aguarda; digite 0 para registrar zero conferido.</p>
-          <form id="overtimeForm" class="overtime-form">
-            <label>Valor oficial do mês (R$)<input id="overtimeAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Aguardando contador"></label>
-            <label>Observação<input id="overtimeNote" maxlength="500" placeholder="Referência ou conferência do contador"></label>
-            <button class="primary" type="submit">Salvar valor oficial</button>
-          </form>
+          <div class="official-summary"><strong id="personOfficial">Pendente</strong><button id="editOfficial" type="button">Editar em Configurações</button></div>
+          <p id="personOfficialNote" class="muted"></p>
         </section>
         <section class="card"><div class="section-title"><div><span class="eyebrow">CALENDÁRIO INDIVIDUAL</span><h2>Horas, peças e observações</h2></div><span class="muted">1,5 hora = 1h30</span></div>
           <div class="table-wrap"><table id="personTable" class="day-table"></table></div>
@@ -98,7 +97,7 @@
     </div>
   </main>
   <dialog id="employeeDialog"><form id="employeeForm" method="dialog"><h2 id="employeeDialogTitle">Novo funcionário</h2><label>Nome<input id="employeeName" maxlength="120" required autocomplete="off"></label><div class="dialog-actions"><button id="cancelEmployee" type="button">Cancelar</button><button class="primary" type="submit">Salvar</button></div></form></dialog>
-  <dialog id="archiveDialog"><div><h2>Arquivar funcionário</h2><p id="archiveImpact"></p><p>Os registros existentes serão preservados para consulta histórica. Não será possível fazer novos lançamentos para este funcionário.</p><div class="dialog-actions"><button id="cancelArchive" type="button">Cancelar</button><button id="confirmArchive" class="danger" type="button">Arquivar funcionário</button></div></div></dialog>
-  <script type="module" src="./horas-producao.js?v=5"></script>
+  <dialog id="deleteDialog"><div><h2>Excluir funcionário?</h2><p id="deleteImpact"></p><p>O funcionário e todos os seus lançamentos de horas, peças e valores oficiais de todos os meses serão excluídos definitivamente. Essa ação não pode ser desfeita.</p><div class="dialog-actions"><button id="cancelDelete" type="button">Cancelar</button><button id="confirmDelete" class="danger" type="button">Excluir definitivamente</button></div></div></dialog>
+  <script type="module" src="./horas-producao.js?v=6"></script>
 </body>
 </html>

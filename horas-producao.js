@@ -5,7 +5,7 @@ const $ = id => document.getElementById(id);
 const fmtMoney = cents => cents === null || cents === undefined ? 'Pendente' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
 const fmtNum = (number, digits = 2) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: digits }).format(number);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const state = { data: null, month: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7), selected: '', tab: 'team', excluded: new Set(), editEmployee: null, archiveEmployee: null, busy: false };
+const state = { data: null, month: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7), selected: '', tab: 'team', excluded: new Set(), editEmployee: null, deleteEmployee: null, deleteImpact: null, busy: false };
 const errors = {
   UNAUTHENTICATED: 'Sua sessão terminou. Abra o aplicativo novamente pelo Portal Livion.',
   FORBIDDEN: 'Este aplicativo ainda não foi liberado para sua conta no Portal.',
@@ -122,7 +122,9 @@ function renderSettings() {
   $('addEmployee').hidden = !state.data.permissions.edit;
 }
 function renderStaff() {
-  const rows = employeeRows();
+  const rows = state.data.employees;
+  const selectable = employeeRows();
+  const selectableIds = new Set(selectable.map(row => row.id));
   const overtime = new Map(state.data.overtime.map(item => [item.employee_id, item]));
   $('staffList').innerHTML = rows.length ? rows.map(row => {
     const item = overtime.get(row.id);
@@ -130,16 +132,16 @@ function renderStaff() {
     const value = informed ? (item.amount_cents / 100).toFixed(2) : '';
     const disabled = editable(row) ? '' : 'disabled';
     return `<article class="staff-item ${row.archived_at ? 'archived' : ''}">
-      <div class="staff-heading"><strong>${esc(row.name)}</strong>${row.archived_at ? '<small>Arquivado</small>' : ''}<div class="staff-actions"><button class="outline" type="button" data-employee-open="${row.id}">Detalhes</button>${editable(row) ? `<button class="outline" type="button" data-employee-edit="${row.id}">Editar</button>` : ''}${state.data.permissions.archive && !row.archived_at ? `<button class="danger" type="button" data-employee-archive="${row.id}">Arquivar</button>` : ''}</div></div>
+      <div class="staff-heading"><strong>${esc(row.name)}</strong>${row.archived_at ? '<small>Registro antigo arquivado</small>' : ''}<div class="staff-actions">${selectableIds.has(row.id) ? `<button class="outline" type="button" data-employee-open="${row.id}">Detalhes</button>` : ''}${editable(row) ? `<button class="outline" type="button" data-employee-edit="${row.id}">Editar</button>` : ''}${state.data.permissions.delete ? `<button class="danger" type="button" data-employee-delete="${row.id}">Excluir</button>` : ''}</div></div>
       <form class="staff-overtime" data-overtime-employee="${row.id}" aria-label="Horas extras de ${esc(row.name)}">
         <label>Valor total da hora extra no mês (R$)<input data-overtime-amount type="number" min="0" step="0.01" inputmode="decimal" placeholder="Aguardando contador" value="${value}" ${disabled}></label>
         <label>Observação<input data-overtime-note maxlength="500" placeholder="Opcional" value="${esc(item?.note || '')}" ${disabled}></label>
         <div class="staff-overtime-foot"><span class="${informed ? 'confirmed-text' : 'pending-text'}">${informed ? `${fmtMoney(item.amount_cents)} registrado` : 'Pendente'}</span>${editable(row) ? '<button class="primary" type="submit">Salvar valor</button>' : ''}</div>
       </form>
     </article>`;
-  }).join('') : '<p class="empty">Nenhum funcionário cadastrado. Use “+ Funcionário” para começar.</p>';
-  if (!rows.some(row => row.id === state.selected)) state.selected = rows.find(row => !row.archived_at)?.id || rows[0]?.id || '';
-  $('selectedEmployee').innerHTML = rows.map(row => `<option value="${row.id}">${esc(row.name)}${row.archived_at ? ' (arquivado)' : ''}</option>`).join('');
+  }).join('') : '<p class="empty">Nenhum funcionário cadastrado. Use “+ Adicionar funcionário” para começar.</p>';
+  if (!selectableIds.has(state.selected)) state.selected = selectable.find(row => !row.archived_at)?.id || selectable[0]?.id || '';
+  $('selectedEmployee').innerHTML = selectable.map(row => `<option value="${row.id}">${esc(row.name)}${row.archived_at ? ' (registro antigo)' : ''}</option>`).join('');
   $('selectedEmployee').value = state.selected;
 }
 function renderTeam(m) {
@@ -161,15 +163,14 @@ function renderTeam(m) {
 }
 function renderPerson(m) {
   const row = m.rows.find(item => item.id === state.selected);
-  if (!row) { $('personMetrics').innerHTML = ''; $('personTable').innerHTML = ''; $('overtimeForm').hidden = true; $('overtimeState').textContent = 'Selecione um funcionário'; return; }
+  if (!row) { $('personMetrics').innerHTML = ''; $('personTable').innerHTML = ''; $('overtimeState').textContent = 'Selecione um funcionário'; $('personOfficial').textContent = 'Pendente'; $('personOfficialNote').textContent = ''; $('editOfficial').hidden = true; return; }
   const result = m.results.get(row.id);
   const official = m.overtime.get(row.id);
-  $('overtimeForm').hidden = false;
   $('personMetrics').innerHTML = metric('Bônus de horas', fmtMoney(result.bonus)) + metric('Produção', fmtMoney(result.production)) + metric('Subtotal', fmtMoney(result.subtotal)) + metric(result.total === null ? 'Parcial conhecido' : 'Total a pagar', fmtMoney(result.total ?? result.known), result.total === null ? 'pending' : 'total');
   $('overtimeState').textContent = result.official === null ? 'Aguardando contador' : 'Valor oficial registrado';
-  $('overtimeAmount').value = result.official === null ? '' : (result.official / 100).toFixed(2);
-  $('overtimeNote').value = official?.note || '';
-  for (const element of $('overtimeForm').querySelectorAll('input,button')) element.disabled = !editable(row);
+  $('personOfficial').textContent = fmtMoney(result.official);
+  $('personOfficialNote').textContent = official?.note || '';
+  $('editOfficial').hidden = !editable(row);
   $('personTable').innerHTML = `<thead><tr><th>Data</th><th>Horas previstas</th><th>Horas feitas</th><th>Peças</th><th>Observações</th></tr></thead><tbody>${m.days.map(day => {
     const item = m.entries.get(`${row.id}|${day.date}`);
     return `<tr class="${day.weekday === 0 ? 'sunday' : day.weekday === 6 ? 'saturday' : ''}"><td>${dayLabel(day)}</td><td>${plannedInput(day, m)}</td><td>${entryInput(row, day, item, 'actual_hours')}</td><td>${entryInput(row, day, item, 'pieces')}</td><td>${entryInput(row, day, item, 'note', 'text')}</td></tr>`;
@@ -230,11 +231,12 @@ function render() {
   renderSettings(); renderStaff();
   const m = calculated();
   renderTeam(m); renderPerson(m); renderCompare(m);
-  for (const tab of ['team', 'person', 'compare']) {
+  for (const tab of ['team', 'person', 'compare', 'config']) {
     $(`${tab}View`).hidden = state.tab !== tab;
     $(`tab${tab[0].toUpperCase() + tab.slice(1)}`).classList.toggle('active', state.tab === tab);
     $(`tab${tab[0].toUpperCase() + tab.slice(1)}`).setAttribute('aria-pressed', String(state.tab === tab));
   }
+  $('configBtn').setAttribute('aria-pressed', String(state.tab === 'config'));
 }
 async function load() {
   clearError(); status('Carregando dados…');
@@ -294,6 +296,7 @@ function openEmployee(row = null) {
 }
 
 $('reloadBtn').addEventListener('click', load);
+$('configBtn').addEventListener('click', () => { state.tab = 'config'; render(); $('configView').scrollIntoView({ block: 'start' }); });
 $('month').addEventListener('change', event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) { state.month = event.target.value; load(); } });
 $('settingsForm').addEventListener('submit', event => {
   event.preventDefault();
@@ -323,29 +326,30 @@ $('staffList').addEventListener('click', async event => {
   if (open) { state.selected = open.dataset.employeeOpen; state.tab = 'person'; render(); $('personView').scrollIntoView({ block: 'start' }); return; }
   const edit = event.target.closest('[data-employee-edit]');
   if (edit) { openEmployee(state.data.employees.find(row => row.id === edit.dataset.employeeEdit)); return; }
-  const archive = event.target.closest('[data-employee-archive]');
-  if (!archive) return;
-  const row = state.data.employees.find(item => item.id === archive.dataset.employeeArchive);
+  const remove = event.target.closest('[data-employee-delete]');
+  if (!remove) return;
+  const row = state.data.employees.find(item => item.id === remove.dataset.employeeDelete);
   try {
     const impact = await api(`/employees/${row.id}/impact`);
-    state.archiveEmployee = row;
-    $('archiveImpact').textContent = `${row.name}: ${impact.entries} lançamento(s) diário(s) e ${impact.overtime} registro(s) de valor oficial serão mantidos.`;
-    $('archiveDialog').showModal();
+    state.deleteEmployee = row;
+    state.deleteImpact = impact;
+    $('deleteImpact').textContent = `${row.name}: ${impact.entries} lançamento(s) diário(s) e ${impact.overtime} valor(es) oficial(is) serão excluídos junto com o cadastro.`;
+    $('deleteDialog').showModal();
   } catch (error) { showError(error); }
 });
-$('cancelArchive').addEventListener('click', () => $('archiveDialog').close());
-$('confirmArchive').addEventListener('click', () => {
-  const row = state.archiveEmployee;
-  $('archiveDialog').close();
-  if (row) save(`/employees/${row.id}`, 'DELETE', { revision: row.revision });
+$('cancelDelete').addEventListener('click', () => $('deleteDialog').close());
+$('confirmDelete').addEventListener('click', () => {
+  if (state.busy) return;
+  const row = state.deleteEmployee, impact = state.deleteImpact;
+  $('deleteDialog').close();
+  if (row && impact) save(`/employees/${row.id}`, 'DELETE', { revision: row.revision, expected_entries: impact.entries, expected_overtime: impact.overtime });
 });
-for (const tab of ['team', 'person', 'compare']) $(`tab${tab[0].toUpperCase() + tab.slice(1)}`).addEventListener('click', () => { state.tab = tab; render(); });
+for (const tab of ['team', 'person', 'compare', 'config']) $(`tab${tab[0].toUpperCase() + tab.slice(1)}`).addEventListener('click', () => { state.tab = tab; render(); });
 $('selectedEmployee').addEventListener('change', event => { state.selected = event.target.value; renderPerson(calculated()); });
-$('overtimeForm').addEventListener('submit', event => {
-  event.preventDefault();
-  if (!state.selected) return;
-  const row = state.data.overtime.find(item => item.employee_id === state.selected);
-  try { save('/overtime', 'PUT', { month: state.month, employee_id: state.selected, amount_cents: cents($('overtimeAmount').value), note: $('overtimeNote').value, revision: row?.revision || 0 }); } catch (error) { showError(error); }
+$('editOfficial').addEventListener('click', () => {
+  state.tab = 'config'; render();
+  const form = [...$('staffList').querySelectorAll('[data-overtime-employee]')].find(item => item.dataset.overtimeEmployee === state.selected);
+  if (form) { form.scrollIntoView({ block: 'center' }); form.querySelector('[data-overtime-amount]').focus(); }
 });
 async function editGrid(event) {
   const element = event.target;

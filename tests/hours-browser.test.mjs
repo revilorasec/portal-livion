@@ -40,7 +40,7 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     let result, status = 200;
     if (path.startsWith('bootstrap')) {
       const month = new URL(request.url()).searchParams.get('month');
-      result = { month, employees, settings: settings || { month: month + '-01', bonus_cents: 0, piece_cents: 0, weekday_hours: 0, saturday_hours: 0, revision: 0 }, plans, entries, overtime: overtime.filter(row => row.month === month), permissions: { edit: true, archive: true } };
+      result = { month, employees, settings: settings || { month: month + '-01', bonus_cents: 0, piece_cents: 0, weekday_hours: 0, saturday_hours: 0, revision: 0 }, plans, entries, overtime: overtime.filter(row => row.month === month), permissions: { edit: true, delete: true } };
     } else if (path === 'employees' && request.method() === 'POST') {
       result = { id: employees.length ? otherId : id, name: input.name, archived_at: null, revision: 1 };
       employees.push(result); status = 201;
@@ -57,13 +57,21 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
       const employeeId = path.split('/')[1];
       result = { entries: entries.filter(row => row.employee_id === employeeId).length, overtime: overtime.filter(row => row.employee_id === employeeId).length };
     } else if (path === `employees/${id}` && request.method() === 'DELETE') {
-      employees[0].archived_at = new Date().toISOString(); result = employees[0];
+      const counts = { entries: entries.filter(row => row.employee_id === id).length, overtime: overtime.filter(row => row.employee_id === id).length };
+      assert.equal(input.expected_entries, counts.entries);
+      assert.equal(input.expected_overtime, counts.overtime);
+      employees.splice(employees.findIndex(row => row.id === id), 1);
+      for (const rows of [entries, overtime]) for (let index = rows.length - 1; index >= 0; index--) if (rows[index].employee_id === id) rows.splice(index, 1);
+      result = { deleted: id, removed: counts };
     } else { status = 404; result = { error: 'NOT_FOUND' }; }
     await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(result) });
   });
     await page.goto(`http://127.0.0.1:${port}/__harness__`);
     const app = page.frameLocator('iframe');
     await app.locator('#app').waitFor({ state: 'visible' });
+    assert.equal(await app.locator('#configView').isVisible(), false);
+    await app.locator('#configBtn').click();
+    assert.equal(await app.locator('#configView').isVisible(), true);
     await app.locator('#addEmployee').click();
     await app.locator('#employeeName').fill('Gian Luca');
     await app.locator('#employeeForm button[type=submit]').click();
@@ -84,12 +92,14 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     await app.locator('#weekdayHours').fill('4');
     await app.locator('#saturdayHours').fill('0');
     await app.locator('#settingsForm button[type=submit]').click();
+    await app.locator('#tabTeam').click();
     await app.locator('#matrix [data-entry-id]').first().fill('2');
     await app.locator('#matrix [data-entry-id]').first().dispatchEvent('change');
     await app.locator('#tabPerson').click();
-    assert.equal(await app.locator('#overtimeAmount').inputValue(), '150.25');
+    assert.match(await app.locator('#personOfficial').innerText(), /150,25/);
     await page.reload();
     await app.locator('#app').waitFor({ state: 'visible' });
+    await app.locator('#tabConfig').click();
     assert.equal(await app.locator('#staffList').getByText('Gian Luca').count(), 1);
     assert.equal(await gianExtra.locator('[data-overtime-amount]').inputValue(), '150.25');
     assert.equal(await anaExtra.locator('[data-overtime-amount]').inputValue(), '0.00');
@@ -98,7 +108,9 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     await app.locator('#tabCompare').click();
     assert.match(await app.locator('#comparisonTable').innerText(), /Diferença para o grupo/);
     await app.locator('#tabPerson').click();
-    assert.equal(await app.locator('#overtimeAmount').inputValue(), '150.25');
+    assert.match(await app.locator('#personOfficial').innerText(), /150,25/);
+    await app.locator('#editOfficial').click();
+    assert.equal(await app.locator('#configView').isVisible(), true);
     const currentMonth = await app.locator('#month').inputValue();
     const [year, month] = currentMonth.split('-').map(Number);
     const nextMonth = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
@@ -112,11 +124,15 @@ test('navega, salva e reencontra os lançamentos após recarregar', { skip: !pla
     await gianExtra.locator('[data-overtime-amount][value="150.25"]').waitFor();
     assert.equal(await gianExtra.locator('[data-overtime-amount]').inputValue(), '150.25');
     assert.equal(await anaExtra.locator('[data-overtime-amount]').inputValue(), '0.00');
-    await app.locator(`[data-employee-archive="${id}"]`).click();
-    await app.locator('#archiveImpact').getByText(/1 lançamento/).waitFor();
-    await app.locator('#confirmArchive').click();
-    await app.locator('#staffList').getByText('Arquivado').waitFor();
-    assert.equal(entries.length, 1);
+    await app.locator(`[data-employee-delete="${id}"]`).click();
+    await app.locator('#deleteImpact').getByText(/1 lançamento/).waitFor();
+    await app.locator('#cancelDelete').click();
+    assert.equal(employees.length, 2);
+    await app.locator(`[data-employee-delete="${id}"]`).click();
+    await app.locator('#confirmDelete').click();
+    await gianExtra.waitFor({ state: 'detached' });
+    assert.equal(entries.length, 0);
+    assert.equal(overtime.length, 1);
     await page.locator('iframe').evaluate(frame => { frame.style.width = '375px'; });
     await app.locator('#tabTeam').click();
     const mobile = await app.locator('html').evaluate(html => ({ page: html.scrollWidth, viewport: html.clientWidth, matrix: document.querySelector('#matrix').scrollWidth, wrap: document.querySelector('#matrix').parentElement.clientWidth }));

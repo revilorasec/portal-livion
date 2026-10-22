@@ -80,15 +80,19 @@ test('bônus e valor por peça são compartilhados, sem dividir o bônus entre p
   assert.equal(b.production, 200);
 });
 
-test('app usa sessão do Portal, armazenamento remoto e arquivamento com histórico', () => {
+test('app usa sessão do Portal e só exclui após mostrar impacto e confirmar', () => {
   const ui = readFileSync(new URL('../horas-producao.js', import.meta.url), 'utf8');
   const api = readFileSync(new URL('../supabase/functions/hours-api/index.ts', import.meta.url), 'utf8');
   const schema = readFileSync(new URL('../supabase/migrations/20261022170000_hours_production_payments.sql', import.meta.url), 'utf8');
+  const deletion = readFileSync(new URL('../supabase/migrations/20261022182000_hours_employee_hard_delete.sql', import.meta.url), 'utf8');
   assert.match(ui, /__PORTAL_GET_TOKEN__/);
   assert.doesNotMatch(ui, /localStorage|sessionStorage/);
+  assert.match(ui, /deleteImpact/);
+  assert.match(ui, /expected_entries: impact\.entries/);
   assert.match(api, /portal-api\/context/);
-  assert.match(api, /archived_at:/);
-  assert.doesNotMatch(api, /from\('hours_employees'\)\.delete/);
+  assert.match(api, /from\('hours_employees'\)\.delete\(\)/);
+  assert.match(api, /HOURS_EMPLOYEE_DELETE/);
+  assert.equal((deletion.match(/on delete cascade/g) || []).length, 2);
   assert.match(schema, /amount_cents integer check/);
   assert.match(schema, /revoke all on public\.hours_employees/);
 });

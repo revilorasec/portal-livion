@@ -48,7 +48,7 @@ async function access(req: Request) {
   return {
     email: String(ctx.user?.email || '').toLowerCase(),
     edit: can(`${APP}.editar`),
-    archive: can(`${APP}.excluir`)
+    delete: can(`${APP}.excluir`)
   };
 }
 function need(value: boolean) { if (!value) fail('FORBIDDEN'); }
@@ -146,12 +146,12 @@ async function bootstrap(month: string, permissions: any) {
       saturday_hours: 0, revision: 0
     },
     plans, entries, overtime,
-    permissions: { edit: permissions.edit, archive: permissions.archive },
+    permissions: { edit: permissions.edit, delete: permissions.delete },
     through: end
   };
 }
 async function impact(id: string) {
-  await employee(id, true);
+  await employee(id);
   const [entries, overtime] = await Promise.all([
     db.from('hours_entries').select('employee_id', { count: 'exact', head: true }).eq('employee_id', id),
     db.from('hours_overtime').select('employee_id', { count: 'exact', head: true }).eq('employee_id', id)
@@ -174,7 +174,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers(origin) });
   const path = new URL(req.url).pathname.replace(/^.*\/hours-api\/?/, '');
   if (req.method === 'GET' && path === 'health')
-    return reply(origin, 200, { ok: true, service: 'hours-api', version: 1 });
+    return reply(origin, 200, { ok: true, service: 'hours-api', version: 2 });
   try {
     const actor = await access(req);
     const url = new URL(req.url);
@@ -182,7 +182,7 @@ Deno.serve(async (req: Request) => {
       return reply(origin, 200, await bootstrap(monthKey(url.searchParams.get('month')), actor));
     }
     if (req.method === 'GET' && /^employees\/[0-9a-f-]+\/impact$/i.test(path)) {
-      need(actor.archive);
+      need(actor.delete);
       return reply(origin, 200, await impact(uuid(path.split('/')[1])));
     }
     if (req.method === 'POST' && path === 'employees') {
@@ -210,20 +210,19 @@ Deno.serve(async (req: Request) => {
       return reply(origin, 200, result);
     }
     if (req.method === 'DELETE' && /^employees\/[0-9a-f-]+$/i.test(path)) {
-      need(actor.archive);
+      need(actor.delete);
       const id = uuid(path.split('/')[1]), input = await body(req);
-      await employee(id, true);
+      await employee(id);
       const expected = revision(input.revision);
       if (expected === 0) fail('INVALID_REVISION');
       const counts = await impact(id);
-      const result = await query(db.from('hours_employees').update({
-        archived_at: new Date().toISOString(), revision: expected + 1,
-        updated_at: new Date().toISOString(), updated_by: actor.email
-      }).eq('id', id).eq('revision', expected).is('archived_at', null)
-        .select('id,name,archived_at,revision').maybeSingle());
+      if (counts.entries !== integer(input.expected_entries, 1000000, 'INVALID_IMPACT') ||
+          counts.overtime !== integer(input.expected_overtime, 1000000, 'INVALID_IMPACT')) fail('CONFLICT');
+      const result = await query(db.from('hours_employees').delete()
+        .eq('id', id).eq('revision', expected).select('id,name').maybeSingle());
       if (!result) fail('CONFLICT');
-      await audited(actor.email, 'HOURS_EMPLOYEE_ARCHIVE', id, counts);
-      return reply(origin, 200, { ...result, preserved: counts });
+      await audited(actor.email, 'HOURS_EMPLOYEE_DELETE', id, { ...counts, name: result.name });
+      return reply(origin, 200, { deleted: result.id, removed: counts });
     }
     if (req.method === 'PUT' && path === 'settings') {
       need(actor.edit);
