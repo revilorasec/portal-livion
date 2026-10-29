@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const source = readFileSync(new URL('../supabase/functions/finance-api/index.ts', import.meta.url), 'utf8').replace(/^import[^\n]+\n/, '');
 const html = '<!doctype html><html><body>dashboard:4d7a3151-8d62-4c70-9031-e1bc4e03c9c7 Synthetic only</body></html>';
 const hash = async body => Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body))).toString('hex');
-function harness(override = {}) {
+function harness(override = {}, authStatus = 200) {
   let handler, writes = [], snapshot = null, ctx = { authenticated: true, administrator: true, profile: 'ADMINISTRADOR', userType: 'INTERNO', apps: ['painel-financeiro'], user: { email: 'synthetic@example.test' }, ...override };
   class Query {
     constructor(table) { this.table = table; }
@@ -27,7 +27,7 @@ function harness(override = {}) {
   vm.runInContext(stripTypeScriptTypes(source), vm.createContext({
     createClient: () => ({ from: table => new Query(table) }),
     Deno: { env: { get: () => 'https://example.test' }, serve: cb => { handler = cb; } },
-    fetch: async () => new Response(JSON.stringify(ctx)), Response, Request, URL, AbortSignal, Uint8Array, TextDecoder, TextEncoder, crypto, console
+    fetch: async () => new Response(JSON.stringify(ctx), { status: authStatus }), Response, Request, URL, AbortSignal, Uint8Array, TextDecoder, TextEncoder, crypto, console
   }));
   return { writes, setSnapshot: value => { snapshot = value; }, call: (path, options = {}) => handler(new Request('https://example.test/functions/v1/finance-api' + path, { headers: { authorization: 'Bearer ' + 'x'.repeat(30) }, ...options })) };
 }
@@ -57,6 +57,14 @@ test('private content has no-store/nosniff, exact integrity, immutable duplicate
   assert.equal((await upload()).status, 200);
   assert.equal(h.writes.find(w => w.table === 'access_audit').value.detail.html, undefined);
   assert.ok(h.writes.every(w => ['finance_snapshots','access_audit'].includes(w.table)));
+});
+test('authentication service failures never release content or perform writes', async () => {
+  for (const [upstream, expected] of [[401,401],[403,403],[500,503]]) {
+    const h = harness({}, upstream);
+    assert.equal((await h.call('/snapshot')).status, expected);
+    assert.equal((await h.call('/snapshots', { method: 'POST' })).status, expected);
+    assert.equal(h.writes.length, 0);
+  }
 });
 test('integrity, dates, size and stale snapshots fail before persistence', async () => {
   const h = harness(), sha256 = await hash(html);

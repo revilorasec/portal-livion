@@ -1,6 +1,6 @@
 # Painel Financeiro Livion
 
-Implantação: 28/10/2026. Entrada: https://portal.livionsolutions.com.br/?app=painel-financeiro
+Implantação iniciada em 28/10/2026; conferência de servidor concluída em 29/10/2026. Entrada: https://portal.livionsolutions.com.br/?app=painel-financeiro
 
 ## Arquitetura e acesso
 
@@ -26,3 +26,13 @@ A rotina existente `livion-html-financeiro-di-rio-s-17h`, às 17h de Brasília, 
 Testes: `node --test tests/finance-security.test.mjs`. Cobrem falta de token/origem indevida, perfis e público recusados, hash, limite de tamanho, data inválida, regressão de data, versão duplicada, auditoria sem conteúdo e isolamento da página pública. Verificar adicionalmente na produção: leitura autorizada, não autorizado, RLS, igualdade do hash, gráficos/navegação/CSV e responsividade. HTTP 200 no health não comprova login ou acesso ao painel.
 
 Migration aplicada: `20261029023110_finance_private_snapshots.sql`. Função nova isolada `finance-api`, sem alteração do portal-api ou funções de outros apps. O cartão é criado inativo e só ativado após a página pública estar disponível. Para suspender, desativar apenas o cartão no catálogo; não apagar versões ou usuários.
+
+## Estado publicado e limites — 29/10/2026
+
+- Código inicial publicado no commit `d3a4ff3`; Portal `2026.10.28.1`; função `finance-api` v1 ativa. O domínio oficial serviu index.html, app.mjs e style.css com conteúdo exatamente igual ao validado localmente.
+- Importado o HTML original da coleta 28/10/2026: 6.005.739 bytes, SHA-256 `19a4cd6f0618202370fc7f7d6c28dfb6bcc6743cec11a11b79f8e4d929b7de32`. Readback pelo banco confirmou tamanho e hash completos. O cartão está ativo. Importação inicial auditada como `deployment:codex`, sem se passar por usuário real.
+- O conector recusou uma requisição SQL única pelo tamanho. A migration `20261029111439_finance_private_import_stage.sql` criou staging privado para transferência retomável em 34 partes. A montagem só foi aceita com hash/tamanho exatos; depois da confirmação foram removidas exclusivamente essas 34 partes temporárias. A versão integral permanece privada. O estágio vazio continua disponível para retomadas futuras, sem grants públicos.
+- Produção: GET de snapshot/access sem token -> 401; token inválido -> 401; origem indevida -> 403; REST com chave pública -> 401/permission denied. RLS ligado e SELECT/INSERT negados a anon/authenticated. Advisors do novo módulo apresentam somente INFO de RLS sem políticas, intencional para acesso exclusivo pelo servidor. Os avisos preexistentes de outros módulos não foram alterados.
+- Os 12 registros de usuários foram preservados integralmente: checksum antes/depois `da3845a55bd9b1033aae423bfe6af4f1`.
+- Abertura autenticada, inspeção visual final, exportação CSV e responsividade em produção **pendentes**. O Portal mostrou indisponibilidade durante a renovação de sessão. A automação do navegador encerrou o controle por não conseguir confirmar a URL de um iframe about:srcdoc isolado; nenhum contorno foi feito. A publicação e o readback de servidor não comprovam esses testes de navegador.
+- A rotina diária existente permanece inalterada: coleta e HTML local, com importação privada manual após validação. Não criar rotina concorrente nem afirmar atualização automática do Portal.
