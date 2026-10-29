@@ -30,8 +30,8 @@ async function call(path, options = {}) {
 function clear() { $('dashboard').hidden = true; $('dashboard').removeAttribute('srcdoc'); $('importer').hidden = true; $('version').textContent = ''; token = ''; }
 function message(error) {
   return ({ SESSION_REQUIRED: 'Abra este app pelo Portal Livion com sua conta corporativa.',
-    ACCESS_DENIED: 'Acesso restrito aos administradores internos já autorizados no Portal.',
-    NO_SNAPSHOT: 'Nenhuma versão foi importada. Selecione o HTML validado abaixo.',
+    ACCESS_DENIED: 'Seu usuário não tem permissão para esta ação no Painel Financeiro. Confira a liberação do aplicativo e a permissão de visualizar no Portal.',
+    NO_SNAPSHOT: 'Nenhuma versão financeira está disponível. Um administrador precisa importar o HTML validado.',
     HASH_MISMATCH: 'O arquivo não passou pela verificação de integridade.',
     OLDER_SNAPSHOT: 'Há uma coleta mais recente publicada. Esta versão anterior foi recusada.',
     INVALID_SNAPSHOT: 'Selecione o HTML portátil validado deste painel.' })[error.message] || 'O serviço privado não respondeu. Tente atualizar novamente.';
@@ -40,9 +40,9 @@ async function load() {
   const current = ++generation; clear(); $('status').hidden = false; $('status').textContent = 'Validando acesso privado…';
   try {
     token = await portalToken();
-    await call('/access');
+    const permission = await (await call('/access')).json();
     if (current !== generation) return;
-    $('importer').hidden = false;
+    $('importer').hidden = !permission.canImport;
     const response = await call('/snapshot'), html = await response.text();
     const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(html))), x => x.toString(16).padStart(2, '0')).join('');
     if (hash !== response.headers.get('x-snapshot-sha256')) throw new Error('HASH_MISMATCH');

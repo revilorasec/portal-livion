@@ -44,6 +44,29 @@ test('missing token, bad origin, ordinary and external profiles cannot read or i
   assert.equal((await harness({ userType: 'CLIENTE' }).call('/snapshot')).status, 403);
   assert.equal((await harness({ apps: [] }).call('/snapshot')).status, 403);
 });
+test('an explicitly authorized partner can read the snapshot without administrator or import access', async () => {
+  const h = harness({ administrator: false, profile: 'SOCIO', companies: ['LIVION'],
+    actions: ['painel-financeiro.visualizar', 'painel-financeiro.importar'] });
+  h.setSnapshot({ html, sha256: await hash(html), snapshot_date: '2026-10-28' });
+  const permission = await h.call('/access');
+  assert.equal(permission.status, 200);
+  assert.deepEqual(await permission.json(), { authorized: true, canImport: false });
+  const response = await h.call('/snapshot');
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), html);
+  assert.equal((await h.call('/snapshots', { method: 'POST' })).status, 403);
+  assert.equal(h.writes.length, 0);
+});
+test('profile, app alone, wildcard alone, foreign company or external audience never grants financial read access', async () => {
+  const authorized = { administrator: false, profile: 'SOCIO', companies: ['LIVION'], actions: ['painel-financeiro.visualizar'] };
+  for (const override of [{ actions: [] }, { actions: ['*'] }, { apps: [] }, { companies: [] },
+    { companies: ['OTHER'] }, { userType: 'CLIENTE' }, { userType: 'PARCEIRO' }, { authenticated: false }]) {
+    const h = harness({ ...authorized, ...override });
+    assert.equal((await h.call('/snapshot')).status, 403);
+    assert.equal((await h.call('/access')).status, 403);
+    assert.equal(h.writes.length, 0);
+  }
+});
 test('private content has no-store/nosniff, exact integrity, immutable duplicates and audit without content', async () => {
   const h = harness(), sha256 = await hash(html);
   const upload = () => h.call('/snapshots', { method: 'POST', headers: { authorization: 'Bearer ' + 'x'.repeat(30), 'content-type': 'text/html', 'x-snapshot-date': '2026-10-28', 'x-snapshot-sha256': sha256 }, body: html });

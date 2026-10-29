@@ -26,11 +26,16 @@ async function access(req: Request) {
   if (response.status === 403) fail('FORBIDDEN');
   if (!response.ok) fail('AUTH_UNAVAILABLE');
   const ctx = await response.json();
-  // Existing global administrator rule only. No implicit finance/payroll grants.
-  if (ctx?.authenticated !== true || ctx.administrator !== true || ctx.profile !== 'ADMINISTRADOR' ||
-      ctx.userType !== 'INTERNO' || !Array.isArray(ctx.apps) || !ctx.apps.includes(APP) ||
+  // Respect explicit Portal app/action grants; a profile alone never grants financial data.
+  if (ctx?.authenticated !== true || ctx.userType !== 'INTERNO' ||
+      !Array.isArray(ctx.apps) || !ctx.apps.includes(APP) ||
       !ctx.user?.email) fail('FORBIDDEN');
-  return ctx;
+  const administrator = ctx.administrator === true && ctx.profile === 'ADMINISTRADOR';
+  const actions = Array.isArray(ctx.actions) ? ctx.actions : [];
+  const companies = Array.isArray(ctx.companies) ? ctx.companies : [];
+  if (!administrator && (!actions.includes(`${APP}.visualizar`) ||
+      !companies.some((company: string) => ['LIVION', 'RHCS', '*'].includes(company)))) fail('FORBIDDEN');
+  return { ...ctx, canImport: administrator };
 }
 async function boundedBody(req: Request) {
   if (Number(req.headers.get('content-length') || 0) > MAX_BYTES) fail('TOO_LARGE');
@@ -63,9 +68,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers() });
   try {
     const path = new URL(req.url).pathname.split('/finance-api')[1] || '/';
-    if (path === '/health' && req.method === 'GET') return json(200, { service: 'finance-api', version: 1 });
+    if (path === '/health' && req.method === 'GET') return json(200, { service: 'finance-api', version: 2 });
     const ctx = await access(req);
-    if (path === '/access' && req.method === 'GET') return json(200, { authorized: true, canImport: true });
+    if (path === '/access' && req.method === 'GET') return json(200, { authorized: true, canImport: ctx.canImport });
     if (path === '/snapshot' && req.method === 'GET') {
       const row = await latest(true);
       if (!row) return json(404, { error: 'NO_SNAPSHOT' });
@@ -73,6 +78,7 @@ Deno.serve(async (req: Request) => {
         'X-Snapshot-Sha256': row.sha256, 'X-Snapshot-Date': row.snapshot_date } });
     }
     if (path === '/snapshots' && req.method === 'POST') {
+      if (!ctx.canImport) fail('FORBIDDEN');
       if (!(req.headers.get('content-type') || '').startsWith('text/html')) fail('INVALID_SNAPSHOT');
       const date = req.headers.get('x-snapshot-date') || '';
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date + 'T12:00:00Z')) || new Date(date + 'T12:00:00Z').toISOString().slice(0, 10) !== date) fail('INVALID_DATE');
