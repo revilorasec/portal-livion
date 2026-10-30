@@ -42,3 +42,29 @@ Migration aplicada: `20261029023110_finance_private_snapshots.sql`. Função nov
 A v1 exigia administrador para toda leitura, bloqueando usuários que já tinham recebido o aplicativo e a ação de visualizar pela administração do Portal. A `finance-api` v2 passa a respeitar essas autorizações existentes. `/access` informa `canImport` separadamente; a interface v2 oculta a importação de quem só pode consultar e apresenta mensagem de permissão coerente com a regra atual. O POST permanece bloqueado no servidor para não administradores.
 
 Sete testes locais passam, incluindo sócio interno com grants explícitos lendo sem poder importar, falta de ação/app/empresa, wildcard isolado, público externo e falha no serviço de autenticação. A confirmação dos grants no banco e os testes de autorização não equivalem a login real na conta de outro usuário; a reabertura por esse usuário deve ser conferida na sessão dele.
+
+## Detalhes por gráfico e diferença parcial — 29/10/2026
+
+Nova revisão privada publicada, mantendo a coleta em 28/10/2026: SHA-256 `25711e02102d7308df2849d331544a54f61fc2a91d6a7953d5886fb53fe7311c`, 5.934.366 bytes. A versão anterior foi preservada. As 43 queries revisadas, dados de origem, identidade do dashboard e runtime foram mantidos; somente o conteúdo autoral e o estado de conclusão da interface mudaram. Nenhum HTML preenchido, dataset ou fonte foi colocado em Git/Pages.
+
+- Clicar numa barra abre a ação de consultar seus registros. Nos recebíveis, **Ver títulos com datas** lista cliente, documento/parcela, projeto, emissão, vencimento, saldo, situação e atraso, respeitando todos os filtros já aplicados. Há total, busca, paginação, CSV e detalhe individual com retorno à mesma lista. A seleção por cliente também abre seus títulos.
+- Os gráficos mensais abrem as notas ou títulos do mês e série selecionados. O comparativo abre notas, custos/fontes ou a memória da diferença, conforme a barra escolhida. Datas contratuais continuam distintas de baixas efetivas.
+- A terceira série é **Diferença parcial = faturamento fiscal − custos identificados**. Ela não é lucro final nem dinheiro disponível. O IPI de Transceivers continua incluído no faturamento fiscal da terceira barra; tabela e memória mostram também o saldo depois de separar o IPI. Custos, encargos, créditos e apurações fiscais pendentes não foram preenchidos como zero. Lucro exato permanece não apurado.
+- Foram verificados na prévia: recorte por projeto, mês, filtro FUST, limpar filtros, notas por projeto, memória do IPI, retorno da parcela à lista e CSV com escopo, totais e datas corretos. A sessão autenticada de administrador no Portal carregou a revisão publicada; a terceira série, memória da diferença e títulos de Reparos foram abertos em produção. Não houve login na conta de outro usuário.
+- Readback do banco confirmou hash/tamanho completos. Endpoints de snapshot e REST público continuam recusando acesso sem sessão. Os 12 usuários e seus grants permaneceram idênticos, e a `finance-api` v2 não foi modificada. Partes temporárias de transferência foram descartadas somente após validar a revisão integral.
+
+Manutenção do conteúdo autoral continua no projeto original privado indicado pelo handoff, em `src/content/dashboard/ProjectDashboard.jsx` e `chart-details.js`. Preservar as ações de detalhamento e as três séries ao atualizar a coleta. Não rerodar scripts antigos que reconstruam a interface a partir de backups. A rotina diária existente não foi alterada nem duplicada.
+
+## Períodos, contas a pagar e relatórios — 30/10/2026
+
+A revisão privada `74759c917d775d2f01b141c3a5f679c359ecb77b098c00b3dc746710c7fa14bd` foi publicada e aberta no Portal autenticado. A coleta continua em 28/10/2026, com as mesmas 43 queries e o mesmo runtime.
+
+- O comparativo permite escolher o intervalo de apuração dentro da cobertura revisada. Faturamento usa emissão e folha usa competência mensal integral. Custos anuais sem data ficam separados no recorte personalizado, sem rateio; ausência de custo datado não vira zero. A diferença é parcial e não é lucro fechado.
+- Cada barra abre os itens do projeto e categoria escolhidos. Custos detalham CMV e holerites/FGTS, mantendo os totais anuais sem abertura identificados como agregados. Notas do recorte são listadas integralmente.
+- A aba Contas a pagar tem filtros de vencimento, fornecedor, projeto, categoria e situação na coleta, além de gráficos e documentos detalhados. Não efetua pagamentos ou baixas.
+- As listas autorais mostram todos os itens por padrão, com rolagem, busca e ordenação; oito por página continua opcional. Busca, CSV e relatório da lista compartilham o mesmo recorte.
+- Relatórios da visão, da lista e geral geram HTML independente com gráficos e tabelas completas, sem recursos remotos. Abra o arquivo e use Imprimir / salvar em PDF. O geral independe dos filtros locais; relatórios da visão/lista os respeitam. Relatórios de lista incluem a busca aplicada.
+
+Correção de download preparada para o shell `app.mjs?v=3`: o iframe isolado envia somente o arquivo explicitamente gerado para a camada autenticada. O receptor exige o `contentWindow` atual, origem opaca, sessão ativa, MIME HTML/CSV, extensão compatível, nome seguro, identificador único e limite de tamanho. Mensagens repetidas, outros emissores, tipos executáveis e sessão encerrada são rejeitados. O sandbox permanece sem `allow-same-origin`; nenhum token é enviado ao quadro.
+
+O artefato privado que usa a correção é `2252239e74938f3d35f019cd9877f093c8febad411a301123c852ef916ac5a06`. Oito testes de autenticação e download sintético passaram. A publicação do shell e a verificação do download autenticado dessa correção estão pendentes da autorização explícita para main, solicitada após a rejeição anterior do auto-review. Nenhum dataset ou HTML preenchido deve entrar neste repositório.
