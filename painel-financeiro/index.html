@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' blob: data:; style-src 'self' 'unsafe-inline'; img-src data: blob: https:; font-src data:; worker-src blob:; connect-src https://kvfjjtkwxxbvzlicwnrz.supabase.co blob:; frame-src 'self' about: blob:; base-uri 'none'; form-action 'none'">
-<title>Painel Financeiro Livion</title><link rel="stylesheet" href="./style.css?v=1"><script type="module" src="./app.mjs?v=3"></script></head>
+<title>Painel Financeiro Livion</title><link rel="stylesheet" href="./style.css?v=1"><script type="module" src="./app.mjs?v=4"></script></head>
 <body><header><strong>Painel Financeiro Livion</strong><span id="version"></span><button id="refresh">Atualizar</button><a href="../?app=painel-financeiro" target="_top">Portal Livion</a></header>
+<div id="exportStatus" role="status" aria-live="polite"></div><a id="exportDownload" hidden download>Baixar arquivo gerado</a>
 <main id="status" role="status">Validando acesso privado…</main>
 <details id="importer" hidden><summary>Importar versão validada</summary><p>Selecione o HTML portátil validado. As versões anteriores são preservadas no armazenamento privado.</p>
 <label>Data da coleta <input id="date" type="date" required></label><label>HTML validado <input id="file" type="file" accept=".html,text/html"></label>
