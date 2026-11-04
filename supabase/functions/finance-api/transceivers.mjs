@@ -1,6 +1,6 @@
 export const technicalFields=['fabricante','modelo','partNumber','tipo','velocidade','distancia','comprimentoOnda','fibra','fibras','conector','observacoes'];
 export const normalizedRef=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/^NF(?:-?E)?\s*[:#-]?\s*/,'').replace(/[^A-Z0-9]/g,'');
-export const operationKey=r=>[r.kind,normalizedRef(r.document),r.product_code.toUpperCase(),r.kind==='purchase'?normalizedRef(r.lot):''].join('|');
+export const operationKey=r=>[r.kind,normalizedRef(r.document),r.product_code.toUpperCase(),r.kind==='purchase'?[normalizedRef(r.counterparty),normalizedRef(r.lot)].join(':'):''].join('|');
 const fail=code=>{throw Error(code);};
 const text=(value,max=160)=>typeof value==='string'&&value.trim().length<=max?value.trim():fail('INVALID_TRANSCEIVER');
 export function validateCatalog(input){
