@@ -28,7 +28,7 @@ async function access(req: Request) {
   if (!response.ok) fail('AUTH_UNAVAILABLE');
   const ctx = await response.json();
   // Respect explicit Portal app/action grants; a profile alone never grants financial data.
-  if (ctx?.authenticated !== true || ctx.userType !== 'INTERNO' ||
+  if (ctx?.authenticated !== true || !['INTERNO','PARCEIRO'].includes(ctx.userType) ||
       !Array.isArray(ctx.apps) || !ctx.apps.includes(APP) ||
       !ctx.user?.email) fail('FORBIDDEN');
   const administrator = ctx.administrator === true && ctx.profile === 'ADMINISTRADOR';
@@ -82,6 +82,13 @@ Deno.serve(async (req: Request) => {
     const path = new URL(req.url).pathname.split('/finance-api')[1] || '/';
     if (path === '/health' && req.method === 'GET') return json(200, { service: 'finance-api', version: 3 });
     const ctx = await access(req);
+    if (path === '/accounting-stock' && req.method === 'GET') {
+      if(!ctx.canImport&&!ctx.companies?.some((company:string)=>['LIVION','*'].includes(company)))fail('FORBIDDEN');
+      const result=await db.rpc('finance_inventory_accounting');
+      if(result.error||!result.data||!Array.isArray(result.data.rows))fail('DATA_UNAVAILABLE');
+      if(new TextEncoder().encode(JSON.stringify(result.data)).length>MAX_BYTES)fail('LIMIT_REACHED');
+      return json(200,result.data);
+    }
     if (path === '/transceivers' && req.method === 'GET') {
       const [catalog,operations]=await Promise.all([
         transceiverRows('finance_transceiver_catalog','product_code,fields,revision,updated_at','product_code',2000),

@@ -8,7 +8,7 @@ const source = readFileSync(new URL('../supabase/functions/finance-api/index.ts'
 const html = '<!doctype html><html><body>dashboard:4d7a3151-8d62-4c70-9031-e1bc4e03c9c7 Synthetic only</body></html>';
 const hash = async body => Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body))).toString('hex');
 function harness(override = {}, authStatus = 200) {
-  let handler, writes = [], snapshot = null, ctx = { authenticated: true, administrator: true, profile: 'ADMINISTRADOR', userType: 'INTERNO', apps: ['painel-financeiro'], user: { email: 'synthetic@example.test' }, ...override };
+  let handler, writes = [], rpcCalls = [], snapshot = null, ctx = { authenticated: true, administrator: true, profile: 'ADMINISTRADOR', userType: 'INTERNO', apps: ['painel-financeiro'], user: { email: 'synthetic@example.test' }, ...override };
   class Query {
     constructor(table) { this.table = table; }
     select() { return this; } order() { return this; } limit() { return this; }
@@ -26,11 +26,11 @@ function harness(override = {}, authStatus = 200) {
     then(resolve) { return this.result().then(resolve); }
   }
   vm.runInContext(stripTypeScriptTypes(source), vm.createContext({
-    validateCatalog,validateOperation,createClient: () => ({ from: table => new Query(table) }),
+    validateCatalog,validateOperation,createClient: () => ({ from: table => new Query(table), rpc: async name => { rpcCalls.push(name); return {data:{rows:[{product_id:'SYNTHETIC',balance:2,avg_purchase_cost:null,estimated_stock_value:null}],collected_at:'2026-11-04T20:00:00Z'}}; } }),
     Deno: { env: { get: () => 'https://example.test' }, serve: cb => { handler = cb; } },
     fetch: async () => new Response(JSON.stringify(ctx), { status: authStatus }), Response, Request, URL, AbortSignal, Uint8Array, TextDecoder, TextEncoder, crypto, console
   }));
-  return { writes, setSnapshot: value => { snapshot = value; }, call: (path, options = {}) => handler(new Request('https://example.test/functions/v1/finance-api' + path, { headers: { authorization: 'Bearer ' + 'x'.repeat(30) }, ...options })) };
+  return { writes, rpcCalls, setSnapshot: value => { snapshot = value; }, call: (path, options = {}) => handler(new Request('https://example.test/functions/v1/finance-api' + path, { headers: { authorization: 'Bearer ' + 'x'.repeat(30) }, ...options })) };
 }
 test('missing token, bad origin, ordinary and external profiles cannot read or import', async () => {
   const h = harness();
@@ -61,13 +61,22 @@ test('an explicitly authorized partner can read the snapshot without administrat
 test('profile, app alone, wildcard alone, foreign company or external audience never grants financial read access', async () => {
   const authorized = { administrator: false, profile: 'SOCIO', companies: ['LIVION'], actions: ['painel-financeiro.visualizar'] };
   for (const override of [{ actions: [] }, { actions: ['*'] }, { apps: [] }, { companies: [] },
-    { companies: ['OTHER'] }, { userType: 'CLIENTE' }, { userType: 'PARCEIRO' }, { authenticated: false }]) {
+    { companies: ['OTHER'] }, { userType: 'CLIENTE' }, { userType: 'UNKNOWN' }, { authenticated: false }]) {
     const h = harness({ ...authorized, ...override });
     assert.equal((await h.call('/snapshot')).status, 403);
     assert.equal((await h.call('/access')).status, 403);
     assert.equal(h.writes.length, 0);
   }
 });
+test('external partner needs explicit app, view action and company scope; import remains denied', async () => {
+  const allowed = { administrator:false,profile:'VISUALIZADOR',userType:'PARCEIRO',companies:['LIVION'],actions:['painel-financeiro.visualizar'] };
+  const h=harness(allowed);h.setSnapshot({html,sha256:await hash(html),snapshot_date:'2026-10-28'});
+  assert.equal((await h.call('/snapshot')).status,200);
+  assert.equal((await h.call('/snapshots',{method:'POST'})).status,403);
+  assert.equal((await h.call('/transceivers/catalog',{method:'POST'})).status,403);
+  for(const extra of [{apps:[]},{actions:[]},{companies:[]},{companies:['OTHER']},{userType:'CLIENTE'}])assert.equal((await harness({...allowed,...extra}).call('/snapshot')).status,403);
+});
+
 test('private content has no-store/nosniff, exact integrity, immutable duplicates and audit without content', async () => {
   const h = harness(), sha256 = await hash(html);
   const upload = () => h.call('/snapshots', { method: 'POST', headers: { authorization: 'Bearer ' + 'x'.repeat(30), 'content-type': 'text/html', 'x-snapshot-date': '2026-10-28', 'x-snapshot-sha256': sha256 }, body: html });
@@ -108,4 +117,11 @@ test('database policies grant no public read; public wrapper includes no reviewe
   const shell = readFileSync(new URL('../painel-financeiro/index.html', import.meta.url), 'utf8');
   assert.match(shell, /sandbox="allow-scripts allow-downloads allow-modals"/);
   assert.doesNotMatch(shell, /allow-same-origin|350361|Bruno Ribeiro|data-reviewed-rows/);
+});
+
+test('accounting stock reuses private inventory position and keeps unavailable cost null',async()=>{
+ const allowed={administrator:false,profile:'VISUALIZADOR',userType:'PARCEIRO',companies:['LIVION'],actions:['painel-financeiro.visualizar']};
+ const h=harness(allowed);const response=await h.call('/accounting-stock');assert.equal(response.status,200);assert.equal((await response.json()).rows[0].avg_purchase_cost,null);assert.deepEqual(h.rpcCalls,['finance_inventory_accounting']);assert.equal(h.writes.length,0);
+ for(const extra of [{companies:['RHCS']},{actions:[]},{apps:[]},{userType:'CLIENTE'}]){const denied=harness({...allowed,...extra});assert.equal((await denied.call('/accounting-stock')).status,403);assert.equal(denied.rpcCalls.length,0);}
+ const post=harness(allowed);assert.equal((await post.call('/accounting-stock',{method:'POST'})).status,404);assert.equal(post.rpcCalls.length,0);assert.equal(post.writes.length,0);
 });

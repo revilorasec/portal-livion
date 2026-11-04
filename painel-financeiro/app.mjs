@@ -1,4 +1,4 @@
-import {attachTransceiversBridge} from './transceivers-bridge.mjs?v=1';
+import {attachTransceiversBridge} from './transceivers-bridge.mjs?v=2';
 const API = 'https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/finance-api';
 const $ = id => document.getElementById(id);
 let token = '', generation = 0, pendingToken = null, exportUrl = null;
