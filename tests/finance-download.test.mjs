@@ -4,11 +4,11 @@ import fs from 'node:fs/promises';
 import vm from 'node:vm';
 
 test('private downloads accept only the active opaque dashboard and safe generated file types',async()=>{
- const source=await fs.readFile(new URL('../painel-financeiro/app.mjs',import.meta.url),'utf8');
+ const source=(await fs.readFile(new URL('../painel-financeiro/app.mjs',import.meta.url),'utf8')).replace(/\r\n/g,'\n').replace(/^import[^\n]+\n/gm,'');
  const events={},downloads=[],acks=[],elements=new Map();
  const frame={postMessage:data=>acks.push(data)};
  const element=id=>{if(!elements.has(id))elements.set(id,{hidden:false,contentWindow:id==='dashboard'?frame:null,files:[],removeAttribute(){},addEventListener(){}});return elements.get(id);};
- const context=vm.createContext({TextEncoder,Blob,Intl,Date,Set,Promise,AbortSignal,URL:{createObjectURL:()=> 'blob:synthetic-file',revokeObjectURL(){}},setTimeout(){},setInterval(){},addEventListener:(name,callback)=>events[name]=callback,document:{getElementById:element,addEventListener(){},body:{appendChild(){}},createElement:()=>({click(){downloads.push({name:this.download,url:this.href});},remove(){}})}});
+ const context=vm.createContext({attachTransceiversBridge(){},TextEncoder,Blob,Intl,Date,Set,Promise,AbortSignal,URL:{createObjectURL:()=> 'blob:synthetic-file',revokeObjectURL(){}},setTimeout(){},setInterval(){},addEventListener:(name,callback)=>events[name]=callback,document:{getElementById:element,addEventListener(){},body:{appendChild(){}},createElement:()=>({click(){downloads.push({name:this.download,url:this.href});},remove(){}})}});
  assert.ok(source.endsWith('load();\n'));
  vm.runInContext(source.slice(0,-8),context);
  vm.runInContext("token='synthetic-session';",context);

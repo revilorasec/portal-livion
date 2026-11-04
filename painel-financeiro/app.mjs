@@ -1,3 +1,4 @@
+import {attachTransceiversBridge} from './transceivers-bridge.mjs?v=1';
 const API = 'https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/finance-api';
 const $ = id => document.getElementById(id);
 let token = '', generation = 0, pendingToken = null, exportUrl = null;
@@ -79,6 +80,7 @@ async function load() {
   }
 }
 $('refresh').onclick = load;
+attachTransceiversBridge({frame:$('dashboard'),isActive:()=>!!token&&!$('dashboard').hidden,call,version:()=>generation});
 $('file').onchange = () => { $('upload').disabled = !$('file').files.length; };
 $('date').value = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 $('upload').onclick = async () => {

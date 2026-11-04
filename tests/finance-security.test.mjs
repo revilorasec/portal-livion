@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
-const source = readFileSync(new URL('../supabase/functions/finance-api/index.ts', import.meta.url), 'utf8').replace(/^import[^\n]+\n/, '');
+import {validateCatalog,validateOperation} from '../supabase/functions/finance-api/transceivers.mjs';
+const source = readFileSync(new URL('../supabase/functions/finance-api/index.ts', import.meta.url), 'utf8').replace(/^import[^\n]+\n/gm, '');
 const html = '<!doctype html><html><body>dashboard:4d7a3151-8d62-4c70-9031-e1bc4e03c9c7 Synthetic only</body></html>';
 const hash = async body => Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body))).toString('hex');
 function harness(override = {}, authStatus = 200) {
@@ -25,7 +26,7 @@ function harness(override = {}, authStatus = 200) {
     then(resolve) { return this.result().then(resolve); }
   }
   vm.runInContext(stripTypeScriptTypes(source), vm.createContext({
-    createClient: () => ({ from: table => new Query(table) }),
+    validateCatalog,validateOperation,createClient: () => ({ from: table => new Query(table) }),
     Deno: { env: { get: () => 'https://example.test' }, serve: cb => { handler = cb; } },
     fetch: async () => new Response(JSON.stringify(ctx), { status: authStatus }), Response, Request, URL, AbortSignal, Uint8Array, TextDecoder, TextEncoder, crypto, console
   }));
