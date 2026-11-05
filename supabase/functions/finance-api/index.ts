@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2.57.4';
 import { validateCatalog, validateOperation } from './transceivers.mjs';
+import {validateBankNote} from './bank-notes.mjs';
 
 const APP = 'painel-financeiro', MAX_BYTES = 12 * 1024 * 1024;
 const BASE = Deno.env.get('SUPABASE_URL')!;
@@ -82,6 +83,29 @@ Deno.serve(async (req: Request) => {
     const path = new URL(req.url).pathname.split('/finance-api')[1] || '/';
     if (path === '/health' && req.method === 'GET') return json(200, { service: 'finance-api', version: 3 });
     const ctx = await access(req);
+    if(path==='/bank-notes'&&req.method==='GET'){
+      const notes=await transceiverRows('finance_bank_notes','account_id,transaction_id,note,revision,updated_at,updated_by','transaction_id',10000);
+      return json(200,{notes,canEdit:ctx.canImport});
+    }
+    if(path==='/bank-notes'&&req.method==='POST'){
+      if(!ctx.canImport)fail('FORBIDDEN');
+      if(!(req.headers.get('content-type')||'').startsWith('application/json'))fail('INVALID_BANK_NOTE');
+      const bytes=await boundedBody(req,16000);
+      let input;try{input=JSON.parse(new TextDecoder().decode(bytes));}catch{fail('INVALID_BANK_NOTE');}
+      const value=validateBankNote(input);
+      const previous=await db.from('finance_bank_notes').select('*').eq('account_id',value.account_id).eq('transaction_id',value.transaction_id).maybeSingle();
+      if(previous.error)fail('DATA_UNAVAILABLE');
+      const old=previous.data;
+      if((old?.revision??0)!==value.revision)return json(409,{error:'REVISION_CONFLICT'});
+      const row={...value,revision:value.revision+1,updated_at:new Date().toISOString(),updated_by:ctx.user.email,
+        history:old?[...old.history,{note:old.note,revision:old.revision,updated_at:old.updated_at,updated_by:old.updated_by}]:[]};
+      const columns='account_id,transaction_id,note,revision,updated_at,updated_by';
+      const saved=old?await db.from('finance_bank_notes').update(row).eq('account_id',value.account_id).eq('transaction_id',value.transaction_id).eq('revision',value.revision).select(columns).maybeSingle():await db.from('finance_bank_notes').insert(row).select(columns).single();
+      if(saved.error?.code==='23505'||!saved.error&&!saved.data)return json(409,{error:'REVISION_CONFLICT'});
+      if(saved.error)fail('DATA_UNAVAILABLE');
+      return json(200,{ok:true,record:saved.data});
+    }
+
     if (path === '/accounting-stock' && req.method === 'GET') {
       if(!ctx.canImport&&!ctx.companies?.some((company:string)=>['LIVION','*'].includes(company)))fail('FORBIDDEN');
       const result=await db.rpc('finance_inventory_accounting');
@@ -152,7 +176,8 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     const code = error instanceof Error ? error.message : 'ERROR';
     const status = code === 'UNAUTHENTICATED' ? 401 : code === 'FORBIDDEN' ? 403 :
-      code === 'TOO_LARGE' ? 413 : ['INVALID_TRANSCEIVER','INVALID_SNAPSHOT','INVALID_DATE','INVALID_HASH','HASH_MISMATCH'].includes(code) ? 400 : 503;
+      code === 'TOO_LARGE' ? 413 : ['INVALID_BANK_NOTE','INVALID_TRANSCEIVER','INVALID_SNAPSHOT','INVALID_DATE','INVALID_HASH','HASH_MISMATCH'].includes(code) ? 400 : 503;
     return json(status, { error: status === 503 ? 'SERVICE_UNAVAILABLE' : code });
   }
 });
+
