@@ -15,7 +15,7 @@ test('histórico de preços consulta todos os itens de uma vez, usa entradas rea
   assert.match(api,/if\(id\)movementQuery=movementQuery\.in/);
   assert.match(api,/product_pn:product\.pn/);
   assert.match(api,/p==='price-history'/);
-  assert.match(api,/version:31/);
+  assert.match(api,/version:32/);
 });
 
 test('tela abre todos os itens e pesquisa produto, fornecedor e datas sem dropdown',()=>{
@@ -34,7 +34,7 @@ test('tela abre todos os itens e pesquisa produto, fornecedor e datas sem dropdo
   assert.match(frontend,/supplierGroups/);
   assert.match(frontend,/Ver histórico de preços/);
   assert.match(html,/estoque-price-history\.js\?v=2/);
-  assert.match(html,/data-app-version="17"/);
+  assert.match(html,/data-app-version="18"/);
 });
 
 test('entrada manual explica e cria automaticamente a nota fiscal vinculada',()=>{

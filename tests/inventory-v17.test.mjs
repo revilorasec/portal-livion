@@ -25,8 +25,8 @@ test('portal e aplicativo exibem versões identificáveis', () => {
   assert.match(portal, /id="workspaceVersion"/);
   assert.match(portal, /class="app-card-version"/);
   assert.match(portal, /function stampFrameVersion/);
-  assert.match(html, /data-app-version="17"/);
-  assert.match(html, /class="app-release">v17/);
+  assert.match(html, /data-app-version="18"/);
+  assert.match(html, /class="app-release">v18/);
   assert.match(versionCatalogSql, /estoque\.html\?v=16/);
   assert.match(versionCatalogSql, /where key in/);
 });
@@ -66,7 +66,7 @@ test('migração protege tabelas novas com RLS e preserva relações históricas
 });
 
 test('API v22 expõe peças no bootstrap e mantém fotos privadas assinadas', () => {
-  assert.match(api, /version:31/);
+  assert.match(api, /version:32/);
   assert.match(api, /data\.parts=parts/);
   assert.match(api, /mediaMap\('PART'/);
   assert.match(api, /createSignedUrl/);

@@ -58,5 +58,5 @@ test('arquivos ficam em armazenamento privado com metadados e auditoria', () => 
 
 test('a versão publicada carrega o novo recurso', () => {
   assert.match(html, /estoque-product-media\.js\?v=3/);
-  assert.match(html, /data-app-version="17"/);
+  assert.match(html, /data-app-version="18"/);
 });
