@@ -5,7 +5,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import vm from 'node:vm';
 import {validateBankNote} from '../supabase/functions/finance-api/bank-notes.mjs';
 const source=readFileSync(new URL('../supabase/functions/finance-api/index.ts',import.meta.url),'utf8').replace(/^import[^\n]+\n/gm,'');
-const input={account_id:'77b447d7-c379-4946-a18c-08152933f225',transaction_id:'f8f0a019-b323-40ab-b1ec-29d33d164664',note:'SYNTHETIC REVIEW ONLY',revision:0};
+const input={account_id:'11111111-1111-4111-8111-111111111111',transaction_id:'22222222-2222-4222-8222-222222222222',note:'SYNTHETIC REVIEW ONLY',revision:0};
 function harness(override={}){
  let handler;const rows=new Map(),writes=[];
  class Q{
