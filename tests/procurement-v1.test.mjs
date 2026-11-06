@@ -147,6 +147,7 @@ test('planilha solicita valor total e orienta prazo e pagamento',()=>{
   assert.match(js,/condição de pagamento inválida/);
   assert.match(js,/prazo de entrega inválido/);
   assert.match(js,/30\/60\/90/);
+  assert.match(js,/incluindo moeda, <b>valor total da quantidade solicitada<\/b>/);
 });
 
 test('respostas multiplas mostram conversao em real pelo dolar atual',()=>{
