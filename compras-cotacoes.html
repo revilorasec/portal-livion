@@ -4,27 +4,26 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0b1733"><title>Cotações do Estoque · Livion</title>
 <link rel="icon" href="./assets/icons/livion-64.png" type="image/png">
-<link rel="stylesheet" href="./compras-cotacoes.css?v=12">
+<link rel="stylesheet" href="./compras-cotacoes.css?v=13">
 </head>
 <body>
-<header class="top"><div><span class="eyebrow">Controle de Estoque</span><h1>Compras e Cotações</h1><p>Solicitação, fornecedores, negociação e recebimento no mesmo histórico</p></div><div class="top-right"><span id="fxBadge" class="fx-badge">Dólar BC: carregando…</span><button id="refreshFxBtn" class="btn">Atualizar dólar</button><span class="version">v12</span><button id="reloadBtn" class="btn">Atualizar</button><button id="newRequestBtn" class="btn primary">+ Nova cotação</button></div></header>
+<header class="top"><div><span class="eyebrow">Controle de Estoque</span><h1>Compras e Cotações</h1><p>Solicitação, fornecedores, negociação e recebimento no mesmo histórico</p></div><div class="top-right"><span id="fxBadge" class="fx-badge">Dólar BC: carregando…</span><button id="refreshFxBtn" class="btn">Atualizar dólar</button><span class="version">v13</span><button id="reloadBtn" class="btn">Atualizar</button><button id="newRequestBtn" class="btn primary">+ Nova cotação</button></div></header>
 <main>
   <div id="flash" class="flash hidden"></div>
   <section id="loading" class="loading">Carregando dados do Portal Livion…</section>
   <section id="app" class="hidden">
     <div class="metrics" id="metrics"></div>
-    <nav class="tabs"><button class="active" data-view="requests">Cotações</button><button data-view="orders">Pedidos e recebimentos</button><button data-view="suppliers">Fornecedores e contatos</button><button data-view="lead">Prazos de reposição</button></nav>
+    <nav class="tabs"><button class="active" data-view="requests">Cotações</button><button data-view="orders">Pedidos e recebimentos</button><button data-view="lead">Prazos de reposição</button></nav>
     <section id="requestsView" class="view">
       <div class="toolbar"><input id="requestSearch" type="search" placeholder="Pesquisar cotação, componente, fornecedor ou solicitante"><select id="requestStatus"><option value="">Todos os status</option></select></div>
       <div id="requestList" class="cards"></div>
     </section>
     <section id="ordersView" class="view hidden"><div id="orderList" class="cards"></div></section>
-    <section id="suppliersView" class="view hidden"><div class="section-head"><div><h2>Fornecedores</h2><p>Cadastro único compartilhado com o Controle de Estoque.</p></div><button id="newSupplierBtn" class="btn primary">+ Fornecedor</button></div><div id="supplierList" class="supplier-grid"></div></section>
     <section id="leadView" class="view hidden"><div class="section-head"><div><h2>Prazos reais de reposição</h2><p>Calculados entre a emissão do pedido e o recebimento. Com poucas amostras, a sugestão deve ser tratada como inicial.</p></div></div><div class="table-wrap"><table><thead><tr><th>Produto</th><th>Amostras</th><th>Mediana</th><th>P75</th><th>P90</th></tr></thead><tbody id="leadBody"></tbody></table></div></section>
   </section>
 </main>
 <dialog id="modal"><form method="dialog" class="modal-card"><div class="modal-head"><div><span class="eyebrow" id="modalEyebrow"></span><h2 id="modalTitle"></h2></div><button value="cancel" class="icon-btn" aria-label="Fechar">×</button></div><div id="modalBody" class="modal-body"></div><div class="modal-actions"><button value="cancel" class="btn">Cancelar</button><button type="button" id="modalSave" class="btn primary">Salvar</button></div></form></dialog>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="./compras-cotacoes.js?v=12"></script>
+<script src="./compras-cotacoes.js?v=13"></script>
 </body></html>
