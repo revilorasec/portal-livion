@@ -8,6 +8,7 @@ const api=readFileSync(new URL('../supabase/functions/procurement-api/index.ts',
 const schema=readFileSync(new URL('../supabase/migrations/20260923120000_procurement_v1.sql',import.meta.url),'utf8');
 const legacy=readFileSync(new URL('../supabase/migrations/20260923123000_procurement_legacy_import.sql',import.meta.url),'utf8');
 const quotes=readFileSync(new URL('../supabase/migrations/20261106133000_procurement_quotes_v1.sql',import.meta.url),'utf8');
+const workflow=readFileSync(new URL('../supabase/migrations/20261106135258_procurement_request_soft_delete.sql',import.meta.url),'utf8');
 const inventory=readFileSync(new URL('../estoque.html',import.meta.url),'utf8');
 const inventoryQuotes=readFileSync(new URL('../estoque-quotes-v19.js',import.meta.url),'utf8');
 const portal=readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -18,7 +19,7 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=4/);
+  assert.match(html,/compras-cotacoes\.js\?v=5/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
@@ -37,7 +38,7 @@ test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>
   assert.match(js,/startupProductId/);
 });
 
-test('v4 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
+test('v5 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
   assert.match(js,/LIVION_QUOTE_V1/);
   assert.match(js,/quoteWorkbook/);
   assert.match(js,/openResponseReview/);
@@ -49,8 +50,41 @@ test('dolar preserva a taxa original e atualiza apenas a referencia atual',()=>{
   assert.match(quotes,/exchange_rate_original/);
   assert.match(quotes,/exchange_rate_current/);
   assert.match(api,/BCB_PTAX/);
+  assert.match(api,/indicadorCambio/);
+  assert.match(js,/Dólar BC venda/);
   assert.match(api,/CotacaoDolarDia/);
   assert.match(js,/PTAX atualizada sem alterar o valor original/);
+});
+
+test('administrador exclui cotacao da lista sem destruir auditoria e pedidos',()=>{
+  assert.match(workflow,/deleted_at timestamptz/);
+  assert.match(workflow,/where deleted_at is null/);
+  assert.match(api,/REQUEST_DELETED/);
+  assert.match(api,/if\(!a\.admin\)throw Error\('FORBIDDEN'\)/);
+  assert.match(js,/data-delete-request/);
+});
+
+test('comparativo destaca menor valor e registra vencedor escolhido',()=>{
+  assert.match(js,/best-price-label/);
+  assert.match(js,/Menor valor/);
+  assert.match(js,/Escolher vencedor/);
+  assert.match(api,/OFFER_SELECTED/);
+});
+
+test('pedido tem acompanhamento e recebe XML ou PDF antes da entrada',()=>{
+  assert.match(workflow,/tracking_status/);
+  assert.match(workflow,/procurement_order_documents/);
+  assert.match(api,/path==='order-tracking'/);
+  assert.match(api,/path==='order-document'/);
+  assert.match(js,/Dar entrada \/ NF/);
+  assert.match(js,/XML autorizado da NF-e/);
+  assert.match(js,/PDF da nota \/ DANFE/);
+});
+
+test('fornecedor aceita varios contatos de cotacao com nome email e telefone',()=>{
+  assert.match(js,/newSupplierContacts/);
+  assert.match(inventoryQuotes,/supplierQuoteContacts/);
+  assert.match(api,/inventory_supplier_quote_contacts/);
 });
 
 test('Outlook recebe escopo sob demanda e cria rascunho com anexo',()=>{

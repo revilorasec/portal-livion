@@ -28,13 +28,15 @@ async function audit(a:any,event:string,id:string,detail:unknown={}){
 }
 async function bootstrap(a:any){
   need(a,'compras.visualizar');
-  const[d,requests,items,offers,orders,orderItems,suppliers,products,lead,requestSuppliers,contacts,fx]=await Promise.all([
+  const currentFx=await latestPtax(a,false);
+  const[d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,fx]=await Promise.all([
     db.from('procurement_dashboard').select('*').single(),
-    db.from('procurement_requests').select('*').order('created_at',{ascending:false}).limit(2500),
+    db.from('procurement_requests').select('*').is('deleted_at',null).order('created_at',{ascending:false}).limit(2500),
     db.from('procurement_request_items').select('*').limit(10000),
     db.from('procurement_offers').select('*').order('created_at',{ascending:false}).limit(15000),
     db.from('procurement_orders').select('*').order('created_at',{ascending:false}).limit(5000),
     db.from('procurement_order_items').select('*').limit(15000),
+    db.from('procurement_order_documents').select('*').order('created_at',{ascending:false}).limit(10000),
     db.from('inventory_suppliers').select('supplier_id,name,document,email,phone,status,photo_url').order('name').limit(2000),
     db.from('inventory_stock_current').select('product_id,pn,description,category,item_type,unit,balance,min_stock,ideal_stock,status').order('description').limit(3000),
     db.from('procurement_lead_time_stats').select('*').limit(3000),
@@ -42,12 +44,13 @@ async function bootstrap(a:any){
     db.from('inventory_supplier_quote_contacts').select('*').eq('active',true).order('is_primary',{ascending:false}).limit(5000),
     db.from('procurement_fx_rates').select('*').eq('base_currency','USD').eq('quote_currency','BRL').order('rate_at',{ascending:false}).limit(1)
   ]);
-  for(const r of [d,requests,items,offers,orders,orderItems,suppliers,products,lead,requestSuppliers,contacts,fx])if(r.error)throw r.error;
+  for(const r of [d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,fx])if(r.error)throw r.error;
   const showValues=can(a,'compras.visualizar_valores');
   const cleanOffer=(x:any)=>showValues?x:{...x,unit_price:null,total_price:null,exchange_rate:null,payment_terms:null};
   const cleanOrder=(x:any)=>showValues?x:{...x,total_value:null,payment_terms:null};
   const cleanOrderItem=(x:any)=>showValues?x:{...x,unit_price:null,total_price:null};
-  return{dashboard:d.data,requests:requests.data||[],items:items.data||[],offers:(offers.data||[]).map(cleanOffer),orders:(orders.data||[]).map(cleanOrder),orderItems:(orderItems.data||[]).map(cleanOrderItem),suppliers:suppliers.data||[],products:products.data||[],leadTimes:lead.data||[],requestSuppliers:requestSuppliers.data||[],supplierContacts:contacts.data||[],fx:fx.data?.[0]||null,user:{name:a.user.name,email:a.email,administrator:a.admin},permissions:{create:can(a,'compras.criar_solicitacao'),quote:can(a,'compras.cotar'),approve:can(a,'compras.aprovar'),order:can(a,'compras.emitir_pedido'),receive:can(a,'compras.receber'),values:showValues,supplier:can(a,'compras.gerenciar_fornecedores'),export:can(a,'compras.exportar')}};
+  const requestIds=new Set((requests.data||[]).map((x:any)=>x.request_id)),activeItems=(items.data||[]).filter((x:any)=>requestIds.has(x.request_id)),itemIds=new Set(activeItems.map((x:any)=>x.item_id));
+  return{dashboard:d.data,requests:requests.data||[],items:activeItems,offers:(offers.data||[]).filter((x:any)=>itemIds.has(x.item_id)).map(cleanOffer),orders:(orders.data||[]).map(cleanOrder),orderItems:(orderItems.data||[]).map(cleanOrderItem),orderDocuments:orderDocuments.data||[],suppliers:suppliers.data||[],products:products.data||[],leadTimes:lead.data||[],requestSuppliers:(requestSuppliers.data||[]).filter((x:any)=>requestIds.has(x.request_id)),supplierContacts:contacts.data||[],fx:currentFx,user:{name:a.user.name,email:a.email,administrator:a.admin},permissions:{create:can(a,'compras.criar_solicitacao'),quote:can(a,'compras.cotar'),approve:can(a,'compras.aprovar'),order:can(a,'compras.emitir_pedido'),receive:can(a,'compras.receber'),values:showValues,supplier:can(a,'compras.gerenciar_fornecedores'),export:can(a,'compras.exportar')}};
 }
 async function saveRequest(a:any,b:any){
   need(a,'compras.criar_solicitacao');
@@ -146,19 +149,23 @@ async function supplierContacts(a:any,b:any){
   if(rows.length){const saved=await db.from('inventory_supplier_quote_contacts').insert(rows);if(saved.error)throw saved.error}
   await audit(a,'SUPPLIER_CONTACTS_UPDATED',supplierId,{contacts:rows.length});return{ok:true};
 }
+async function getSupplierContacts(a:any,u:URL){
+  need(a,'compras.visualizar');const supplierId=String(u.searchParams.get('supplier_id')||'');if(!supplierId)throw Error('INVALID_SUPPLIER');const rows=await db.from('inventory_supplier_quote_contacts').select('*').eq('supplier_id',supplierId).eq('active',true).order('is_primary',{ascending:false});if(rows.error)throw rows.error;return{contacts:rows.data||[]};
+}
 async function latestPtax(a:any,refresh=false){
   const cached=await db.from('procurement_fx_rates').select('*').eq('base_currency','USD').eq('quote_currency','BRL').order('rate_at',{ascending:false}).limit(1).maybeSingle();if(cached.error)throw cached.error;
-  if(!refresh&&cached.data)return cached.data;
-  let quote:any=null;
+  if(!refresh&&cached.data&&Date.now()-new Date(cached.data.fetched_at).getTime()<30*60000)return cached.data;
+  let quote:any=null,source='BCB_INDICADOR_CAMBIO';
+  try{const response=await fetch('https://www.bcb.gov.br/api/servico/sitebcb/indicadorCambio',{signal:AbortSignal.timeout(12000)});if(response.ok){const payload=await response.json(),values=(Array.isArray(payload?.conteudo)?payload.conteudo:[]).filter((x:any)=>String(x.moeda||'').toLocaleLowerCase('pt-BR')==='dólar'&&Number(x.valorVenda)>0).sort((x:any,y:any)=>new Date(y.dataIndicador).getTime()-new Date(x.dataIndicador).getTime());if(values.length)quote={cotacaoVenda:values[0].valorVenda,dataHoraCotacao:values[0].dataIndicador}}}catch{}
   for(let offset=0;offset<12&&!quote;offset++){
     const d=new Date(Date.now()-offset*86400000),mdy=`${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}-${d.getUTCFullYear()}`;
     const url=`https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='${mdy}'&$top=100&$format=json&$select=cotacaoVenda,dataHoraCotacao`;
-    const response=await fetch(url,{signal:AbortSignal.timeout(12000)});if(!response.ok)continue;const payload=await response.json().catch(()=>({value:[]}));const values=Array.isArray(payload.value)?payload.value:[];if(values.length)quote=values.sort((x:any,y:any)=>String(y.dataHoraCotacao).localeCompare(String(x.dataHoraCotacao)))[0];
+    const response=await fetch(url,{signal:AbortSignal.timeout(12000)});if(!response.ok)continue;const payload=await response.json().catch(()=>({value:[]}));const values=Array.isArray(payload.value)?payload.value:[];if(values.length){quote=values.sort((x:any,y:any)=>String(y.dataHoraCotacao).localeCompare(String(x.dataHoraCotacao)))[0];source='BCB_PTAX'}
   }
   if(!quote){if(cached.data)return cached.data;throw Error('FX_UNAVAILABLE')}
   const sourceTime=String(quote.dataHoraCotacao||'').trim().replace(' ','T'),parsedTime=new Date(/(?:Z|[+-]\d\d:\d\d)$/.test(sourceTime)?sourceTime:`${sourceTime}-03:00`);
   if(!Number.isFinite(parsedTime.getTime()))throw Error('FX_UNAVAILABLE');
-  const row={base_currency:'USD',quote_currency:'BRL',rate:Number(quote.cotacaoVenda),rate_at:parsedTime.toISOString(),source:'BCB_PTAX',fetched_by:a.email};
+  const row={base_currency:'USD',quote_currency:'BRL',rate:Number(quote.cotacaoVenda),rate_at:parsedTime.toISOString(),source,fetched_by:a.email};
   const saved=await db.from('procurement_fx_rates').upsert(row,{onConflict:'base_currency,quote_currency,rate_at,source'}).select().single();if(saved.error)throw saved.error;
   await db.from('procurement_offers').update({exchange_rate_current:row.rate,exchange_rate_current_at:row.rate_at}).eq('currency','USD');
   await audit(a,'FX_REFRESHED',saved.data.fx_rate_id,{rate:row.rate,rate_at:row.rate_at,source:row.source});return saved.data;
@@ -184,6 +191,27 @@ async function requestStatus(a:any,b:any){
   const current=await db.from('procurement_requests').select('request_id,status').eq('request_id',requestId).maybeSingle();if(current.error||!current.data)throw Error('INVALID_REQUEST');
   let status='ENCERRADO';if(target==='REABRIR'){const items=await db.from('procurement_request_items').select('item_id').eq('request_id',requestId);if(items.error)throw items.error;const ids=(items.data||[]).map((x:any)=>x.item_id);let offerCount=0;if(ids.length){const offers=await db.from('procurement_offers').select('offer_id',{count:'exact',head:true}).in('item_id',ids);if(offers.error)throw offers.error;offerCount=offers.count||0}status=offerCount?'COTANDO':'SOLICITADA'}
   const updated=await db.from('procurement_requests').update({status,updated_at:new Date().toISOString()}).eq('request_id',requestId);if(updated.error)throw updated.error;await audit(a,status==='ENCERRADO'?'REQUEST_CLOSED':'REQUEST_REOPENED',requestId,{before:current.data.status,after:status});return{ok:true,status};
+}
+async function deleteRequest(a:any,b:any){
+  if(!a.admin)throw Error('FORBIDDEN');
+  const requestId=String(b.request_id||''),reason=String(b.reason||'Limpeza de cotações antigas').trim().slice(0,500),now=new Date().toISOString();
+  const current=await db.from('procurement_requests').select('request_id,request_number,title,status,deleted_at').eq('request_id',requestId).maybeSingle();if(current.error||!current.data||current.data.deleted_at)throw Error('INVALID_REQUEST');
+  const updated=await db.from('procurement_requests').update({deleted_at:now,deleted_by:a.email,deletion_reason:reason,updated_at:now}).eq('request_id',requestId).is('deleted_at',null).select('request_id');if(updated.error||!updated.data?.length)throw Error('INVALID_REQUEST');
+  await audit(a,'REQUEST_DELETED',requestId,{request_number:current.data.request_number,title:current.data.title,status:current.data.status,reason});return{ok:true,deleted_at:now};
+}
+async function orderTracking(a:any,b:any){
+  if(!can(a,'compras.cotar')&&!can(a,'compras.emitir_pedido')&&!can(a,'compras.receber'))throw Error('FORBIDDEN');
+  const orderId=String(b.order_id||''),status=String(b.tracking_status||'').toUpperCase();if(!['AGUARDANDO_ENVIO','EM_TRANSPORTE','ENTREGUE'].includes(status))throw Error('INVALID_TRACKING_STATUS');
+  const now=new Date().toISOString(),row={tracking_status:status,tracking_code:String(b.tracking_code||'').trim().slice(0,200)||null,tracking_url:String(b.tracking_url||'').trim().slice(0,1000)||null,shipped_at:b.shipped_at||null,tracking_updated_at:now,tracking_updated_by:a.email,updated_at:now};
+  const updated=await db.from('procurement_orders').update(row).eq('order_id',orderId).select('order_id');if(updated.error||!updated.data?.length)throw Error('INVALID_ORDER');await audit(a,'ORDER_TRACKING_UPDATED',orderId,row);return{ok:true};
+}
+async function orderDocument(a:any,r:Request){
+  need(a,'compras.receber');const form=await r.formData(),file=form.get('file'),orderId=String(form.get('order_id')||'');
+  if(!(file instanceof File)||!orderId||file.size<=0||file.size>10485760)throw Error('INVALID_ORDER_DOCUMENT');
+  const lower=file.name.toLowerCase(),kind=lower.endsWith('.xml')?'NFE_XML':lower.endsWith('.pdf')?'DANFE_PDF':'';if(!kind)throw Error('INVALID_ORDER_DOCUMENT');
+  const order=await db.from('procurement_orders').select('order_id').eq('order_id',orderId).maybeSingle();if(order.error||!order.data)throw Error('INVALID_ORDER');
+  const ext=kind==='NFE_XML'?'xml':'pdf',path=`orders/${orderId}/${crypto.randomUUID()}.${ext}`,mime=kind==='NFE_XML'?'application/xml':'application/pdf',uploaded=await db.storage.from('procurement-documents').upload(path,file,{contentType:mime});if(uploaded.error)throw uploaded.error;
+  const saved=await db.from('procurement_order_documents').insert({order_id:orderId,kind,bucket:'procurement-documents',object_path:path,file_name:file.name.slice(0,240),mime_type:file.type||mime,file_size:file.size,created_by:a.email}).select().single();if(saved.error){await db.storage.from('procurement-documents').remove([path]);throw saved.error}await audit(a,'ORDER_DOCUMENT_ADDED',orderId,{document_id:saved.data.document_id,kind,file_name:saved.data.file_name});return{ok:true,document:saved.data};
 }
 async function markSent(a:any,b:any){
   if(!can(a,'compras.cotar')&&!can(a,'compras.exportar'))throw Error('FORBIDDEN');const requestId=String(b.request_id||''),supplierId=String(b.supplier_id||''),now=new Date().toISOString();const updated=await db.from('procurement_request_suppliers').update({status:'ENVIADA',sent_at:now,updated_at:now}).eq('request_id',requestId).eq('supplier_id',supplierId).select('request_supplier_id');if(updated.error||!updated.data?.length)throw Error('INVALID_REQUEST_SUPPLIER');await audit(a,'QUOTE_SENT',requestId,{supplier_id:supplierId});return{ok:true,sent_at:now};
@@ -219,6 +247,7 @@ Deno.serve(async req=>{
     if(req.method==='GET'&&path==='bootstrap')return reply(await bootstrap(a));
     if(req.method==='GET'&&path==='fx')return reply({fx:await latestPtax(a,new URL(req.url).searchParams.get('refresh')==='1')});
     if(req.method==='GET'&&path==='request-history')return reply(await requestHistory(a,new URL(req.url)));
+    if(req.method==='GET'&&path==='supplier-contacts')return reply(await getSupplierContacts(a,new URL(req.url)));
     if(req.method==='POST'&&path==='request')return reply(await saveRequest(a,await req.json()));
     if(req.method==='POST'&&path==='offer')return reply(await saveOffer(a,await req.json()));
     if(req.method==='POST'&&path==='select-offer')return reply(await selectOffer(a,await req.json()));
@@ -228,6 +257,9 @@ Deno.serve(async req=>{
     if(req.method==='POST'&&path==='supplier-contacts')return reply(await supplierContacts(a,await req.json()));
     if(req.method==='POST'&&path==='bulk-offers')return reply(await bulkOffers(a,await req.json()));
     if(req.method==='POST'&&path==='request-status')return reply(await requestStatus(a,await req.json()));
+    if(req.method==='POST'&&path==='delete-request')return reply(await deleteRequest(a,await req.json()));
+    if(req.method==='POST'&&path==='order-tracking')return reply(await orderTracking(a,await req.json()));
+    if(req.method==='POST'&&path==='order-document')return reply(await orderDocument(a,req));
     if(req.method==='POST'&&path==='mark-sent')return reply(await markSent(a,await req.json()));
     if(req.method==='POST'&&path==='suggest-product')return reply(await suggestProduct(a,await req.json()));
     if(req.method==='POST'&&path==='link-item')return reply(await linkItem(a,await req.json()));
