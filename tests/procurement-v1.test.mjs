@@ -20,7 +20,7 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=6/);
+  assert.match(html,/compras-cotacoes\.js\?v=7/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
@@ -39,7 +39,7 @@ test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>
   assert.match(js,/startupProductId/);
 });
 
-test('v6 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
+test('v7 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
   assert.match(js,/LIVION_QUOTE_V2/);
   assert.match(html,/exceljs@4\.4\.0/);
   assert.match(js,/quoteWorkbook/);
@@ -50,6 +50,8 @@ test('v6 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
 });
 
 test('nova cotacao usa titulo automatico produto exato e unidades do cadastro',()=>{
+  assert.match(js,/Nova cotação · COT-/);
+  assert.match(api,/nextRequestNumber/);
   assert.match(js,/autoRequestTitle/);
   assert.match(js,/Título automático/);
   assert.match(js,/Pesquise e escolha exatamente um item do estoque/);

@@ -29,7 +29,7 @@ async function audit(a:any,event:string,id:string,detail:unknown={}){
 async function bootstrap(a:any){
   need(a,'compras.visualizar');
   const currentFx=await latestPtax(a,false);
-  const[d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,catalog,fx]=await Promise.all([
+  const[d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,catalog,fx,lastNumber]=await Promise.all([
     db.from('procurement_dashboard').select('*').single(),
     db.from('procurement_requests').select('*').is('deleted_at',null).order('created_at',{ascending:false}).limit(2500),
     db.from('procurement_request_items').select('*').limit(10000),
@@ -43,9 +43,10 @@ async function bootstrap(a:any){
     db.from('procurement_request_suppliers').select('*').limit(10000),
     db.from('inventory_supplier_quote_contacts').select('*').eq('active',true).order('is_primary',{ascending:false}).limit(5000),
     db.from('inventory_catalog_options').select('value,sort_order').eq('option_type','UNIT').eq('active',true).order('sort_order').order('value'),
-    db.from('procurement_fx_rates').select('*').eq('base_currency','USD').eq('quote_currency','BRL').order('rate_at',{ascending:false}).limit(1)
+    db.from('procurement_fx_rates').select('*').eq('base_currency','USD').eq('quote_currency','BRL').order('rate_at',{ascending:false}).limit(1),
+    db.from('procurement_requests').select('request_number').order('request_number',{ascending:false}).limit(1).maybeSingle()
   ]);
-  for(const r of [d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,catalog,fx])if(r.error)throw r.error;
+  for(const r of [d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,catalog,fx,lastNumber])if(r.error)throw r.error;
   const supplierIds=(suppliers.data||[]).map((x:any)=>x.supplier_id),supplierLogos=supplierIds.length?await db.from('inventory_media').select('entity_id,bucket,object_path').eq('entity_type','SUPPLIER').eq('position',1).in('entity_id',supplierIds):{data:[],error:null};
   if(supplierLogos.error)throw supplierLogos.error;
   const logoUrls=new Map<string,string>();
@@ -56,7 +57,7 @@ async function bootstrap(a:any){
   const cleanOrder=(x:any)=>showValues?x:{...x,total_value:null,payment_terms:null};
   const cleanOrderItem=(x:any)=>showValues?x:{...x,unit_price:null,total_price:null};
   const requestIds=new Set((requests.data||[]).map((x:any)=>x.request_id)),activeItems=(items.data||[]).filter((x:any)=>requestIds.has(x.request_id)),itemIds=new Set(activeItems.map((x:any)=>x.item_id));
-  return{dashboard:d.data,requests:requests.data||[],items:activeItems,offers:(offers.data||[]).filter((x:any)=>itemIds.has(x.item_id)).map(cleanOffer),orders:(orders.data||[]).map(cleanOrder),orderItems:(orderItems.data||[]).map(cleanOrderItem),orderDocuments:orderDocuments.data||[],suppliers:suppliersWithLogos,products:products.data||[],units:(catalog.data||[]).map((x:any)=>x.value),leadTimes:lead.data||[],requestSuppliers:(requestSuppliers.data||[]).filter((x:any)=>requestIds.has(x.request_id)),supplierContacts:contacts.data||[],fx:currentFx,user:{name:a.user.name,email:a.email,administrator:a.admin},permissions:{create:can(a,'compras.criar_solicitacao'),quote:can(a,'compras.cotar'),approve:can(a,'compras.aprovar'),order:can(a,'compras.emitir_pedido'),receive:can(a,'compras.receber'),values:showValues,supplier:can(a,'compras.gerenciar_fornecedores'),export:can(a,'compras.exportar')}};
+  return{dashboard:d.data,requests:requests.data||[],items:activeItems,offers:(offers.data||[]).filter((x:any)=>itemIds.has(x.item_id)).map(cleanOffer),orders:(orders.data||[]).map(cleanOrder),orderItems:(orderItems.data||[]).map(cleanOrderItem),orderDocuments:orderDocuments.data||[],suppliers:suppliersWithLogos,products:products.data||[],units:(catalog.data||[]).map((x:any)=>x.value),nextRequestNumber:Number(lastNumber.data?.request_number||0)+1,leadTimes:lead.data||[],requestSuppliers:(requestSuppliers.data||[]).filter((x:any)=>requestIds.has(x.request_id)),supplierContacts:contacts.data||[],fx:currentFx,user:{name:a.user.name,email:a.email,administrator:a.admin},permissions:{create:can(a,'compras.criar_solicitacao'),quote:can(a,'compras.cotar'),approve:can(a,'compras.aprovar'),order:can(a,'compras.emitir_pedido'),receive:can(a,'compras.receber'),values:showValues,supplier:can(a,'compras.gerenciar_fornecedores'),export:can(a,'compras.exportar')}};
 }
 async function saveRequest(a:any,b:any){
   need(a,'compras.criar_solicitacao');
