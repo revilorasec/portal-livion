@@ -11,6 +11,7 @@ const quotes=readFileSync(new URL('../supabase/migrations/20261106133000_procure
 const workflow=readFileSync(new URL('../supabase/migrations/20261106135258_procurement_request_soft_delete.sql',import.meta.url),'utf8');
 const supplierDocuments=readFileSync(new URL('../supabase/migrations/20261106145607_procurement_supplier_documents.sql',import.meta.url),'utf8');
 const quoteTitles=readFileSync(new URL('../supabase/migrations/20261106170000_procurement_quote_number_date_title.sql',import.meta.url),'utf8');
+const internalQuotes=readFileSync(new URL('../supabase/migrations/20261106182834_procurement_internal_quote_mode.sql',import.meta.url),'utf8');
 const inventory=readFileSync(new URL('../estoque.html',import.meta.url),'utf8');
 const inventoryQuotes=readFileSync(new URL('../estoque-quotes-v19.js',import.meta.url),'utf8');
 const portal=readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -21,7 +22,7 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=9/);
+  assert.match(html,/compras-cotacoes\.js\?v=10/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
@@ -148,6 +149,19 @@ test('planilha solicita valor total e orienta prazo e pagamento',()=>{
   assert.match(js,/prazo de entrega inválido/);
   assert.match(js,/30\/60\/90/);
   assert.match(js,/incluindo moeda, <b>valor total da quantidade solicitada<\/b>/);
+});
+
+test('cotacao interna usa os mesmos fornecedores em uma unica planilha reimportavel',()=>{
+  assert.match(internalQuotes,/quote_mode text not null default 'SUPPLIER'/);
+  assert.match(internalQuotes,/INTERNAL/);
+  assert.match(api,/quote_mode:quoteMode/);
+  assert.match(js,/Fazer pesquisa internamente/);
+  assert.match(js,/um único Excel/);
+  assert.match(js,/LIVION_INTERNAL_QUOTE_V1/);
+  assert.match(js,/Baixar planilha interna única/);
+  assert.match(js,/Importar pesquisa interna/);
+  assert.match(js,/Pesquisa interna registrada/);
+  assert.match(js,/for\(const \[supplierId,group\] of groups\)await api\('\/bulk-offers'/);
 });
 
 test('respostas multiplas mostram conversao em real pelo dolar atual',()=>{

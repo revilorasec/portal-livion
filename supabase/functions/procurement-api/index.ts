@@ -62,6 +62,8 @@ async function bootstrap(a:any){
 async function saveRequest(a:any,b:any){
   need(a,'compras.criar_solicitacao');
   const items=Array.isArray(b.items)?b.items:[],supplierIds=[...new Set((Array.isArray(b.supplier_ids)?b.supplier_ids:[]).map(String).filter(Boolean))];
+  const quoteMode=String(b.quote_mode||'SUPPLIER').toUpperCase();
+  if(!['SUPPLIER','INTERNAL'].includes(quoteMode))throw Error('INVALID_QUOTE_MODE');
   if(!items.length)throw Error('INVALID_REQUEST');
   if(b.submit&&!supplierIds.length)throw Error('SELECT_SUPPLIERS_FIRST');
   const productIds=[...new Set(items.map((x:any)=>String(x.inventory_product_id||'')).filter(Boolean))];
@@ -74,7 +76,7 @@ async function saveRequest(a:any,b:any){
   const title=String(b.title||'Cotação em criação').trim();
   const urgency=String(b.urgency||'MEDIA').toUpperCase();
   if(!['BAIXA','MEDIA','ALTA','CRITICA'].includes(urgency))throw Error('INVALID_URGENCY');
-  const row={title,requester_email:a.email,department:String(b.department||'').trim()||null,urgency,needed_at:b.needed_at||null,notes:String(b.notes||'').trim()||null,status:b.submit?'SOLICITADA':'RASCUNHO',source:'PORTAL',created_by:a.email,updated_at:new Date().toISOString()};
+  const row={title,requester_email:a.email,department:String(b.department||'').trim()||null,urgency,needed_at:b.needed_at||null,notes:String(b.notes||'').trim()||null,quote_mode:quoteMode,status:b.submit?'SOLICITADA':'RASCUNHO',source:'PORTAL',created_by:a.email,updated_at:new Date().toISOString()};
   let saved:any;
   if(b.request_id){
     const current=await db.from('procurement_requests').select('request_id,status,requester_email').eq('request_id',b.request_id).maybeSingle();if(current.error||!current.data||current.data.status!=='RASCUNHO'||(!a.admin&&current.data.requester_email!==a.email))throw Error('INVALID_REQUEST_EDIT');
@@ -88,8 +90,8 @@ async function saveRequest(a:any,b:any){
   if(saved.data.title!==officialTitle){const named=await db.from('procurement_requests').update({title:officialTitle,updated_at:new Date().toISOString()}).eq('request_id',saved.data.request_id);if(named.error)throw named.error;saved.data.title=officialTitle}
   const itemRows=preparedItems.map((x:any)=>({...x,request_id:saved.data.request_id}));
   const inserted=await db.from('procurement_request_items').insert(itemRows);if(inserted.error)throw inserted.error;
-  if(supplierIds.length){const supplierRows=supplierIds.map((supplier_id:string)=>({request_id:saved.data.request_id,supplier_id,status:b.submit?'ENVIADA':'PENDENTE',sent_at:b.submit?new Date().toISOString():null,created_by:a.email}));const linked=await db.from('procurement_request_suppliers').insert(supplierRows);if(linked.error)throw linked.error}
-  await audit(a,row.status==='SOLICITADA'?'REQUEST_SUBMITTED':'REQUEST_SAVED',saved.data.request_id,{items:itemRows.length,suppliers:supplierIds.length});
+  if(supplierIds.length){const sent=b.submit&&quoteMode==='SUPPLIER',supplierRows=supplierIds.map((supplier_id:string)=>({request_id:saved.data.request_id,supplier_id,status:sent?'ENVIADA':'PENDENTE',sent_at:sent?new Date().toISOString():null,created_by:a.email}));const linked=await db.from('procurement_request_suppliers').insert(supplierRows);if(linked.error)throw linked.error}
+  await audit(a,row.status==='SOLICITADA'?'REQUEST_SUBMITTED':'REQUEST_SAVED',saved.data.request_id,{items:itemRows.length,suppliers:supplierIds.length,quote_mode:quoteMode});
   return{ok:true,request_id:saved.data.request_id,request_number:saved.data.request_number,title:officialTitle};
 }
 async function saveOffer(a:any,b:any){
