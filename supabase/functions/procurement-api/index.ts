@@ -112,12 +112,14 @@ async function saveOffer(a:any,b:any){
 }
 async function selectOffer(a:any,b:any){
   need(a,'compras.aprovar');
-  const offer=await db.from('procurement_offers').select('offer_id,item_id,procurement_request_items(request_id)').eq('offer_id',b.offer_id).maybeSingle();
+  const offer=await db.from('procurement_offers').select('offer_id,item_id,supplier_id,procurement_request_items(request_id)').eq('offer_id',b.offer_id).maybeSingle();
   if(offer.error||!offer.data)throw Error('INVALID_OFFER');
+  const requestId=(offer.data as any).procurement_request_items?.request_id;
+  const linked=await db.from('procurement_request_suppliers').select('request_supplier_id').eq('request_id',requestId).eq('supplier_id',offer.data.supplier_id).maybeSingle();
+  if(linked.error||!linked.data)throw Error('INVALID_REQUEST_SUPPLIER');
   await db.from('procurement_offers').update({selected:false,updated_at:new Date().toISOString()}).eq('item_id',offer.data.item_id);
   const selected=await db.from('procurement_offers').update({selected:true,updated_at:new Date().toISOString()}).eq('offer_id',b.offer_id);if(selected.error)throw selected.error;
   await db.from('procurement_request_items').update({status:'SELECIONADO'}).eq('item_id',offer.data.item_id);
-  const requestId=(offer.data as any).procurement_request_items?.request_id;
   if(requestId)await db.from('procurement_requests').update({status:'APROVADA',updated_at:new Date().toISOString()}).eq('request_id',requestId);
   await audit(a,'OFFER_SELECTED',requestId||offer.data.item_id,{offer_id:b.offer_id,item_id:offer.data.item_id});
   return{ok:true};
@@ -127,6 +129,7 @@ async function issueOrders(a:any,b:any){
   const request=await db.from('procurement_requests').select('*').eq('request_id',b.request_id).maybeSingle();if(request.error||!request.data)throw Error('INVALID_REQUEST');
   const items=await db.from('procurement_request_items').select('*').eq('request_id',b.request_id);if(items.error)throw items.error;
   const ids=(items.data||[]).map((x:any)=>x.item_id),offers=ids.length?await db.from('procurement_offers').select('*').in('item_id',ids).eq('selected',true):{data:[],error:null};if(offers.error)throw offers.error;
+  if(ids.length){const previousItems=await db.from('procurement_order_items').select('order_id').in('request_item_id',ids);if(previousItems.error)throw previousItems.error;const previousOrderIds=[...new Set((previousItems.data||[]).map((x:any)=>x.order_id))];if(previousOrderIds.length){const active=await db.from('procurement_orders').select('order_id').in('order_id',previousOrderIds).in('status',['RASCUNHO','EMITIDO','PARCIALMENTE_RECEBIDO']);if(active.error)throw active.error;if(active.data?.length)throw Error('ACTIVE_ORDERS_EXIST')}}
   if(!(offers.data||[]).length||(offers.data||[]).some((x:any)=>!x.supplier_id))throw Error('SELECT_OFFERS_FIRST');
   const missing=(items.data||[]).filter((x:any)=>!(offers.data||[]).some((o:any)=>o.item_id===x.item_id));if(missing.length)throw Error('SELECT_ALL_OFFERS');
   const groups=new Map<string,any[]>();for(const o of offers.data||[]){const arr=groups.get(o.supplier_id)||[];arr.push(o);groups.set(o.supplier_id,arr)}
@@ -217,8 +220,33 @@ async function requestStatus(a:any,b:any){
   if(!can(a,'compras.cotar')&&!can(a,'compras.aprovar'))throw Error('FORBIDDEN');
   const requestId=String(b.request_id||''),target=String(b.status||'').toUpperCase();if(!['ENCERRADO','REABRIR'].includes(target))throw Error('INVALID_STATUS');
   const current=await db.from('procurement_requests').select('request_id,status').eq('request_id',requestId).maybeSingle();if(current.error||!current.data)throw Error('INVALID_REQUEST');
-  let status='ENCERRADO';if(target==='REABRIR'){const items=await db.from('procurement_request_items').select('item_id').eq('request_id',requestId);if(items.error)throw items.error;const ids=(items.data||[]).map((x:any)=>x.item_id);let offerCount=0;if(ids.length){const offers=await db.from('procurement_offers').select('offer_id',{count:'exact',head:true}).in('item_id',ids);if(offers.error)throw offers.error;offerCount=offers.count||0}status=offerCount?'COTANDO':'SOLICITADA'}
-  const updated=await db.from('procurement_requests').update({status,updated_at:new Date().toISOString()}).eq('request_id',requestId);if(updated.error)throw updated.error;await audit(a,status==='ENCERRADO'?'REQUEST_CLOSED':'REQUEST_REOPENED',requestId,{before:current.data.status,after:status});return{ok:true,status};
+  let status='ENCERRADO',cancelledOrders:string[]=[];if(target==='REABRIR'){
+    const items=await db.from('procurement_request_items').select('item_id').eq('request_id',requestId);if(items.error)throw items.error;const ids=(items.data||[]).map((x:any)=>x.item_id);let offerCount=0;
+    if(ids.length){
+      const offers=await db.from('procurement_offers').select('offer_id',{count:'exact',head:true}).in('item_id',ids);if(offers.error)throw offers.error;offerCount=offers.count||0;
+      const orderItems=await db.from('procurement_order_items').select('order_id,received_quantity').in('request_item_id',ids);if(orderItems.error)throw orderItems.error;
+      if((orderItems.data||[]).some((x:any)=>Number(x.received_quantity||0)>0))throw Error('REQUEST_HAS_RECEIPTS');
+      const orderIds=[...new Set((orderItems.data||[]).map((x:any)=>String(x.order_id)))];
+      if(orderIds.length){const orders=await db.from('procurement_orders').select('order_id,status').in('order_id',orderIds);if(orders.error)throw orders.error;cancelledOrders=(orders.data||[]).filter((x:any)=>!['CANCELADO','RECEBIDO'].includes(x.status)).map((x:any)=>x.order_id);if(cancelledOrders.length){const cancelled=await db.from('procurement_orders').update({status:'CANCELADO',updated_at:new Date().toISOString()}).in('order_id',cancelledOrders);if(cancelled.error)throw cancelled.error}}
+      const resetOffers=await db.from('procurement_offers').update({selected:false,updated_at:new Date().toISOString()}).in('item_id',ids);if(resetOffers.error)throw resetOffers.error;
+      const resetItems=await db.from('procurement_request_items').update({status:offerCount?'COTANDO':'SOLICITADA'}).in('item_id',ids);if(resetItems.error)throw resetItems.error;
+    }
+    status=offerCount?'COTANDO':'SOLICITADA';
+  }
+  const updated=await db.from('procurement_requests').update({status,updated_at:new Date().toISOString()}).eq('request_id',requestId);if(updated.error)throw updated.error;await audit(a,status==='ENCERRADO'?'REQUEST_CLOSED':'REQUEST_REOPENED',requestId,{before:current.data.status,after:status,cancelled_orders:cancelledOrders});return{ok:true,status,cancelled_orders:cancelledOrders};
+}
+async function requestSuppliers(a:any,b:any){
+  if(!can(a,'compras.cotar')&&!can(a,'compras.criar_solicitacao'))throw Error('FORBIDDEN');
+  const requestId=String(b.request_id||''),supplierIds=[...new Set((Array.isArray(b.supplier_ids)?b.supplier_ids:[]).map(String).filter(Boolean))],now=new Date().toISOString();if(!supplierIds.length)throw Error('SELECT_SUPPLIERS_FIRST');
+  const request=await db.from('procurement_requests').select('request_id,status').eq('request_id',requestId).maybeSingle();if(request.error||!request.data||!['SOLICITADA','COTANDO','APROVADA'].includes(request.data.status))throw Error('INVALID_REQUEST_EDIT');
+  const suppliers=await db.from('inventory_suppliers').select('supplier_id').in('supplier_id',supplierIds).eq('status','ATIVO');if(suppliers.error)throw suppliers.error;if((suppliers.data||[]).length!==supplierIds.length)throw Error('INVALID_SUPPLIER');
+  const items=await db.from('procurement_request_items').select('item_id').eq('request_id',requestId);if(items.error)throw items.error;const itemIds=(items.data||[]).map((x:any)=>x.item_id);
+  const offers=itemIds.length?await db.from('procurement_offers').select('supplier_id').in('item_id',itemIds):{data:[],error:null};if(offers.error)throw offers.error;const responded=new Set((offers.data||[]).map((x:any)=>String(x.supplier_id)));
+  const removed=await db.from('procurement_request_suppliers').delete().eq('request_id',requestId);if(removed.error)throw removed.error;
+  const rows=supplierIds.map((supplier_id:string)=>({request_id:requestId,supplier_id,status:responded.has(supplier_id)?'RESPONDIDA':'PENDENTE',responded_at:responded.has(supplier_id)?now:null,created_by:a.email,updated_at:now}));const saved=await db.from('procurement_request_suppliers').insert(rows);if(saved.error)throw saved.error;
+  if(itemIds.length){const selected=await db.from('procurement_offers').update({selected:false,updated_at:now}).in('item_id',itemIds);if(selected.error)throw selected.error;const itemStatus=await db.from('procurement_request_items').update({status:offers.data?.length?'COTANDO':'SOLICITADA'}).in('item_id',itemIds);if(itemStatus.error)throw itemStatus.error}
+  const nextStatus=offers.data?.length?'COTANDO':'SOLICITADA';const updated=await db.from('procurement_requests').update({status:nextStatus,updated_at:now}).eq('request_id',requestId);if(updated.error)throw updated.error;
+  await audit(a,'REQUEST_SUPPLIERS_UPDATED',requestId,{supplier_ids:supplierIds});return{ok:true,status:nextStatus,supplier_ids:supplierIds};
 }
 async function deleteRequest(a:any,b:any){
   if(!a.admin)throw Error('FORBIDDEN');
@@ -293,6 +321,7 @@ Deno.serve(async req=>{
     if(req.method==='POST'&&path==='supplier-contacts')return reply(await supplierContacts(a,await req.json()));
     if(req.method==='POST'&&path==='bulk-offers')return reply(await bulkOffers(a,await req.json()));
     if(req.method==='POST'&&path==='request-status')return reply(await requestStatus(a,await req.json()));
+    if(req.method==='POST'&&path==='request-suppliers')return reply(await requestSuppliers(a,await req.json()));
     if(req.method==='POST'&&path==='delete-request')return reply(await deleteRequest(a,await req.json()));
     if(req.method==='POST'&&path==='order-tracking')return reply(await orderTracking(a,await req.json()));
     if(req.method==='POST'&&path==='order-document')return reply(await orderDocument(a,req));
@@ -302,7 +331,7 @@ Deno.serve(async req=>{
     if(req.method==='POST'&&path==='link-item')return reply(await linkItem(a,await req.json()));
     return reply({error:'NOT_FOUND'},404);
   }catch(error){
-    const message=String(error?.message||error),status=message.includes('UNAUTHORIZED')?401:message.includes('FORBIDDEN')?403:message.includes('INVALID')||message.includes('SELECT_')?400:500;
+    const message=String(error?.message||error),status=message.includes('UNAUTHORIZED')?401:message.includes('FORBIDDEN')?403:message==='REQUEST_HAS_RECEIPTS'||message==='ACTIVE_ORDERS_EXIST'?409:message.includes('INVALID')||message.includes('SELECT_')?400:500;
     if(a&&status===403)await db.from('access_audit').insert({actor_email:a.email,action:'PROCUREMENT_ACCESS_DENIED',target:'procurement-api',detail:{message}}).catch(()=>{});
     return reply({error:message},status);
   }

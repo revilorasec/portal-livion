@@ -22,7 +22,7 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=15/);
+  assert.match(html,/compras-cotacoes\.js\?v=16/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
@@ -35,7 +35,7 @@ test('app possui entrada e instalacao independentes no Portal Livion',()=>{
 test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>{
   assert.match(inventory,/data-app-version="19"/);
   assert.match(inventory,/data-v="quotes"/);
-  assert.match(inventory,/estoque-quotes-v19\.js\?v=15/);
+  assert.match(inventory,/estoque-quotes-v19\.js\?v=16/);
   assert.match(inventoryQuotes,/quoteProductBtn/);
   assert.match(inventoryQuotes,/product_id/);
   assert.match(js,/startupProductId/);
@@ -84,6 +84,19 @@ test('pedidos ficam agrupados e recolhidos por numero da cotacao',()=>{
   assert.match(js,/quote-order-link/);
 });
 
+test('reabrir cancela pedidos sem entrada e permite revisar fornecedores',()=>{
+  assert.match(api,/REQUEST_HAS_RECEIPTS/);
+  assert.match(api,/status:'CANCELADO'/);
+  assert.match(api,/selected:false/);
+  assert.match(api,/path==='request-suppliers'/);
+  assert.match(api,/REQUEST_SUPPLIERS_UPDATED/);
+  assert.match(api,/ACTIVE_ORDERS_EXIST/);
+  assert.match(js,/Alterar fornecedores/);
+  assert.match(js,/data-edit-suppliers/);
+  assert.match(js,/o\.status!=='CANCELADO'/);
+  assert.match(js,/Todos os pedidos sem recebimento serão cancelados/);
+});
+
 test('dolar preserva a taxa original e atualiza apenas a referencia atual',()=>{
   assert.match(quotes,/exchange_rate_original/);
   assert.match(quotes,/exchange_rate_current/);
@@ -129,8 +142,8 @@ test('pedido pode ser enviado por email ao fornecedor com apenas os itens venced
   assert.match(js,/\$\{doc\.quoteNumber\} \/ \$\{doc\.number\}/);
   assert.match(js,/LIVION_PURCHASE_ORDER_V1/);
   assert.match(js,/message\/rfc822/);
-  assert.match(inventoryQuotes,/searchParams\.set\('v','15'\)/);
-  assert.match(inventory,/estoque-quotes-v19\.js\?v=15/);
+  assert.match(inventoryQuotes,/searchParams\.set\('v','16'\)/);
+  assert.match(inventory,/estoque-quotes-v19\.js\?v=16/);
   assert.match(js,/order-dispatch-card/);
   assert.match(js,/Contato de compras não cadastrado/);
 });
