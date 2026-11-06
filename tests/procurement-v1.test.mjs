@@ -9,6 +9,7 @@ const schema=readFileSync(new URL('../supabase/migrations/20260923120000_procure
 const legacy=readFileSync(new URL('../supabase/migrations/20260923123000_procurement_legacy_import.sql',import.meta.url),'utf8');
 const quotes=readFileSync(new URL('../supabase/migrations/20261106133000_procurement_quotes_v1.sql',import.meta.url),'utf8');
 const workflow=readFileSync(new URL('../supabase/migrations/20261106135258_procurement_request_soft_delete.sql',import.meta.url),'utf8');
+const supplierDocuments=readFileSync(new URL('../supabase/migrations/20261106145607_procurement_supplier_documents.sql',import.meta.url),'utf8');
 const inventory=readFileSync(new URL('../estoque.html',import.meta.url),'utf8');
 const inventoryQuotes=readFileSync(new URL('../estoque-quotes-v19.js',import.meta.url),'utf8');
 const portal=readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -19,7 +20,7 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=5/);
+  assert.match(html,/compras-cotacoes\.js\?v=6/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
@@ -38,12 +39,30 @@ test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>
   assert.match(js,/startupProductId/);
 });
 
-test('v5 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
-  assert.match(js,/LIVION_QUOTE_V1/);
+test('v6 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
+  assert.match(js,/LIVION_QUOTE_V2/);
+  assert.match(html,/exceljs@4\.4\.0/);
   assert.match(js,/quoteWorkbook/);
   assert.match(js,/openResponseReview/);
+  assert.match(js,/quote-response-document/);
   assert.match(api,/path==='bulk-offers'/);
   assert.match(quotes,/procurement_request_suppliers/);
+});
+
+test('nova cotacao usa titulo automatico produto exato e unidades do cadastro',()=>{
+  assert.match(js,/autoRequestTitle/);
+  assert.match(js,/Título automático/);
+  assert.match(js,/Pesquise e escolha exatamente um item do estoque/);
+  assert.match(api,/SELECT_EXACT_PRODUCTS/);
+  assert.match(api,/inventory_catalog_options/);
+  assert.match(js,/unitOptions/);
+});
+
+test('seletor de fornecedores e compacto pesquisavel',()=>{
+  assert.match(js,/supplier-select-button/);
+  assert.match(js,/supplier-dropdown/);
+  assert.match(js,/selectedSupplierChips/);
+  assert.match(js,/Pesquisar fornecedor/);
 });
 
 test('dolar preserva a taxa original e atualiza apenas a referencia atual',()=>{
@@ -87,11 +106,37 @@ test('fornecedor aceita varios contatos de cotacao com nome email e telefone',()
   assert.match(api,/inventory_supplier_quote_contacts/);
 });
 
+test('fornecedor aceita logo privada usada na planilha de cotacao',()=>{
+  assert.match(js,/Logo do fornecedor/);
+  assert.match(js,/supplier-logo/);
+  assert.match(js,/workbookImage\(supplier\.photo_url\)/);
+  assert.match(api,/inventory_media/);
+  assert.match(api,/createSignedUrl\(logo\.object_path,3600\)/);
+  assert.match(api,/SUPPLIER_LOGO_UPDATED/);
+});
+
 test('Outlook recebe escopo sob demanda e cria rascunho com anexo',()=>{
   assert.match(portal,/__PORTAL_GET_OUTLOOK_TOKEN__/);
   assert.match(portal,/Mail\.ReadWrite/);
   assert.match(js,/graph\.microsoft\.com\/v1\.0\/me\/messages/);
   assert.match(js,/fileAttachment/);
+  assert.match(js,/outlook\.office\.com\/mail\/deeplink\/compose/);
+  assert.match(js,/Cotação Livion >/);
+});
+
+test('respostas multiplas mostram conversao em real pelo dolar atual',()=>{
+  assert.match(js,/Valor em real/);
+  assert.match(js,/USD ×/);
+  assert.match(js,/Cada planilha importada aparece separadamente/);
+  assert.match(api,/response_source:'XLSX_IMPORT'/);
+});
+
+test('ordem oficial do fornecedor fica anexada separada da nota fiscal',()=>{
+  assert.match(supplierDocuments,/SUPPLIER_PURCHASE_ORDER/);
+  assert.match(supplierDocuments,/procurement_response_documents/);
+  assert.match(js,/Ordem de compra oficial do fornecedor/);
+  assert.match(api,/QUOTE_RESPONSE_DOCUMENT_ADDED/);
+  assert.match(api,/getOrderDocument/);
 });
 
 test('app usa marca Livion e expõe o fluxo completo',()=>{
@@ -112,7 +157,7 @@ test('recebimento é transacional, idempotente e integra com estoque',()=>{
 test('migração histórica não cria movimentações de estoque',()=>{
   assert.match(schema,/procurement_legacy_rows/);
   assert.match(legacy,/Histórico importado; não gerou movimentação de estoque/);
-  assert.match(js,/Vincular ao estoque/);
+  assert.match(js,/Produto não localizado no estoque/);
 });
 
 test('sugestão de vínculo permanece local e exige alta confiança',()=>{

@@ -29,7 +29,7 @@ async function audit(a:any,event:string,id:string,detail:unknown={}){
 async function bootstrap(a:any){
   need(a,'compras.visualizar');
   const currentFx=await latestPtax(a,false);
-  const[d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,fx]=await Promise.all([
+  const[d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,catalog,fx]=await Promise.all([
     db.from('procurement_dashboard').select('*').single(),
     db.from('procurement_requests').select('*').is('deleted_at',null).order('created_at',{ascending:false}).limit(2500),
     db.from('procurement_request_items').select('*').limit(10000),
@@ -37,31 +37,43 @@ async function bootstrap(a:any){
     db.from('procurement_orders').select('*').order('created_at',{ascending:false}).limit(5000),
     db.from('procurement_order_items').select('*').limit(15000),
     db.from('procurement_order_documents').select('*').order('created_at',{ascending:false}).limit(10000),
-    db.from('inventory_suppliers').select('supplier_id,name,document,email,phone,status,photo_url').order('name').limit(2000),
+    db.from('inventory_suppliers').select('supplier_id,name,document,email,phone,address,notes,status,photo_url').order('name').limit(2000),
     db.from('inventory_stock_current').select('product_id,pn,description,category,item_type,unit,balance,min_stock,ideal_stock,status').order('description').limit(3000),
     db.from('procurement_lead_time_stats').select('*').limit(3000),
     db.from('procurement_request_suppliers').select('*').limit(10000),
     db.from('inventory_supplier_quote_contacts').select('*').eq('active',true).order('is_primary',{ascending:false}).limit(5000),
+    db.from('inventory_catalog_options').select('value,sort_order').eq('option_type','UNIT').eq('active',true).order('sort_order').order('value'),
     db.from('procurement_fx_rates').select('*').eq('base_currency','USD').eq('quote_currency','BRL').order('rate_at',{ascending:false}).limit(1)
   ]);
-  for(const r of [d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,fx])if(r.error)throw r.error;
+  for(const r of [d,requests,items,offers,orders,orderItems,orderDocuments,suppliers,products,lead,requestSuppliers,contacts,catalog,fx])if(r.error)throw r.error;
+  const supplierIds=(suppliers.data||[]).map((x:any)=>x.supplier_id),supplierLogos=supplierIds.length?await db.from('inventory_media').select('entity_id,bucket,object_path').eq('entity_type','SUPPLIER').eq('position',1).in('entity_id',supplierIds):{data:[],error:null};
+  if(supplierLogos.error)throw supplierLogos.error;
+  const logoUrls=new Map<string,string>();
+  for(const logo of supplierLogos.data||[]){const signed=await db.storage.from(logo.bucket).createSignedUrl(logo.object_path,3600);if(signed.data?.signedUrl)logoUrls.set(logo.entity_id,signed.data.signedUrl)}
+  const suppliersWithLogos=(suppliers.data||[]).map((x:any)=>({...x,photo_url:logoUrls.get(x.supplier_id)||x.photo_url||null}));
   const showValues=can(a,'compras.visualizar_valores');
   const cleanOffer=(x:any)=>showValues?x:{...x,unit_price:null,total_price:null,exchange_rate:null,payment_terms:null};
   const cleanOrder=(x:any)=>showValues?x:{...x,total_value:null,payment_terms:null};
   const cleanOrderItem=(x:any)=>showValues?x:{...x,unit_price:null,total_price:null};
   const requestIds=new Set((requests.data||[]).map((x:any)=>x.request_id)),activeItems=(items.data||[]).filter((x:any)=>requestIds.has(x.request_id)),itemIds=new Set(activeItems.map((x:any)=>x.item_id));
-  return{dashboard:d.data,requests:requests.data||[],items:activeItems,offers:(offers.data||[]).filter((x:any)=>itemIds.has(x.item_id)).map(cleanOffer),orders:(orders.data||[]).map(cleanOrder),orderItems:(orderItems.data||[]).map(cleanOrderItem),orderDocuments:orderDocuments.data||[],suppliers:suppliers.data||[],products:products.data||[],leadTimes:lead.data||[],requestSuppliers:(requestSuppliers.data||[]).filter((x:any)=>requestIds.has(x.request_id)),supplierContacts:contacts.data||[],fx:currentFx,user:{name:a.user.name,email:a.email,administrator:a.admin},permissions:{create:can(a,'compras.criar_solicitacao'),quote:can(a,'compras.cotar'),approve:can(a,'compras.aprovar'),order:can(a,'compras.emitir_pedido'),receive:can(a,'compras.receber'),values:showValues,supplier:can(a,'compras.gerenciar_fornecedores'),export:can(a,'compras.exportar')}};
+  return{dashboard:d.data,requests:requests.data||[],items:activeItems,offers:(offers.data||[]).filter((x:any)=>itemIds.has(x.item_id)).map(cleanOffer),orders:(orders.data||[]).map(cleanOrder),orderItems:(orderItems.data||[]).map(cleanOrderItem),orderDocuments:orderDocuments.data||[],suppliers:suppliersWithLogos,products:products.data||[],units:(catalog.data||[]).map((x:any)=>x.value),leadTimes:lead.data||[],requestSuppliers:(requestSuppliers.data||[]).filter((x:any)=>requestIds.has(x.request_id)),supplierContacts:contacts.data||[],fx:currentFx,user:{name:a.user.name,email:a.email,administrator:a.admin},permissions:{create:can(a,'compras.criar_solicitacao'),quote:can(a,'compras.cotar'),approve:can(a,'compras.aprovar'),order:can(a,'compras.emitir_pedido'),receive:can(a,'compras.receber'),values:showValues,supplier:can(a,'compras.gerenciar_fornecedores'),export:can(a,'compras.exportar')}};
 }
 async function saveRequest(a:any,b:any){
   need(a,'compras.criar_solicitacao');
   const items=Array.isArray(b.items)?b.items:[],supplierIds=[...new Set((Array.isArray(b.supplier_ids)?b.supplier_ids:[]).map(String).filter(Boolean))];
-  if(!String(b.title||'').trim()||!items.length)throw Error('INVALID_REQUEST');
+  if(!items.length)throw Error('INVALID_REQUEST');
   if(b.submit&&!supplierIds.length)throw Error('SELECT_SUPPLIERS_FIRST');
-  const preparedItems=items.map((x:any,i:number)=>({line_number:i+1,inventory_product_id:x.inventory_product_id||null,description:String(x.description||'').trim(),manufacturer:String(x.manufacturer||'').trim()||null,category:String(x.category||'').trim()||null,quantity:Number(x.quantity),unit:String(x.unit||'UNIDADE').trim(),quantity_notes:String(x.quantity_notes||'').trim()||null}));
-  if(preparedItems.some((x:any)=>!x.description||!Number.isFinite(x.quantity)||x.quantity<=0))throw Error('INVALID_REQUEST_ITEMS');
+  const productIds=[...new Set(items.map((x:any)=>String(x.inventory_product_id||'')).filter(Boolean))];
+  if(productIds.length!==items.length)throw Error('SELECT_EXACT_PRODUCTS');
+  const products=await db.from('inventory_products').select('product_id,pn,description,category,item_type,unit,status').in('product_id',productIds).eq('status','ATIVO');if(products.error)throw products.error;
+  const productMap=new Map((products.data||[]).map((x:any)=>[x.product_id,x]));if(productMap.size!==productIds.length)throw Error('SELECT_EXACT_PRODUCTS');
+  const allowedUnits=await db.from('inventory_catalog_options').select('value').eq('option_type','UNIT').eq('active',true);if(allowedUnits.error)throw allowedUnits.error;const unitSet=new Set((allowedUnits.data||[]).map((x:any)=>String(x.value)));
+  const preparedItems=items.map((x:any,i:number)=>{const p:any=productMap.get(String(x.inventory_product_id));const unit=String(x.unit||p.unit||'UNIDADE').trim();return{line_number:i+1,inventory_product_id:p.product_id,description:p.description,manufacturer:null,category:p.category||p.item_type||null,quantity:Number(x.quantity),unit,quantity_notes:String(x.quantity_notes||'').trim()||null}});
+  if(preparedItems.some((x:any)=>!Number.isFinite(x.quantity)||x.quantity<=0||!unitSet.has(x.unit)))throw Error('INVALID_REQUEST_ITEMS');
+  const first:any=productMap.get(String(items[0].inventory_product_id)),title=preparedItems.length===1?`Cotação - ${first.pn} - ${first.description}`:`Cotação - ${first.pn} e mais ${preparedItems.length-1} item(ns)`;
   const urgency=String(b.urgency||'MEDIA').toUpperCase();
   if(!['BAIXA','MEDIA','ALTA','CRITICA'].includes(urgency))throw Error('INVALID_URGENCY');
-  const row={title:String(b.title).trim(),requester_email:a.email,department:String(b.department||'').trim()||null,urgency,needed_at:b.needed_at||null,notes:String(b.notes||'').trim()||null,status:b.submit?'SOLICITADA':'RASCUNHO',source:'PORTAL',created_by:a.email,updated_at:new Date().toISOString()};
+  const row={title,requester_email:a.email,department:String(b.department||'').trim()||null,urgency,needed_at:b.needed_at||null,notes:String(b.notes||'').trim()||null,status:b.submit?'SOLICITADA':'RASCUNHO',source:'PORTAL',created_by:a.email,updated_at:new Date().toISOString()};
   let saved:any;
   if(b.request_id){
     const current=await db.from('procurement_requests').select('request_id,status,requester_email').eq('request_id',b.request_id).maybeSingle();if(current.error||!current.data||current.data.status!=='RASCUNHO'||(!a.admin&&current.data.requester_email!==a.email))throw Error('INVALID_REQUEST_EDIT');
@@ -139,6 +151,17 @@ async function supplier(a:any,b:any){
   const row={supplier_id:b.supplier_id||crypto.randomUUID(),name,document:String(b.document||'').trim()||null,email:String(b.email||'').trim()||null,phone:String(b.phone||'').trim()||null,address:String(b.address||'').trim()||null,status:'ATIVO',notes:String(b.notes||'').trim()||null,updated_at:new Date().toISOString()};
   const saved=await db.from('inventory_suppliers').upsert(row,{onConflict:'supplier_id'}).select().single();if(saved.error)throw saved.error;return{ok:true,supplier:saved.data};
 }
+async function supplierLogo(a:any,r:Request){
+  need(a,'compras.gerenciar_fornecedores');
+  const form=await r.formData(),supplierId=String(form.get('supplier_id')||''),file=form.get('file');
+  if(!supplierId||!(file instanceof File)||!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10485760)throw Error('INVALID_SUPPLIER_LOGO');
+  const supplier=await db.from('inventory_suppliers').select('supplier_id').eq('supplier_id',supplierId).maybeSingle();if(supplier.error||!supplier.data)throw Error('INVALID_SUPPLIER');
+  const old=(await db.from('inventory_media').select('*').match({entity_type:'SUPPLIER',entity_id:supplierId,position:1}).maybeSingle()).data;
+  const ext=file.type.split('/')[1].replace('jpeg','jpg'),path=`supplier/${supplierId}/${crypto.randomUUID()}.${ext}`,stored=await db.storage.from('inventory-media').upload(path,file,{contentType:file.type});if(stored.error)throw stored.error;
+  const saved=await db.from('inventory_media').upsert({entity_type:'SUPPLIER',entity_id:supplierId,position:1,bucket:'inventory-media',object_path:path,mime_type:file.type,byte_size:file.size,created_by:a.email},{onConflict:'entity_type,entity_id,position'});if(saved.error){await db.storage.from('inventory-media').remove([path]);throw saved.error}
+  if(old)await db.storage.from(old.bucket).remove([old.object_path]);
+  await audit(a,'SUPPLIER_LOGO_UPDATED',supplierId,{mime_type:file.type,byte_size:file.size});return{ok:true};
+}
 async function supplierContacts(a:any,b:any){
   need(a,'compras.gerenciar_fornecedores');
   const supplierId=String(b.supplier_id||''),contacts=Array.isArray(b.contacts)?b.contacts.slice(0,20):[];
@@ -206,12 +229,18 @@ async function orderTracking(a:any,b:any){
   const updated=await db.from('procurement_orders').update(row).eq('order_id',orderId).select('order_id');if(updated.error||!updated.data?.length)throw Error('INVALID_ORDER');await audit(a,'ORDER_TRACKING_UPDATED',orderId,row);return{ok:true};
 }
 async function orderDocument(a:any,r:Request){
-  need(a,'compras.receber');const form=await r.formData(),file=form.get('file'),orderId=String(form.get('order_id')||'');
-  if(!(file instanceof File)||!orderId||file.size<=0||file.size>10485760)throw Error('INVALID_ORDER_DOCUMENT');
-  const lower=file.name.toLowerCase(),kind=lower.endsWith('.xml')?'NFE_XML':lower.endsWith('.pdf')?'DANFE_PDF':'';if(!kind)throw Error('INVALID_ORDER_DOCUMENT');
+  if(!can(a,'compras.receber')&&!can(a,'compras.emitir_pedido'))throw Error('FORBIDDEN');const form=await r.formData(),file=form.get('file'),orderId=String(form.get('order_id')||''),requestedKind=String(form.get('kind')||'').toUpperCase();
+  if(!(file instanceof File)||!orderId||file.size<=0||file.size>20971520)throw Error('INVALID_ORDER_DOCUMENT');
+  const lower=file.name.toLowerCase(),isSupplierOrder=requestedKind==='SUPPLIER_PURCHASE_ORDER',allowedSupplier=/\.(pdf|png|jpe?g|xlsx?|docx?)$/.test(lower);let kind=isSupplierOrder&&allowedSupplier?'SUPPLIER_PURCHASE_ORDER':lower.endsWith('.xml')?'NFE_XML':lower.endsWith('.pdf')?'DANFE_PDF':'';if(!kind)throw Error('INVALID_ORDER_DOCUMENT');
   const order=await db.from('procurement_orders').select('order_id').eq('order_id',orderId).maybeSingle();if(order.error||!order.data)throw Error('INVALID_ORDER');
-  const ext=kind==='NFE_XML'?'xml':'pdf',path=`orders/${orderId}/${crypto.randomUUID()}.${ext}`,mime=kind==='NFE_XML'?'application/xml':'application/pdf',uploaded=await db.storage.from('procurement-documents').upload(path,file,{contentType:mime});if(uploaded.error)throw uploaded.error;
+  const ext=(lower.match(/\.([a-z0-9]+)$/)?.[1]||'bin'),path=`orders/${orderId}/${crypto.randomUUID()}.${ext}`,mime=file.type||(kind==='NFE_XML'?'application/xml':kind==='DANFE_PDF'?'application/pdf':'application/octet-stream'),uploaded=await db.storage.from('procurement-documents').upload(path,file,{contentType:mime});if(uploaded.error)throw uploaded.error;
   const saved=await db.from('procurement_order_documents').insert({order_id:orderId,kind,bucket:'procurement-documents',object_path:path,file_name:file.name.slice(0,240),mime_type:file.type||mime,file_size:file.size,created_by:a.email}).select().single();if(saved.error){await db.storage.from('procurement-documents').remove([path]);throw saved.error}await audit(a,'ORDER_DOCUMENT_ADDED',orderId,{document_id:saved.data.document_id,kind,file_name:saved.data.file_name});return{ok:true,document:saved.data};
+}
+async function getOrderDocument(a:any,u:URL){
+  need(a,'compras.visualizar');const documentId=String(u.searchParams.get('document_id')||'');if(!documentId)throw Error('INVALID_ORDER_DOCUMENT');const document=await db.from('procurement_order_documents').select('*').eq('document_id',documentId).maybeSingle();if(document.error||!document.data)throw Error('INVALID_ORDER_DOCUMENT');const signed=await db.storage.from(document.data.bucket).createSignedUrl(document.data.object_path,300);if(signed.error)throw signed.error;return{url:signed.data.signedUrl,file_name:document.data.file_name};
+}
+async function quoteResponseDocument(a:any,r:Request){
+  need(a,'compras.cotar');const form=await r.formData(),file=form.get('file'),requestId=String(form.get('request_id')||''),supplierId=String(form.get('supplier_id')||'');if(!(file instanceof File)||!requestId||!supplierId||file.size<=0||file.size>20971520||!(/\.xlsx?$/i.test(file.name)))throw Error('INVALID_QUOTE_RESPONSE');const link=await db.from('procurement_request_suppliers').select('request_supplier_id').eq('request_id',requestId).eq('supplier_id',supplierId).maybeSingle();if(link.error||!link.data)throw Error('INVALID_REQUEST_SUPPLIER');const ext=file.name.toLowerCase().endsWith('.xls')?'xls':'xlsx',path=`responses/${requestId}/${supplierId}/${crypto.randomUUID()}.${ext}`,mime=file.type||(ext==='xlsx'?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.ms-excel'),uploaded=await db.storage.from('procurement-documents').upload(path,file,{contentType:mime});if(uploaded.error)throw uploaded.error;const saved=await db.from('procurement_response_documents').insert({request_id:requestId,supplier_id:supplierId,object_path:path,file_name:file.name.slice(0,240),mime_type:mime,file_size:file.size,uploaded_by:a.email}).select().single();if(saved.error){await db.storage.from('procurement-documents').remove([path]);throw saved.error}await audit(a,'QUOTE_RESPONSE_DOCUMENT_ADDED',requestId,{document_id:saved.data.document_id,supplier_id:supplierId,file_name:saved.data.file_name});return{ok:true,document:saved.data};
 }
 async function markSent(a:any,b:any){
   if(!can(a,'compras.cotar')&&!can(a,'compras.exportar'))throw Error('FORBIDDEN');const requestId=String(b.request_id||''),supplierId=String(b.supplier_id||''),now=new Date().toISOString();const updated=await db.from('procurement_request_suppliers').update({status:'ENVIADA',sent_at:now,updated_at:now}).eq('request_id',requestId).eq('supplier_id',supplierId).select('request_supplier_id');if(updated.error||!updated.data?.length)throw Error('INVALID_REQUEST_SUPPLIER');await audit(a,'QUOTE_SENT',requestId,{supplier_id:supplierId});return{ok:true,sent_at:now};
@@ -247,6 +276,7 @@ Deno.serve(async req=>{
     if(req.method==='GET'&&path==='bootstrap')return reply(await bootstrap(a));
     if(req.method==='GET'&&path==='fx')return reply({fx:await latestPtax(a,new URL(req.url).searchParams.get('refresh')==='1')});
     if(req.method==='GET'&&path==='request-history')return reply(await requestHistory(a,new URL(req.url)));
+    if(req.method==='GET'&&path==='order-document')return reply(await getOrderDocument(a,new URL(req.url)));
     if(req.method==='GET'&&path==='supplier-contacts')return reply(await getSupplierContacts(a,new URL(req.url)));
     if(req.method==='POST'&&path==='request')return reply(await saveRequest(a,await req.json()));
     if(req.method==='POST'&&path==='offer')return reply(await saveOffer(a,await req.json()));
@@ -254,12 +284,14 @@ Deno.serve(async req=>{
     if(req.method==='POST'&&path==='issue-orders')return reply(await issueOrders(a,await req.json()));
     if(req.method==='POST'&&path==='receive')return reply(await receive(a,await req.json()));
     if(req.method==='POST'&&path==='supplier')return reply(await supplier(a,await req.json()));
+    if(req.method==='POST'&&path==='supplier-logo')return reply(await supplierLogo(a,req));
     if(req.method==='POST'&&path==='supplier-contacts')return reply(await supplierContacts(a,await req.json()));
     if(req.method==='POST'&&path==='bulk-offers')return reply(await bulkOffers(a,await req.json()));
     if(req.method==='POST'&&path==='request-status')return reply(await requestStatus(a,await req.json()));
     if(req.method==='POST'&&path==='delete-request')return reply(await deleteRequest(a,await req.json()));
     if(req.method==='POST'&&path==='order-tracking')return reply(await orderTracking(a,await req.json()));
     if(req.method==='POST'&&path==='order-document')return reply(await orderDocument(a,req));
+    if(req.method==='POST'&&path==='quote-response-document')return reply(await quoteResponseDocument(a,req));
     if(req.method==='POST'&&path==='mark-sent')return reply(await markSent(a,await req.json()));
     if(req.method==='POST'&&path==='suggest-product')return reply(await suggestProduct(a,await req.json()));
     if(req.method==='POST'&&path==='link-item')return reply(await linkItem(a,await req.json()));
