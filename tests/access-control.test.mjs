@@ -17,3 +17,10 @@ test('RH continua bloqueado para perfil operacional', () => {
   assert.deepEqual(context?.apps, ['fretes']);
   assert.equal(canAccessApp(context, 'rh'), false);
 });
+
+test('perfil Funcionário recebe somente o RH e nenhuma ação administrativa', () => {
+  const context = contextFromRow({ active: 1, profile: 'FUNCIONARIO', email: 'funcionario@example.com', apps_json: '["fretes","rh"]', actions_json: '["rh.editar_funcionarios"]', companies_json: '["LIVION"]' });
+  assert.deepEqual(context?.apps, ['rh']);
+  assert.deepEqual(context?.actions, []);
+  assert.equal(canAccessApp(context, 'fretes'), false);
+});
