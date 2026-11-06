@@ -22,7 +22,7 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=11/);
+  assert.match(html,/compras-cotacoes\.js\?v=12/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
@@ -35,7 +35,7 @@ test('app possui entrada e instalacao independentes no Portal Livion',()=>{
 test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>{
   assert.match(inventory,/data-app-version="19"/);
   assert.match(inventory,/data-v="quotes"/);
-  assert.match(inventory,/estoque-quotes-v19\.js\?v=11/);
+  assert.match(inventory,/estoque-quotes-v19\.js\?v=12/);
   assert.match(inventoryQuotes,/quoteProductBtn/);
   assert.match(inventoryQuotes,/product_id/);
   assert.match(js,/startupProductId/);
@@ -108,11 +108,16 @@ test('pedido pode ser enviado por email ao fornecedor com apenas os itens venced
   assert.match(js,/Enviar pedidos aos fornecedores/);
   assert.match(js,/Enviar pedido por e-mail/);
   assert.match(js,/PEDIDO DE COMPRA CONFIRMADO/);
-  assert.match(js,/Pedido de compra confirmado Livion/);
+  assert.match(js,/Pedido de compra Livion/);
+  assert.match(js,/function orderRequest/);
+  assert.match(js,/quote-order-link/);
+  assert.match(js,/\$\{doc\.quoteNumber\} \/ \$\{doc\.number\}/);
   assert.match(js,/LIVION_PURCHASE_ORDER_V1/);
   assert.match(js,/message\/rfc822/);
-  assert.match(inventoryQuotes,/searchParams\.set\('v','11'\)/);
-  assert.match(inventory,/estoque-quotes-v19\.js\?v=11/);
+  assert.match(inventoryQuotes,/searchParams\.set\('v','12'\)/);
+  assert.match(inventory,/estoque-quotes-v19\.js\?v=12/);
+  assert.match(js,/order-dispatch-card/);
+  assert.match(js,/Contato de compras não cadastrado/);
 });
 
 test('fornecedor aceita varios contatos de cotacao com nome email e telefone',()=>{
