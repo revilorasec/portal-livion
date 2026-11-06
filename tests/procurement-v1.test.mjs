@@ -22,7 +22,7 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=13/);
+  assert.match(html,/compras-cotacoes\.js\?v=14/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
@@ -35,7 +35,7 @@ test('app possui entrada e instalacao independentes no Portal Livion',()=>{
 test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>{
   assert.match(inventory,/data-app-version="19"/);
   assert.match(inventory,/data-v="quotes"/);
-  assert.match(inventory,/estoque-quotes-v19\.js\?v=13/);
+  assert.match(inventory,/estoque-quotes-v19\.js\?v=14/);
   assert.match(inventoryQuotes,/quoteProductBtn/);
   assert.match(inventoryQuotes,/product_id/);
   assert.match(js,/startupProductId/);
@@ -67,6 +67,14 @@ test('seletor de fornecedores e compacto pesquisavel',()=>{
   assert.match(js,/supplier-dropdown/);
   assert.match(js,/selectedSupplierChips/);
   assert.match(js,/Pesquisar fornecedor/);
+});
+
+test('cotacoes iniciam recolhidas e usam cores por status',()=>{
+  assert.match(js,/expandedRequests=new Set/);
+  assert.match(js,/data-toggle-request/);
+  assert.match(js,/aria-expanded/);
+  assert.match(js,/requestStatusTone/);
+  assert.match(js,/request-status-badge/);
 });
 
 test('dolar preserva a taxa original e atualiza apenas a referencia atual',()=>{
@@ -114,8 +122,8 @@ test('pedido pode ser enviado por email ao fornecedor com apenas os itens venced
   assert.match(js,/\$\{doc\.quoteNumber\} \/ \$\{doc\.number\}/);
   assert.match(js,/LIVION_PURCHASE_ORDER_V1/);
   assert.match(js,/message\/rfc822/);
-  assert.match(inventoryQuotes,/searchParams\.set\('v','13'\)/);
-  assert.match(inventory,/estoque-quotes-v19\.js\?v=13/);
+  assert.match(inventoryQuotes,/searchParams\.set\('v','14'\)/);
+  assert.match(inventory,/estoque-quotes-v19\.js\?v=14/);
   assert.match(js,/order-dispatch-card/);
   assert.match(js,/Contato de compras não cadastrado/);
 });
