@@ -38,7 +38,7 @@ const API='https://kvfjjtkwxxbvzlicwnrz.supabase.co/functions/v1/portal-api';
 const CLIENT='88cf5cba-9f67-467d-8a51-9638200bed52',TENANT='911e1aee-070e-421b-ae71-439f01c2263e';
 const REDIRECT=new URL('./',window.location.href).href;
 const GRAPH_INVITE_SCOPE='User.Invite.All';
-const PORTAL_VERSION='2026.10.28.1';
+const PORTAL_VERSION='2026.11.06.1';
 const TRUSTED_DEVICE_KEY='livion.portal.trusted-device.v1',LOGIN_AFTER_TRUST_KEY='livion.portal.login-after-trust.v1';
 let msalApp,ctx,token,catalog,users=[],audit=[],editing=null,currentApp=null;
 let portalAuthError='';
@@ -186,6 +186,6 @@ if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serv
 init();
 </script>
 <script src="./portal-admin-v2.js?v=1"></script>
-<script src="./portal-admin-v3.js?v=4"></script>
+<script src="./portal-admin-v3.js?v=5"></script>
 </body>
 </html>
