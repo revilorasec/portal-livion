@@ -10,6 +10,7 @@ const legacy=readFileSync(new URL('../supabase/migrations/20260923123000_procure
 const quotes=readFileSync(new URL('../supabase/migrations/20261106133000_procurement_quotes_v1.sql',import.meta.url),'utf8');
 const workflow=readFileSync(new URL('../supabase/migrations/20261106135258_procurement_request_soft_delete.sql',import.meta.url),'utf8');
 const supplierDocuments=readFileSync(new URL('../supabase/migrations/20261106145607_procurement_supplier_documents.sql',import.meta.url),'utf8');
+const quoteTitles=readFileSync(new URL('../supabase/migrations/20261106170000_procurement_quote_number_date_title.sql',import.meta.url),'utf8');
 const inventory=readFileSync(new URL('../estoque.html',import.meta.url),'utf8');
 const inventoryQuotes=readFileSync(new URL('../estoque-quotes-v19.js',import.meta.url),'utf8');
 const portal=readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -20,7 +21,7 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=7/);
+  assert.match(html,/compras-cotacoes\.js\?v=8/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
@@ -39,7 +40,7 @@ test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>
   assert.match(js,/startupProductId/);
 });
 
-test('v7 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
+test('v8 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
   assert.match(js,/LIVION_QUOTE_V2/);
   assert.match(html,/exceljs@4\.4\.0/);
   assert.match(js,/quoteWorkbook/);
@@ -117,13 +118,25 @@ test('fornecedor aceita logo privada usada na planilha de cotacao',()=>{
   assert.match(api,/SUPPLIER_LOGO_UPDATED/);
 });
 
-test('Outlook recebe escopo sob demanda e cria rascunho com anexo',()=>{
-  assert.match(portal,/__PORTAL_GET_OUTLOOK_TOKEN__/);
-  assert.match(portal,/Mail\.ReadWrite/);
-  assert.match(js,/graph\.microsoft\.com\/v1\.0\/me\/messages/);
-  assert.match(js,/fileAttachment/);
-  assert.match(js,/outlook\.office\.com\/mail\/deeplink\/compose/);
-  assert.match(js,/Cotação Livion >/);
+test('Outlook classico recebe rascunho EML nominal com Excel anexado',()=>{
+  assert.match(js,/X-Unsent: 1/);
+  assert.match(js,/message\/rfc822/);
+  assert.match(js,/Preparar no Outlook clássico/);
+  assert.match(js,/Olá, \$\{esc\(contactName\)\}/);
+  assert.match(js,/Content-Disposition: attachment/);
+});
+
+test('titulo oficial usa numero COT e data de criacao',()=>{
+  assert.match(js,/COT-\$\{String\(number\)\.padStart\(6,'0'\)\} -/);
+  assert.match(api,/officialTitle/);
+  assert.match(quoteTitles,/America\/Sao_Paulo/);
+  assert.match(quoteTitles,/DD\/MM\/YYYY/);
+});
+
+test('planilha destaca em amarelo os campos do fornecedor',()=>{
+  assert.match(js,/preencha todas as células amarelas/);
+  assert.match(js,/FFFFF2CC/);
+  assert.match(js,/FFFFD966/);
 });
 
 test('respostas multiplas mostram conversao em real pelo dolar atual',()=>{

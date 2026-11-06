@@ -71,7 +71,7 @@ async function saveRequest(a:any,b:any){
   const allowedUnits=await db.from('inventory_catalog_options').select('value').eq('option_type','UNIT').eq('active',true);if(allowedUnits.error)throw allowedUnits.error;const unitSet=new Set((allowedUnits.data||[]).map((x:any)=>String(x.value)));
   const preparedItems=items.map((x:any,i:number)=>{const p:any=productMap.get(String(x.inventory_product_id));const unit=String(x.unit||p.unit||'UNIDADE').trim();return{line_number:i+1,inventory_product_id:p.product_id,description:p.description,manufacturer:null,category:p.category||p.item_type||null,quantity:Number(x.quantity),unit,quantity_notes:String(x.quantity_notes||'').trim()||null}});
   if(preparedItems.some((x:any)=>!Number.isFinite(x.quantity)||x.quantity<=0||!unitSet.has(x.unit)))throw Error('INVALID_REQUEST_ITEMS');
-  const first:any=productMap.get(String(items[0].inventory_product_id)),title=preparedItems.length===1?`Cotação - ${first.pn} - ${first.description}`:`Cotação - ${first.pn} e mais ${preparedItems.length-1} item(ns)`;
+  const title=String(b.title||'Cotação em criação').trim();
   const urgency=String(b.urgency||'MEDIA').toUpperCase();
   if(!['BAIXA','MEDIA','ALTA','CRITICA'].includes(urgency))throw Error('INVALID_URGENCY');
   const row={title,requester_email:a.email,department:String(b.department||'').trim()||null,urgency,needed_at:b.needed_at||null,notes:String(b.notes||'').trim()||null,status:b.submit?'SOLICITADA':'RASCUNHO',source:'PORTAL',created_by:a.email,updated_at:new Date().toISOString()};
@@ -84,11 +84,13 @@ async function saveRequest(a:any,b:any){
     const removed=await db.from('procurement_request_items').delete().eq('request_id',b.request_id);if(removed.error)throw removed.error;
     await db.from('procurement_request_suppliers').delete().eq('request_id',b.request_id);
   }else{saved=await db.from('procurement_requests').insert(row).select().single();if(saved.error)throw saved.error}
+  const createdAt=new Date(saved.data.created_at||Date.now()),quoteDate=createdAt.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}),officialTitle=`COT-${String(saved.data.request_number).padStart(6,'0')} - ${quoteDate}`;
+  if(saved.data.title!==officialTitle){const named=await db.from('procurement_requests').update({title:officialTitle,updated_at:new Date().toISOString()}).eq('request_id',saved.data.request_id);if(named.error)throw named.error;saved.data.title=officialTitle}
   const itemRows=preparedItems.map((x:any)=>({...x,request_id:saved.data.request_id}));
   const inserted=await db.from('procurement_request_items').insert(itemRows);if(inserted.error)throw inserted.error;
   if(supplierIds.length){const supplierRows=supplierIds.map((supplier_id:string)=>({request_id:saved.data.request_id,supplier_id,status:b.submit?'ENVIADA':'PENDENTE',sent_at:b.submit?new Date().toISOString():null,created_by:a.email}));const linked=await db.from('procurement_request_suppliers').insert(supplierRows);if(linked.error)throw linked.error}
   await audit(a,row.status==='SOLICITADA'?'REQUEST_SUBMITTED':'REQUEST_SAVED',saved.data.request_id,{items:itemRows.length,suppliers:supplierIds.length});
-  return{ok:true,request_id:saved.data.request_id,request_number:saved.data.request_number};
+  return{ok:true,request_id:saved.data.request_id,request_number:saved.data.request_number,title:officialTitle};
 }
 async function saveOffer(a:any,b:any){
   need(a,'compras.cotar');

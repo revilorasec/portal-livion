@@ -4,10 +4,10 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0b1733"><title>Cotações do Estoque · Livion</title>
 <link rel="icon" href="./assets/icons/livion-64.png" type="image/png">
-<link rel="stylesheet" href="./compras-cotacoes.css?v=7">
+<link rel="stylesheet" href="./compras-cotacoes.css?v=8">
 </head>
 <body>
-<header class="top"><div><span class="eyebrow">Controle de Estoque</span><h1>Compras e Cotações</h1><p>Solicitação, fornecedores, negociação e recebimento no mesmo histórico</p></div><div class="top-right"><span id="fxBadge" class="fx-badge">Dólar BC: carregando…</span><button id="refreshFxBtn" class="btn">Atualizar dólar</button><span class="version">v7</span><button id="reloadBtn" class="btn">Atualizar</button><button id="newRequestBtn" class="btn primary">+ Nova cotação</button></div></header>
+<header class="top"><div><span class="eyebrow">Controle de Estoque</span><h1>Compras e Cotações</h1><p>Solicitação, fornecedores, negociação e recebimento no mesmo histórico</p></div><div class="top-right"><span id="fxBadge" class="fx-badge">Dólar BC: carregando…</span><button id="refreshFxBtn" class="btn">Atualizar dólar</button><span class="version">v8</span><button id="reloadBtn" class="btn">Atualizar</button><button id="newRequestBtn" class="btn primary">+ Nova cotação</button></div></header>
 <main>
   <div id="flash" class="flash hidden"></div>
   <section id="loading" class="loading">Carregando dados do Portal Livion…</section>
@@ -26,5 +26,5 @@
 <dialog id="modal"><form method="dialog" class="modal-card"><div class="modal-head"><div><span class="eyebrow" id="modalEyebrow"></span><h2 id="modalTitle"></h2></div><button value="cancel" class="icon-btn" aria-label="Fechar">×</button></div><div id="modalBody" class="modal-body"></div><div class="modal-actions"><button value="cancel" class="btn">Cancelar</button><button type="button" id="modalSave" class="btn primary">Salvar</button></div></form></dialog>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="./compras-cotacoes.js?v=7"></script>
+<script src="./compras-cotacoes.js?v=8"></script>
 </body></html>

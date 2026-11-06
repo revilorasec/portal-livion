@@ -10,7 +10,7 @@
   function openQuotes(productId=''){
     document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===nav));
     document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));section.classList.add('active');
-    const frame=document.getElementById('quotesFrame'),url=new URL('compras-cotacoes.html',location.href);url.searchParams.set('embedded','1');url.searchParams.set('v','7');if(productId)url.searchParams.set('product_id',productId);
+    const frame=document.getElementById('quotesFrame'),url=new URL('compras-cotacoes.html',location.href);url.searchParams.set('embedded','1');url.searchParams.set('v','8');if(productId)url.searchParams.set('product_id',productId);
     if(!frame.src||productId)frame.src=url.href;
   }
   nav.onclick=()=>openQuotes();
