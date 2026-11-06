@@ -34,7 +34,7 @@ test('tela abre todos os itens e pesquisa produto, fornecedor e datas sem dropdo
   assert.match(frontend,/supplierGroups/);
   assert.match(frontend,/Ver histórico de preços/);
   assert.match(html,/estoque-price-history\.js\?v=2/);
-  assert.match(html,/data-app-version="18"/);
+  assert.match(html,/data-app-version="19"/);
 });
 
 test('entrada manual explica e cria automaticamente a nota fiscal vinculada',()=>{

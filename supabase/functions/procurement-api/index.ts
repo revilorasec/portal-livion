@@ -14,7 +14,8 @@ async function auth(req:Request){
   let found=await db.from('portal_users').select('*').eq('microsoft_id',me.id).maybeSingle();
   if(!found.data)found=await db.from('portal_users').select('*').ilike('email',email).maybeSingle();
   const user=found.data,admin=user?.profile==='ADMINISTRADOR';
-  if(!user?.active||(!admin&&!(user.apps||[]).includes('compras-cotacoes')))throw Error('FORBIDDEN');
+  const apps=Array.isArray(user?.apps)?user.apps:[];
+  if(!user?.active||(!admin&&!apps.some((x:string)=>['compras-cotacoes','estoque'].includes(x))))throw Error('FORBIDDEN');
   return{user,email,admin,actions:Array.isArray(user.actions)?user.actions:[]};
 }
 const can=(a:any,key:string)=>a.admin||a.actions.includes(key);
@@ -27,36 +28,50 @@ async function audit(a:any,event:string,id:string,detail:unknown={}){
 }
 async function bootstrap(a:any){
   need(a,'compras.visualizar');
-  const[d,requests,items,offers,orders,orderItems,suppliers,products,lead]=await Promise.all([
+  const[d,requests,items,offers,orders,orderItems,suppliers,products,lead,requestSuppliers,contacts,fx]=await Promise.all([
     db.from('procurement_dashboard').select('*').single(),
     db.from('procurement_requests').select('*').order('created_at',{ascending:false}).limit(2500),
     db.from('procurement_request_items').select('*').limit(10000),
     db.from('procurement_offers').select('*').order('created_at',{ascending:false}).limit(15000),
     db.from('procurement_orders').select('*').order('created_at',{ascending:false}).limit(5000),
     db.from('procurement_order_items').select('*').limit(15000),
-    db.from('inventory_suppliers').select('supplier_id,name,document,email,phone,status').order('name').limit(2000),
+    db.from('inventory_suppliers').select('supplier_id,name,document,email,phone,status,photo_url').order('name').limit(2000),
     db.from('inventory_stock_current').select('product_id,pn,description,category,item_type,unit,balance,min_stock,ideal_stock,status').order('description').limit(3000),
-    db.from('procurement_lead_time_stats').select('*').limit(3000)
+    db.from('procurement_lead_time_stats').select('*').limit(3000),
+    db.from('procurement_request_suppliers').select('*').limit(10000),
+    db.from('inventory_supplier_quote_contacts').select('*').eq('active',true).order('is_primary',{ascending:false}).limit(5000),
+    db.from('procurement_fx_rates').select('*').eq('base_currency','USD').eq('quote_currency','BRL').order('rate_at',{ascending:false}).limit(1)
   ]);
-  for(const r of [d,requests,items,offers,orders,orderItems,suppliers,products,lead])if(r.error)throw r.error;
+  for(const r of [d,requests,items,offers,orders,orderItems,suppliers,products,lead,requestSuppliers,contacts,fx])if(r.error)throw r.error;
   const showValues=can(a,'compras.visualizar_valores');
   const cleanOffer=(x:any)=>showValues?x:{...x,unit_price:null,total_price:null,exchange_rate:null,payment_terms:null};
   const cleanOrder=(x:any)=>showValues?x:{...x,total_value:null,payment_terms:null};
   const cleanOrderItem=(x:any)=>showValues?x:{...x,unit_price:null,total_price:null};
-  return{dashboard:d.data,requests:requests.data||[],items:items.data||[],offers:(offers.data||[]).map(cleanOffer),orders:(orders.data||[]).map(cleanOrder),orderItems:(orderItems.data||[]).map(cleanOrderItem),suppliers:suppliers.data||[],products:products.data||[],leadTimes:lead.data||[],user:{name:a.user.name,email:a.email,administrator:a.admin},permissions:{create:can(a,'compras.criar_solicitacao'),quote:can(a,'compras.cotar'),approve:can(a,'compras.aprovar'),order:can(a,'compras.emitir_pedido'),receive:can(a,'compras.receber'),values:showValues,supplier:can(a,'compras.gerenciar_fornecedores'),export:can(a,'compras.exportar')}};
+  return{dashboard:d.data,requests:requests.data||[],items:items.data||[],offers:(offers.data||[]).map(cleanOffer),orders:(orders.data||[]).map(cleanOrder),orderItems:(orderItems.data||[]).map(cleanOrderItem),suppliers:suppliers.data||[],products:products.data||[],leadTimes:lead.data||[],requestSuppliers:requestSuppliers.data||[],supplierContacts:contacts.data||[],fx:fx.data?.[0]||null,user:{name:a.user.name,email:a.email,administrator:a.admin},permissions:{create:can(a,'compras.criar_solicitacao'),quote:can(a,'compras.cotar'),approve:can(a,'compras.aprovar'),order:can(a,'compras.emitir_pedido'),receive:can(a,'compras.receber'),values:showValues,supplier:can(a,'compras.gerenciar_fornecedores'),export:can(a,'compras.exportar')}};
 }
 async function saveRequest(a:any,b:any){
   need(a,'compras.criar_solicitacao');
-  const items=Array.isArray(b.items)?b.items:[];
+  const items=Array.isArray(b.items)?b.items:[],supplierIds=[...new Set((Array.isArray(b.supplier_ids)?b.supplier_ids:[]).map(String).filter(Boolean))];
   if(!String(b.title||'').trim()||!items.length)throw Error('INVALID_REQUEST');
+  if(b.submit&&!supplierIds.length)throw Error('SELECT_SUPPLIERS_FIRST');
+  const preparedItems=items.map((x:any,i:number)=>({line_number:i+1,inventory_product_id:x.inventory_product_id||null,description:String(x.description||'').trim(),manufacturer:String(x.manufacturer||'').trim()||null,category:String(x.category||'').trim()||null,quantity:Number(x.quantity),unit:String(x.unit||'UNIDADE').trim(),quantity_notes:String(x.quantity_notes||'').trim()||null}));
+  if(preparedItems.some((x:any)=>!x.description||!Number.isFinite(x.quantity)||x.quantity<=0))throw Error('INVALID_REQUEST_ITEMS');
   const urgency=String(b.urgency||'MEDIA').toUpperCase();
   if(!['BAIXA','MEDIA','ALTA','CRITICA'].includes(urgency))throw Error('INVALID_URGENCY');
   const row={title:String(b.title).trim(),requester_email:a.email,department:String(b.department||'').trim()||null,urgency,needed_at:b.needed_at||null,notes:String(b.notes||'').trim()||null,status:b.submit?'SOLICITADA':'RASCUNHO',source:'PORTAL',created_by:a.email,updated_at:new Date().toISOString()};
-  const saved=await db.from('procurement_requests').insert(row).select().single();if(saved.error)throw saved.error;
-  const itemRows=items.map((x:any,i:number)=>({request_id:saved.data.request_id,line_number:i+1,inventory_product_id:x.inventory_product_id||null,description:String(x.description||'').trim(),manufacturer:String(x.manufacturer||'').trim()||null,category:String(x.category||'').trim()||null,quantity:Number(x.quantity),unit:String(x.unit||'UNIDADE').trim(),quantity_notes:String(x.quantity_notes||'').trim()||null}));
-  if(itemRows.some((x:any)=>!x.description||!Number.isFinite(x.quantity)||x.quantity<=0)){await db.from('procurement_requests').delete().eq('request_id',saved.data.request_id);throw Error('INVALID_REQUEST_ITEMS')}
-  const inserted=await db.from('procurement_request_items').insert(itemRows);if(inserted.error){await db.from('procurement_requests').delete().eq('request_id',saved.data.request_id);throw inserted.error}
-  await audit(a,row.status==='SOLICITADA'?'REQUEST_SUBMITTED':'REQUEST_CREATED',saved.data.request_id,{items:itemRows.length});
+  let saved:any;
+  if(b.request_id){
+    const current=await db.from('procurement_requests').select('request_id,status,requester_email').eq('request_id',b.request_id).maybeSingle();if(current.error||!current.data||current.data.status!=='RASCUNHO'||(!a.admin&&current.data.requester_email!==a.email))throw Error('INVALID_REQUEST_EDIT');
+    const oldItems=await db.from('procurement_request_items').select('item_id').eq('request_id',b.request_id);if(oldItems.error)throw oldItems.error;
+    const oldIds=(oldItems.data||[]).map((x:any)=>x.item_id);if(oldIds.length){const used=await db.from('procurement_offers').select('offer_id',{count:'exact',head:true}).in('item_id',oldIds);if(used.error)throw used.error;if(used.count)throw Error('REQUEST_ALREADY_QUOTED')}
+    const updated=await db.from('procurement_requests').update({...row,created_by:undefined}).eq('request_id',b.request_id).select().single();if(updated.error)throw updated.error;saved=updated;
+    const removed=await db.from('procurement_request_items').delete().eq('request_id',b.request_id);if(removed.error)throw removed.error;
+    await db.from('procurement_request_suppliers').delete().eq('request_id',b.request_id);
+  }else{saved=await db.from('procurement_requests').insert(row).select().single();if(saved.error)throw saved.error}
+  const itemRows=preparedItems.map((x:any)=>({...x,request_id:saved.data.request_id}));
+  const inserted=await db.from('procurement_request_items').insert(itemRows);if(inserted.error)throw inserted.error;
+  if(supplierIds.length){const supplierRows=supplierIds.map((supplier_id:string)=>({request_id:saved.data.request_id,supplier_id,status:b.submit?'ENVIADA':'PENDENTE',sent_at:b.submit?new Date().toISOString():null,created_by:a.email}));const linked=await db.from('procurement_request_suppliers').insert(supplierRows);if(linked.error)throw linked.error}
+  await audit(a,row.status==='SOLICITADA'?'REQUEST_SUBMITTED':'REQUEST_SAVED',saved.data.request_id,{items:itemRows.length,suppliers:supplierIds.length});
   return{ok:true,request_id:saved.data.request_id,request_number:saved.data.request_number};
 }
 async function saveOffer(a:any,b:any){
@@ -67,7 +82,8 @@ async function saveOffer(a:any,b:any){
   if(supplier.error||!supplier.data)throw Error('INVALID_SUPPLIER');
   const unit=b.unit_price==null||b.unit_price===''?null:Number(b.unit_price),total=b.total_price==null||b.total_price===''?(unit==null?null:unit*Number(item.data.quantity)):Number(b.total_price);
   if(unit!=null&&(!Number.isFinite(unit)||unit<0)||total!=null&&(!Number.isFinite(total)||total<0))throw Error('INVALID_PRICE');
-  const row={item_id:b.item_id,supplier_id:b.supplier_id,supplier_name_snapshot:supplier.data.name,requested_at:b.requested_at||new Date().toISOString(),responded_at:b.responded_at||null,currency:String(b.currency||'BRL').toUpperCase(),exchange_rate:b.exchange_rate?Number(b.exchange_rate):null,unit_price:unit,total_price:total,payment_terms:String(b.payment_terms||'').trim()||null,delivery_days:b.delivery_days===''||b.delivery_days==null?null:Number(b.delivery_days),delivery_method:String(b.delivery_method||'').trim()||null,purchase_url:String(b.purchase_url||'').trim()||null,supplier_reference:String(b.supplier_reference||'').trim()||null,notes:String(b.notes||'').trim()||null,created_by:a.email,updated_at:new Date().toISOString()};
+  const currency=String(b.currency||'BRL').toUpperCase(),fx=currency==='USD'?await latestPtax(a,false):null,rate=currency==='USD'?(b.exchange_rate?Number(b.exchange_rate):Number(fx?.rate)||null):null;
+  const row={item_id:b.item_id,supplier_id:b.supplier_id,supplier_name_snapshot:supplier.data.name,requested_at:b.requested_at||new Date().toISOString(),responded_at:b.responded_at||null,currency,exchange_rate:rate,exchange_rate_original:rate,exchange_rate_current:rate,exchange_rate_current_at:currency==='USD'?(fx?.rate_at||new Date().toISOString()):null,unit_price:unit,total_price:total,payment_terms:String(b.payment_terms||'').trim()||null,delivery_days:b.delivery_days===''||b.delivery_days==null?null:Number(b.delivery_days),delivery_method:String(b.delivery_method||'').trim()||null,purchase_url:String(b.purchase_url||'').trim()||null,supplier_reference:String(b.supplier_reference||'').trim()||null,notes:String(b.notes||'').trim()||null,response_source:'MANUAL',created_by:a.email,updated_at:new Date().toISOString()};
   const saved=await db.from('procurement_offers').insert(row).select().single();if(saved.error)throw saved.error;
   await db.from('procurement_request_items').update({status:'COTANDO'}).eq('item_id',b.item_id);
   await db.from('procurement_requests').update({status:'COTANDO',updated_at:new Date().toISOString()}).eq('request_id',item.data.request_id).in('status',['SOLICITADA','RASCUNHO']);
@@ -120,6 +136,61 @@ async function supplier(a:any,b:any){
   const row={supplier_id:b.supplier_id||crypto.randomUUID(),name,document:String(b.document||'').trim()||null,email:String(b.email||'').trim()||null,phone:String(b.phone||'').trim()||null,address:String(b.address||'').trim()||null,status:'ATIVO',notes:String(b.notes||'').trim()||null,updated_at:new Date().toISOString()};
   const saved=await db.from('inventory_suppliers').upsert(row,{onConflict:'supplier_id'}).select().single();if(saved.error)throw saved.error;return{ok:true,supplier:saved.data};
 }
+async function supplierContacts(a:any,b:any){
+  need(a,'compras.gerenciar_fornecedores');
+  const supplierId=String(b.supplier_id||''),contacts=Array.isArray(b.contacts)?b.contacts.slice(0,20):[];
+  const supplier=await db.from('inventory_suppliers').select('supplier_id').eq('supplier_id',supplierId).maybeSingle();if(supplier.error||!supplier.data)throw Error('INVALID_SUPPLIER');
+  const rows=contacts.map((x:any,i:number)=>({supplier_id:supplierId,name:String(x.name||'').trim()||null,email:String(x.email||'').trim().toLowerCase(),phone:String(x.phone||'').trim()||null,is_primary:!!x.is_primary||i===0,active:true}));
+  if(rows.some((x:any)=>!/^\S+@\S+\.\S+$/.test(x.email)))throw Error('INVALID_CONTACT_EMAIL');
+  const removed=await db.from('inventory_supplier_quote_contacts').delete().eq('supplier_id',supplierId);if(removed.error)throw removed.error;
+  if(rows.length){const saved=await db.from('inventory_supplier_quote_contacts').insert(rows);if(saved.error)throw saved.error}
+  await audit(a,'SUPPLIER_CONTACTS_UPDATED',supplierId,{contacts:rows.length});return{ok:true};
+}
+async function latestPtax(a:any,refresh=false){
+  const cached=await db.from('procurement_fx_rates').select('*').eq('base_currency','USD').eq('quote_currency','BRL').order('rate_at',{ascending:false}).limit(1).maybeSingle();if(cached.error)throw cached.error;
+  if(!refresh&&cached.data)return cached.data;
+  let quote:any=null;
+  for(let offset=0;offset<12&&!quote;offset++){
+    const d=new Date(Date.now()-offset*86400000),mdy=`${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}-${d.getUTCFullYear()}`;
+    const url=`https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='${mdy}'&$top=100&$format=json&$select=cotacaoVenda,dataHoraCotacao`;
+    const response=await fetch(url,{signal:AbortSignal.timeout(12000)});if(!response.ok)continue;const payload=await response.json().catch(()=>({value:[]}));const values=Array.isArray(payload.value)?payload.value:[];if(values.length)quote=values.sort((x:any,y:any)=>String(y.dataHoraCotacao).localeCompare(String(x.dataHoraCotacao)))[0];
+  }
+  if(!quote){if(cached.data)return cached.data;throw Error('FX_UNAVAILABLE')}
+  const sourceTime=String(quote.dataHoraCotacao||'').trim().replace(' ','T'),parsedTime=new Date(/(?:Z|[+-]\d\d:\d\d)$/.test(sourceTime)?sourceTime:`${sourceTime}-03:00`);
+  if(!Number.isFinite(parsedTime.getTime()))throw Error('FX_UNAVAILABLE');
+  const row={base_currency:'USD',quote_currency:'BRL',rate:Number(quote.cotacaoVenda),rate_at:parsedTime.toISOString(),source:'BCB_PTAX',fetched_by:a.email};
+  const saved=await db.from('procurement_fx_rates').upsert(row,{onConflict:'base_currency,quote_currency,rate_at,source'}).select().single();if(saved.error)throw saved.error;
+  await db.from('procurement_offers').update({exchange_rate_current:row.rate,exchange_rate_current_at:row.rate_at}).eq('currency','USD');
+  await audit(a,'FX_REFRESHED',saved.data.fx_rate_id,{rate:row.rate,rate_at:row.rate_at,source:row.source});return saved.data;
+}
+async function bulkOffers(a:any,b:any){
+  need(a,'compras.cotar');
+  const requestId=String(b.request_id||''),supplierId=String(b.supplier_id||''),responses=Array.isArray(b.items)?b.items.slice(0,500):[];
+  if(!requestId||!supplierId||!responses.length)throw Error('INVALID_QUOTE_RESPONSE');
+  const link=await db.from('procurement_request_suppliers').select('*').eq('request_id',requestId).eq('supplier_id',supplierId).maybeSingle();if(link.error||!link.data)throw Error('INVALID_REQUEST_SUPPLIER');
+  const items=await db.from('procurement_request_items').select('item_id,quantity').eq('request_id',requestId);if(items.error)throw items.error;const itemMap=new Map((items.data||[]).map((x:any)=>[x.item_id,x]));
+  const supplier=await db.from('inventory_suppliers').select('name').eq('supplier_id',supplierId).maybeSingle();if(supplier.error||!supplier.data)throw Error('INVALID_SUPPLIER');
+  const needsUsd=responses.some((x:any)=>String(x.currency||'BRL').toUpperCase()==='USD'),fx=needsUsd?await latestPtax(a,true):null,now=new Date().toISOString();
+  const rows=responses.map((x:any)=>{const item:any=itemMap.get(String(x.item_id||''));if(!item)throw Error('INVALID_ITEM');const currency=String(x.currency||'BRL').toUpperCase(),unit=x.unit_price===''||x.unit_price==null?null:Number(x.unit_price),total=x.total_price===''||x.total_price==null?(unit==null?null:unit*Number(item.quantity)):Number(x.total_price),rate=currency==='USD'?Number(x.exchange_rate||fx?.rate||0)||null:null;if(unit!=null&&(!Number.isFinite(unit)||unit<0)||total!=null&&(!Number.isFinite(total)||total<0))throw Error('INVALID_PRICE');return{item_id:item.item_id,supplier_id:supplierId,supplier_name_snapshot:supplier.data.name,requested_at:link.data.sent_at||link.data.created_at,responded_at:b.responded_at||now,currency,exchange_rate:rate,exchange_rate_original:rate,exchange_rate_current:rate,exchange_rate_current_at:currency==='USD'?(fx?.rate_at||now):null,unit_price:unit,total_price:total,payment_terms:String(x.payment_terms||b.payment_terms||'').trim()||null,delivery_days:x.delivery_days===''||x.delivery_days==null?null:Number(x.delivery_days),delivery_method:String(x.delivery_method||'').trim()||null,supplier_reference:String(x.supplier_reference||'').trim()||null,notes:String(x.notes||'').trim()||null,response_source:'XLSX_IMPORT',response_file_name:String(b.file_name||'').slice(0,240)||null,created_by:a.email,updated_at:now}});
+  const saved=await db.from('procurement_offers').insert(rows);if(saved.error)throw saved.error;
+  await db.from('procurement_request_suppliers').update({status:'RESPONDIDA',responded_at:b.responded_at||now,updated_at:now}).eq('request_id',requestId).eq('supplier_id',supplierId);
+  await db.from('procurement_request_items').update({status:'COTANDO'}).eq('request_id',requestId);
+  await db.from('procurement_requests').update({status:'COTANDO',updated_at:now}).eq('request_id',requestId).neq('status','ENCERRADO');
+  await audit(a,'QUOTE_RESPONSE_IMPORTED',requestId,{supplier_id:supplierId,items:rows.length,file_name:b.file_name||null});return{ok:true,items:rows.length,fx};
+}
+async function requestStatus(a:any,b:any){
+  if(!can(a,'compras.cotar')&&!can(a,'compras.aprovar'))throw Error('FORBIDDEN');
+  const requestId=String(b.request_id||''),target=String(b.status||'').toUpperCase();if(!['ENCERRADO','REABRIR'].includes(target))throw Error('INVALID_STATUS');
+  const current=await db.from('procurement_requests').select('request_id,status').eq('request_id',requestId).maybeSingle();if(current.error||!current.data)throw Error('INVALID_REQUEST');
+  let status='ENCERRADO';if(target==='REABRIR'){const items=await db.from('procurement_request_items').select('item_id').eq('request_id',requestId);if(items.error)throw items.error;const ids=(items.data||[]).map((x:any)=>x.item_id);let offerCount=0;if(ids.length){const offers=await db.from('procurement_offers').select('offer_id',{count:'exact',head:true}).in('item_id',ids);if(offers.error)throw offers.error;offerCount=offers.count||0}status=offerCount?'COTANDO':'SOLICITADA'}
+  const updated=await db.from('procurement_requests').update({status,updated_at:new Date().toISOString()}).eq('request_id',requestId);if(updated.error)throw updated.error;await audit(a,status==='ENCERRADO'?'REQUEST_CLOSED':'REQUEST_REOPENED',requestId,{before:current.data.status,after:status});return{ok:true,status};
+}
+async function markSent(a:any,b:any){
+  if(!can(a,'compras.cotar')&&!can(a,'compras.exportar'))throw Error('FORBIDDEN');const requestId=String(b.request_id||''),supplierId=String(b.supplier_id||''),now=new Date().toISOString();const updated=await db.from('procurement_request_suppliers').update({status:'ENVIADA',sent_at:now,updated_at:now}).eq('request_id',requestId).eq('supplier_id',supplierId).select('request_supplier_id');if(updated.error||!updated.data?.length)throw Error('INVALID_REQUEST_SUPPLIER');await audit(a,'QUOTE_SENT',requestId,{supplier_id:supplierId});return{ok:true,sent_at:now};
+}
+async function requestHistory(a:any,u:URL){
+  need(a,'compras.visualizar_valores');const requestId=String(u.searchParams.get('request_id')||'');if(!requestId)throw Error('INVALID_REQUEST');const items=await db.from('procurement_request_items').select('item_id,inventory_product_id,description').eq('request_id',requestId);if(items.error)throw items.error;const productIds=[...new Set((items.data||[]).map((x:any)=>x.inventory_product_id).filter(Boolean))];if(!productIds.length)return{history:[]};const prices=await db.from('inventory_supplier_price_history').select('*').in('product_id',productIds).order('purchased_at',{ascending:false}).limit(500);if(prices.error)throw prices.error;const supplierIds=[...new Set((prices.data||[]).map((x:any)=>x.supplier_id).filter(Boolean))],suppliers=supplierIds.length?await db.from('inventory_suppliers').select('supplier_id,name').in('supplier_id',supplierIds):{data:[]};const names=new Map((suppliers.data||[]).map((x:any)=>[x.supplier_id,x.name]));return{history:(prices.data||[]).map((x:any)=>({...x,supplier_name:names.get(x.supplier_id)||'Fornecedor não informado'}))};
+}
 async function linkItem(a:any,b:any){
   if(!can(a,'compras.cotar')&&!can(a,'compras.criar_solicitacao'))throw Error('FORBIDDEN');
   const item=await db.from('procurement_request_items').select('item_id,request_id,inventory_product_id').eq('item_id',b.item_id).maybeSingle();if(item.error||!item.data)throw Error('INVALID_ITEM');
@@ -144,14 +215,20 @@ Deno.serve(async req=>{
   if(req.method==='OPTIONS')return new Response('',{headers:cors});let a:any;
   try{
     a=await auth(req);const path=new URL(req.url).pathname.split('/').pop();
-    if(req.method==='GET'&&path==='health')return reply({ok:true,version:1});
+    if(req.method==='GET'&&path==='health')return reply({ok:true,version:2});
     if(req.method==='GET'&&path==='bootstrap')return reply(await bootstrap(a));
+    if(req.method==='GET'&&path==='fx')return reply({fx:await latestPtax(a,new URL(req.url).searchParams.get('refresh')==='1')});
+    if(req.method==='GET'&&path==='request-history')return reply(await requestHistory(a,new URL(req.url)));
     if(req.method==='POST'&&path==='request')return reply(await saveRequest(a,await req.json()));
     if(req.method==='POST'&&path==='offer')return reply(await saveOffer(a,await req.json()));
     if(req.method==='POST'&&path==='select-offer')return reply(await selectOffer(a,await req.json()));
     if(req.method==='POST'&&path==='issue-orders')return reply(await issueOrders(a,await req.json()));
     if(req.method==='POST'&&path==='receive')return reply(await receive(a,await req.json()));
     if(req.method==='POST'&&path==='supplier')return reply(await supplier(a,await req.json()));
+    if(req.method==='POST'&&path==='supplier-contacts')return reply(await supplierContacts(a,await req.json()));
+    if(req.method==='POST'&&path==='bulk-offers')return reply(await bulkOffers(a,await req.json()));
+    if(req.method==='POST'&&path==='request-status')return reply(await requestStatus(a,await req.json()));
+    if(req.method==='POST'&&path==='mark-sent')return reply(await markSent(a,await req.json()));
     if(req.method==='POST'&&path==='suggest-product')return reply(await suggestProduct(a,await req.json()));
     if(req.method==='POST'&&path==='link-item')return reply(await linkItem(a,await req.json()));
     return reply({error:'NOT_FOUND'},404);

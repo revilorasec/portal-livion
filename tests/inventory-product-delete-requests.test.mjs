@@ -32,10 +32,10 @@ test('administrador pode mesclar ou recusar e a fila acompanha a decisão',()=>{
   assert.match(api,/merged_into_product_id:targetId/);
 });
 
-test('solicitações são privadas e a V18 carrega o fluxo',()=>{
+test('solicitações são privadas e a V19 carrega o fluxo',()=>{
   assert.match(migration,/enable row level security/);
   assert.match(migration,/revoke all .* from anon,authenticated/);
   assert.match(migration,/grant select,insert,update .* to service_role/);
-  assert.match(html,/data-app-version="18"/);
+  assert.match(html,/data-app-version="19"/);
   assert.match(html,/estoque-product-delete-requests\.js\?v=1/);
 });

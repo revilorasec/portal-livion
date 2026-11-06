@@ -60,6 +60,16 @@ window.__PORTAL_GET_OLV_GRAPH_TOKEN__=async(interactive=false)=>{
  try{return (await msalApp.acquireTokenSilent(request)).accessToken}
  catch(e){if(!interactive||!interactionRequired(e))throw e;return (await msalApp.acquireTokenPopup(request)).accessToken}
 };
+window.__PORTAL_GET_OUTLOOK_TOKEN__=async(interactive=false)=>{
+ if(!['estoque','compras-cotacoes'].includes(currentApp?.key))throw new Error('Abra o Controle de Estoque antes de criar o rascunho no Outlook.');
+ const fresh=await api('/context');
+ if(!fresh.apps.some(key=>['estoque','compras-cotacoes'].includes(key)))throw new Error('Seu usuário não tem acesso às cotações do estoque.');
+ const account=msalApp?.getActiveAccount()||msalApp?.getAllAccounts()?.[0];
+ if(!account)throw new Error('Sessão Microsoft não encontrada');
+ const request={scopes:['User.Read','Mail.ReadWrite'],account};
+ try{return (await msalApp.acquireTokenSilent(request)).accessToken}
+ catch(e){if(!interactive||!interactionRequired(e))throw e;return (await msalApp.acquireTokenPopup(request)).accessToken}
+};
 if(portalSessionChannel)portalSessionChannel.onmessage=async e=>{if(e.data?.type!=='PORTAL_TOKEN_REQUEST'||!e.data?.requestId)return;try{const currentToken=await refreshPortalToken(false);portalSessionChannel.postMessage({type:'PORTAL_TOKEN_RESPONSE',requestId:e.data.requestId,token:currentToken,context:ctx})}catch{}};
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;if(!isStandalone())$('installBtn').classList.remove('hidden')});

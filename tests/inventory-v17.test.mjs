@@ -20,14 +20,14 @@ test('carrega os recursos v17 depois do painel v16', () => {
 });
 
 test('portal e aplicativo exibem versões identificáveis', () => {
-  assert.match(portal, /PORTAL_VERSION='2026\.10\.20\.3'/);
+  assert.match(portal, /PORTAL_VERSION='2026\.10\.28\.1'/);
   assert.match(portal, /id="portalVersion"/);
   assert.match(portal, /id="workspaceVersion"/);
   assert.match(portal, /class="app-card-version"/);
   assert.match(portal, /function stampFrameVersion/);
-  assert.match(html, /data-app-version="18"/);
-  assert.match(html, /class="app-release">v18/);
-  assert.match(versionCatalogSql, /estoque\.html\?v=16/);
+  assert.match(html, /data-app-version="19"/);
+  assert.match(html, /class="app-release">v19/);
+  assert.match(versionCatalogSql, /estoque\.html\?v=19/);
   assert.match(versionCatalogSql, /where key in/);
 });
 

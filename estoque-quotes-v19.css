@@ -1,0 +1,4 @@
+.quotes-frame{display:block;width:100%;height:calc(100vh - 108px);min-height:720px;border:0;background:transparent}
+.nav button[data-v=quotes]:before{content:'$'}
+.quote-product-btn{border-color:#214f8f!important;color:#214f8f!important;font-weight:700}
+@media(max-width:620px){.quotes-frame{height:calc(100vh - 126px);min-height:620px}.nav button[data-v=quotes]:before{content:'$';font-size:18px}}

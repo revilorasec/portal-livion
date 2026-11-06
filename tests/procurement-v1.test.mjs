@@ -7,6 +7,10 @@ const js=readFileSync(new URL('../compras-cotacoes.js',import.meta.url),'utf8');
 const api=readFileSync(new URL('../supabase/functions/procurement-api/index.ts',import.meta.url),'utf8');
 const schema=readFileSync(new URL('../supabase/migrations/20260923120000_procurement_v1.sql',import.meta.url),'utf8');
 const legacy=readFileSync(new URL('../supabase/migrations/20260923123000_procurement_legacy_import.sql',import.meta.url),'utf8');
+const quotes=readFileSync(new URL('../supabase/migrations/20261106133000_procurement_quotes_v1.sql',import.meta.url),'utf8');
+const inventory=readFileSync(new URL('../estoque.html',import.meta.url),'utf8');
+const inventoryQuotes=readFileSync(new URL('../estoque-quotes-v19.js',import.meta.url),'utf8');
+const portal=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const installer=readFileSync(new URL('../app-installers.js',import.meta.url),'utf8');
 const manifest=readFileSync(new URL('../manifest-compras-cotacoes.webmanifest',import.meta.url),'utf8');
 
@@ -14,14 +18,46 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=3/);
+  assert.match(html,/compras-cotacoes\.js\?v=4/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
   assert.match(js,/openThroughPortal/);
-  assert.match(js,/searchParams\.set\('app','compras-cotacoes'\)/);
+  assert.match(js,/searchParams\.set\('app','estoque'\)/);
   assert.match(installer,/'compras-cotacoes':\{name:'Compras e Cotações'/);
   assert.equal(JSON.parse(manifest).start_url,'./?app=compras-cotacoes');
+});
+
+test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>{
+  assert.match(inventory,/data-app-version="19"/);
+  assert.match(inventory,/data-v="quotes"/);
+  assert.match(inventory,/estoque-quotes-v19\.js/);
+  assert.match(inventoryQuotes,/quoteProductBtn/);
+  assert.match(inventoryQuotes,/product_id/);
+  assert.match(js,/startupProductId/);
+});
+
+test('v4 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
+  assert.match(js,/LIVION_QUOTE_V1/);
+  assert.match(js,/quoteWorkbook/);
+  assert.match(js,/openResponseReview/);
+  assert.match(api,/path==='bulk-offers'/);
+  assert.match(quotes,/procurement_request_suppliers/);
+});
+
+test('dolar preserva a taxa original e atualiza apenas a referencia atual',()=>{
+  assert.match(quotes,/exchange_rate_original/);
+  assert.match(quotes,/exchange_rate_current/);
+  assert.match(api,/BCB_PTAX/);
+  assert.match(api,/CotacaoDolarDia/);
+  assert.match(js,/PTAX atualizada sem alterar o valor original/);
+});
+
+test('Outlook recebe escopo sob demanda e cria rascunho com anexo',()=>{
+  assert.match(portal,/__PORTAL_GET_OUTLOOK_TOKEN__/);
+  assert.match(portal,/Mail\.ReadWrite/);
+  assert.match(js,/graph\.microsoft\.com\/v1\.0\/me\/messages/);
+  assert.match(js,/fileAttachment/);
 });
 
 test('app usa marca Livion e expõe o fluxo completo',()=>{
