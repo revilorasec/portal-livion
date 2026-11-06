@@ -120,3 +120,61 @@ function openSupplier(seed={}){const editing=!!seed.supplier_id,rows=editing?sup
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));$(b.dataset.view+'View').classList.remove('hidden')});
 $('requestSearch').oninput=()=>{requestLimit=60;renderRequests()};$('requestStatus').onchange=()=>{requestLimit=60;renderRequests()};$('newRequestBtn').onclick=()=>openRequest();$('newSupplierBtn').onclick=()=>openSupplier();$('reloadBtn').onclick=()=>reload().catch(e=>alert(e.message));$('refreshFxBtn').onclick=async()=>{const button=$('refreshFxBtn');button.disabled=true;try{const result=await api('/fx?refresh=1');D.fx=result.fx;renderFx();await reload();flash('PTAX atualizada sem alterar o valor original das cotações.')}catch(e){alert(e.message)}finally{button.disabled=false}};
 reload().catch(e=>{$('loading').innerHTML=`<b>Não foi possível abrir o aplicativo.</b><br>${esc(e.message)}<br><button class="btn" onclick="location.reload()">Tentar novamente</button>`});
+
+function quoteNumberValue(value){
+  if(value===null||value===undefined||value==='')return null;
+  if(typeof value==='number')return Number.isFinite(value)?value:null;
+  let text=String(value).trim().replace(/\s/g,'').replace(/R\$/gi,'');
+  if(text.includes(',')&&text.includes('.'))text=text.replace(/\./g,'').replace(',','.');
+  else if(text.includes(','))text=text.replace(',','.');
+  const number=Number(text);
+  return Number.isFinite(number)?number:null;
+}
+
+function quotePaymentTerms(value,line){
+  const text=String(value??'').trim().replace(/\s/g,'');
+  if(text&&!/^\d+(\/\d+)*$/.test(text))throw Error(`Item ${line}: condição de pagamento inválida. Use somente dias separados por /, por exemplo 30/60/90.`);
+  return text;
+}
+
+function quoteDeliveryDays(value,line){
+  const text=String(value??'').trim();
+  if(text&&!/^\d+$/.test(text))throw Error(`Item ${line}: prazo de entrega inválido. Informe somente o número inteiro de dias.`);
+  return text===''?'':Number(text);
+}
+
+async function quoteWorkbook(request,supplier){
+  if(!window.ExcelJS)throw Error('A biblioteca Excel ainda está carregando.');
+  const items=requestItems(request.request_id),number=`COT-${String(request.request_number).padStart(6,'0')}`,contacts=supplierContacts(supplier.supplier_id),wb=new ExcelJS.Workbook();
+  wb.creator='Portal Livion';wb.created=new Date();
+  const ws=wb.addWorksheet('Cotação',{views:[{state:'frozen',ySplit:7}]});
+  ws.properties.defaultRowHeight=22;ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9};
+  ws.columns=[{width:8},{width:22},{width:42},{width:13},{width:15},{width:11},{width:17},{width:21},{width:25},{width:20},{width:25},{width:38}];
+  ws.mergeCells('D1:I2');ws.getCell('D1').value='SOLICITAÇÃO DE COTAÇÃO';ws.getCell('D1').font={bold:true,size:19,color:{argb:'FF102A56'}};ws.getCell('D1').alignment={vertical:'middle',horizontal:'center'};
+  ws.mergeCells('D3:I3');ws.getCell('D3').value=request.title||quoteTitle(request.request_number,request.created_at);ws.getCell('D3').font={bold:true,size:11,color:{argb:'FF36577E'}};ws.getCell('D3').alignment={horizontal:'center'};
+  ws.mergeCells('A4:F4');ws.getCell('A4').value=`Fornecedor: ${supplier.name}`;ws.mergeCells('G4:L4');ws.getCell('G4').value=`Contato: ${contacts.map(x=>`${x.name||'Contato'} <${x.email}>`).join('; ')||'não cadastrado'}`;
+  ws.mergeCells('A5:F5');ws.getCell('A5').value=`Cotação: ${number} · Data: ${quoteDate(request.created_at||new Date())}`;ws.mergeCells('G5:L5');ws.getCell('G5').value='Devolva esta planilha preenchida em resposta ao e-mail da Livion.';
+  for(const cell of ['A4','G4','A5','G5']){ws.getCell(cell).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF1F5FA'}};ws.getCell(cell).font={bold:true,color:{argb:'FF314764'}};ws.getCell(cell).alignment={vertical:'middle',wrapText:true}}
+  ws.mergeCells('A6:L6');ws.getCell('A6').value='FORNECEDOR: preencha as células amarelas. Informe o VALOR TOTAL da quantidade solicitada; prazo somente em dias; pagamento como 30/60/90. Veja a aba “Como preencher”.';ws.getCell('A6').fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFE699'}};ws.getCell('A6').font={bold:true,color:{argb:'FF6B4E00'}};ws.getCell('A6').alignment={vertical:'middle',horizontal:'center',wrapText:true};ws.getRow(6).height=42;
+  const headers=['Item','PN','Descrição','Quantidade','Unidade','Moeda','Valor total','Prazo de entrega (dias)','Condição de pagamento','Forma de entrega','Referência do fornecedor','Observações'];
+  const header=ws.addRow(headers);header.height=34;header.eachCell((cell,col)=>{cell.font={bold:true,color:{argb:col>=6?'FF5B4300':'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:col>=6?'FFFFD966':'FF102A56'}};cell.alignment={vertical:'middle',horizontal:'center',wrapText:true};cell.border={bottom:{style:'thin',color:{argb:'FFDFB516'}}}});
+  items.forEach((it,i)=>{const p=product(it.inventory_product_id),row=ws.addRow([i+1,p?.pn||'',it.description,Number(it.quantity),it.unit,'BRL',null,null,null,null,null,null]);row.height=28;row.eachCell((cell,col)=>{cell.alignment={vertical:'middle',wrapText:col===3||col>=9};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:col>=6?'FFFFF2CC':i%2?'FFF7F9FC':'FFFFFFFF'}};cell.border={bottom:{style:'hair',color:{argb:'FFD7DFEB'}}}});row.getCell(4).numFmt='#,##0.###';row.getCell(7).numFmt='R$ #,##0.00';row.getCell(6).dataValidation={type:'list',allowBlank:false,formulae:['"BRL,USD,EUR"']};row.getCell(7).dataValidation={type:'decimal',operator:'greaterThanOrEqual',allowBlank:false,showErrorMessage:true,errorTitle:'Valor total inválido',error:'Informe o valor total para toda a quantidade solicitada.',formulae:[0]};row.getCell(8).dataValidation={type:'whole',operator:'between',allowBlank:false,showErrorMessage:true,errorTitle:'Prazo inválido',error:'Informe somente o número inteiro de dias.',formulae:[0,3650]};row.getCell(9).note='Use somente dias separados por barra. Exemplos: 30 ou 30/60/90.'});
+  ws.autoFilter={from:{row:7,column:1},to:{row:7+items.length,column:12}};ws.getRow(1).height=31;ws.getRow(2).height=31;ws.getRow(3).height=25;
+  const livion=await workbookImage('./assets/livion-logo.png'),supplierLogo=await workbookImage(supplier.photo_url);
+  if(livion){const imageId=wb.addImage(livion);ws.addImage(imageId,{tl:{col:.15,row:.15},ext:{width:180,height:58}})}else{ws.mergeCells('A1:C3');ws.getCell('A1').value='LIVION SOLUTIONS';ws.getCell('A1').font={bold:true,size:16,color:{argb:'FF102A56'}};ws.getCell('A1').alignment={vertical:'middle',horizontal:'center'}}
+  if(supplierLogo){const imageId=wb.addImage(supplierLogo);ws.addImage(imageId,{tl:{col:9.2,row:.15},ext:{width:175,height:58}})}else{ws.mergeCells('J1:L3');ws.getCell('J1').value=supplier.name;ws.getCell('J1').font={bold:true,size:14,color:{argb:'FF102A56'}};ws.getCell('J1').alignment={vertical:'middle',horizontal:'center',wrapText:true}}
+  const example=wb.addWorksheet('Como preencher');example.columns=[{width:25},{width:65}];example.addRow(['CAMPO','COMO PREENCHER']);example.addRow(['Valor total','Total correspondente a toda a quantidade. Ex.: 10 peças por R$ 100,00 cada = 1000,00. O Portal calculará R$ 100,00 por unidade.']);example.addRow(['Prazo de entrega (dias)','Digite apenas um número inteiro. Ex.: 15']);example.addRow(['Condição de pagamento','Digite os dias separados por /. Ex.: 30/60/90']);example.addRow(['Moeda','Escolha BRL, USD ou EUR.']);example.addRow(['Observações','Informe validade da proposta, impostos, frete, marca ou qualquer condição relevante.']);example.getRow(1).eachCell(cell=>{cell.font={bold:true,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A56'}}});for(let r=2;r<=6;r++){example.getRow(r).height=34;example.getRow(r).eachCell(cell=>{cell.alignment={vertical:'middle',wrapText:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:r%2?'FFFFFFFF':'FFF1F5FA'}}})}example.views=[{state:'frozen',ySplit:1}];
+  const control=wb.addWorksheet('Controle');control.state='veryHidden';control.addRow(['template','request_id','request_number','supplier_id','request_item_id','line_number']);items.forEach((it,i)=>control.addRow(['LIVION_QUOTE_V3',request.request_id,request.request_number,supplier.supplier_id,it.item_id,i+1]));
+  const buffer=await wb.xlsx.writeBuffer(),filename=`${number}_${supplier.name.replace(/[^a-z0-9_-]+/gi,'_')}.xlsx`;return{buffer,filename};
+}
+
+async function readResponseFile(expectedRequestId,file){
+  if(!window.XLSX)throw Error('A biblioteca Excel ainda está carregando.');
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),quote=wb.Sheets['Cotação'],control=wb.Sheets['Controle'];if(!quote||!control)throw Error('Use a planilha gerada pelo Portal Livion.');
+  const meta=XLSX.utils.sheet_to_json(control,{defval:''}),template=String(meta[0]?.template||''),rows=XLSX.utils.sheet_to_json(quote,{range:['LIVION_QUOTE_V2','LIVION_QUOTE_V3'].includes(template)?6:5,defval:''});
+  if(!meta.length||!['LIVION_QUOTE_V1','LIVION_QUOTE_V2','LIVION_QUOTE_V3'].includes(template)||String(meta[0].request_id)!==expectedRequestId)throw Error('A planilha não pertence a esta cotação.');
+  const supplierId=String(meta[0].supplier_id),supplier=D.suppliers.find(x=>x.supplier_id===supplierId);if(!supplier)throw Error('Fornecedor da planilha não encontrado.');
+  const originals=new Map(requestItems(expectedRequestId).map(x=>[String(x.item_id),x]));
+  const parsed=meta.map((m,i)=>{const row=rows[i]||{},itemId=String(m.request_item_id),original=originals.get(itemId),quantity=Number(original?.quantity||0),total=quoteNumberValue(row['Valor total']),legacyUnit=quoteNumberValue(row['Valor unitário']);if(template==='LIVION_QUOTE_V3'&&!(total>=0))throw Error(`Item ${i+1}: informe o valor total.`);return{item_id:itemId,description:String(original?.description||row['Descrição']||''),quantity,unit:String(original?.unit||row['Unidade']||''),currency:String(row['Moeda']||'BRL').toUpperCase(),unit_price:template==='LIVION_QUOTE_V3'?(quantity>0?total/quantity:null):legacyUnit,delivery_days:quoteDeliveryDays(row['Prazo de entrega (dias)'],i+1),payment_terms:quotePaymentTerms(row['Condição de pagamento'],i+1),delivery_method:row['Forma de entrega'],supplier_reference:row['Referência do fornecedor'],notes:row['Observações']}});
+  openResponseReview(expectedRequestId,supplier,file,parsed);
+}

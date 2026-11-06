@@ -21,7 +21,7 @@ test('historico inicia paginado e permite carregar mais solicitacoes',()=>{
   assert.match(js,/requestLimit=60/);
   assert.match(js,/rows\.slice\(0,requestLimit\)/);
   assert.match(js,/Mostrar mais/);
-  assert.match(html,/compras-cotacoes\.js\?v=8/);
+  assert.match(html,/compras-cotacoes\.js\?v=9/);
 });
 
 test('app possui entrada e instalacao independentes no Portal Livion',()=>{
@@ -40,7 +40,7 @@ test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>
   assert.match(js,/startupProductId/);
 });
 
-test('v8 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
+test('v9 gera uma planilha por fornecedor e importa somente apos revisao',()=>{
   assert.match(js,/LIVION_QUOTE_V2/);
   assert.match(html,/exceljs@4\.4\.0/);
   assert.match(js,/quoteWorkbook/);
@@ -137,6 +137,16 @@ test('planilha destaca em amarelo os campos do fornecedor',()=>{
   assert.match(js,/preencha todas as células amarelas/);
   assert.match(js,/FFFFF2CC/);
   assert.match(js,/FFFFD966/);
+});
+
+test('planilha solicita valor total e orienta prazo e pagamento',()=>{
+  assert.match(js,/LIVION_QUOTE_V3/);
+  assert.match(js,/Valor total/);
+  assert.match(js,/Como preencher/);
+  assert.match(js,/total\/quantity/);
+  assert.match(js,/condição de pagamento inválida/);
+  assert.match(js,/prazo de entrega inválido/);
+  assert.match(js,/30\/60\/90/);
 });
 
 test('respostas multiplas mostram conversao em real pelo dolar atual',()=>{
