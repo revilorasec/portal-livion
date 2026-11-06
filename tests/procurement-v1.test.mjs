@@ -35,7 +35,7 @@ test('app possui entrada e instalacao independentes no Portal Livion',()=>{
 test('cotacoes ficam dentro do estoque e podem nascer de um produto aberto',()=>{
   assert.match(inventory,/data-app-version="19"/);
   assert.match(inventory,/data-v="quotes"/);
-  assert.match(inventory,/estoque-quotes-v19\.js/);
+  assert.match(inventory,/estoque-quotes-v19\.js\?v=10/);
   assert.match(inventoryQuotes,/quoteProductBtn/);
   assert.match(inventoryQuotes,/product_id/);
   assert.match(js,/startupProductId/);
