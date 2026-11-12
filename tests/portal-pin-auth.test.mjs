@@ -73,3 +73,13 @@ test('all changed browser and Edge Function scripts parse',()=>{
   new vm.Script(stripTypeScriptTypes(source).replace(/^import .*?;\s*$/gm,''));
  }
 });
+
+test('login setup executes before asynchronous Microsoft initialization',()=>{
+ const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const setup=html.slice(html.indexOf('const API='),html.indexOf('const isStandalone='));
+ const elements=new Map();const document={getElementById(id){if(!elements.has(id))elements.set(id,{});return elements.get(id)}};
+ const runtime={window:{location:{href:'https://portal.example/'}},document,URL};
+ vm.runInNewContext(setup,runtime);
+ assert.equal(typeof elements.get('pinLoginForm').onsubmit,'function');
+ assert.equal(typeof runtime.window.__PORTAL_GET_TOKEN__,'function');
+});
