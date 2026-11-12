@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {pinCredential,externalPinUser,validPin,randomHex,derivePin} from '../supabase/functions/portal-api/pin-auth.mjs';
 
 const frontend=fs.readFileSync(new URL('../portal-admin-v3.js',import.meta.url),'utf8');
 const backend=fs.readFileSync(new URL('../supabase/functions/portal-api/index.ts',import.meta.url),'utf8');
@@ -10,7 +11,7 @@ function handler(start,end){
  const section=backend.slice(backend.indexOf(start),backend.indexOf(end));
  assert.ok(section.startsWith(start));
  const body=section.replace(/:\s*(?:any|string)(?=[),;=])/g,'');
- return new AsyncFunction('path','req','origin','admin','db','reply','audit','keyify','ENTITY_TYPES','PROFILES','entityUserType','guardLastAdmin','appsRegistry','appAllowedForType','viewOnlyAction','entities','externalUserType',body);
+ return new AsyncFunction('path','req','origin','admin','db','reply','audit','keyify','ENTITY_TYPES','PROFILES','entityUserType','guardLastAdmin','appsRegistry','appAllowedForType','viewOnlyAction','entities','externalUserType','pinCredential','externalPinUser','validPin','randomHex','derivePin',body);
 }
 const reply=(_origin,status,body)=>({status,body});
 const keyify=v=>String(v||'').trim().toUpperCase().replace(/[^A-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'');
@@ -47,11 +48,11 @@ test('nova empresa tem código próprio e edição antiga não sobrescreve mudan
 
 function userDb(existing){
  const state={existing:{...existing},written:null};
- return {state,from(table){if(table==='portal_entities')return {select(){return this},eq(){return this},async maybeSingle(){return {data:{entity_type:'EMPRESA'},error:null}}};
+ return {state,async rpc(name,args){assert.equal(name,'portal_save_user_with_pin');state.written=args.p_payload;return {error:null}},from(table){if(table==='portal_pin_credentials')return {select(){return this},eq(){return this},async maybeSingle(){return {data:null,error:null}}};if(table==='portal_entities')return {select(){return this},eq(){return this},async maybeSingle(){return {data:{entity_type:'EMPRESA'},error:null}}};
   assert.equal(table,'portal_users');return {select(){return this},eq(){return this},async maybeSingle(){return {data:state.existing,error:null}},async upsert(row){state.written=row;return {error:null}}};
  }};
 }
-async function runUser(db,body){return userHandler('/users',fakeReq(body),'',admin,db,reply,async()=>{},keyify,[],['SOCIO','ADMINISTRADOR','OPERACIONAL'],()=> 'INTERNO',async()=>{},async()=>[{key:'app',active:true,actions:[{key:'app.ver'}]}],()=>true,()=>true,async()=>[{key:'LIVION',entity_type:'EMPRESA'}],()=>false);}
+async function runUser(db,body){return userHandler('/users',fakeReq(body),'',admin,db,reply,async()=>{},keyify,[],['SOCIO','ADMINISTRADOR','OPERACIONAL'],()=> 'INTERNO',async()=>{},async()=>[{key:'app',active:true,actions:[{key:'app.ver'}]}],()=>true,()=>true,async()=>[{key:'LIVION',entity_type:'EMPRESA'}],()=>false,pinCredential,externalPinUser,validPin,randomHex,derivePin);}
 test('categoria é independente das permissões e sobrevive a uma gravação antiga',async()=>{
  const db=userDb({email:'x@example.test',person_category:'SOCIO',companies:['LIVION']});
  const input={email:'x@example.test',name:'Teste',profile:'SOCIO',entity_key:'LIVION',active:true,apps:['app'],actions:['app.ver']};

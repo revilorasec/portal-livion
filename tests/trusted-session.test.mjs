@@ -68,7 +68,7 @@ test('reconexão automática preserva a sessão e agenda nova tentativa',()=>{
     return elements.get(id);
   };
   let scheduled=null;
-  const runtime={msal:{InteractionRequiredAuthError:class {}},$:get,trustedDevice:()=>true,
+  const runtime={msal:{InteractionRequiredAuthError:class {}},$:get,trustedDevice:()=>true,showPinLogin:()=>{},
     setTimeout:(fn,delay)=>{scheduled={fn,delay};return 1},clearTimeout:()=>{},resumeLoginAfterTrust:()=>{throw new Error('login indevido')}};
   runInNewContext(`${source};showAuthError(new Error('SERVICE_UNAVAILABLE'))`,runtime);
   assert.equal(get('authTitle').textContent,'Reconectando ao Portal...');
@@ -92,7 +92,7 @@ test('falha de rede do MSAL não redireciona para login e a tentativa seguinte r
   }
   const runtime={msal:{PublicClientApplication:FakeMsal,InteractionRequiredAuthError:class {}},msalApp:null,
     window:{opener:null},document:{documentElement:{}},CLIENT:'client',TENANT:'tenant',REDIRECT:'https://portal.example/',
-    trustedDevice:()=>true,token:null,ctx:null,sessionStorage:{removeItem(){}},LOGIN_AFTER_TRUST_KEY:'pending',
+    trustedDevice:()=>true,token:null,ctx:null,sessionStorage:{removeItem(){},getItem(){return null}},readPinSession:()=>null,PIN_LOGOUT_KEY:'pin-logout',LOGIN_AFTER_TRUST_KEY:'pending',
     api:async()=>({authenticated:true}),showPortal:()=>{shown++},showAuthError:e=>errors.push(e.message),signedOut:()=>{},clearTimeout:()=>{}};
   runInNewContext(`${source};globalThis.retryPortal=init`,runtime);
   await runtime.retryPortal();
@@ -112,7 +112,7 @@ test('segunda tentativa recupera o portal após uma falha transitória',async()=
   assert.equal(calls,2);
 });
 
-test('tokens continuam sob controle do MSAL e não são gravados manualmente',()=>{
+test('tokens Microsoft continuam sob controle do MSAL e não são gravados manualmente',()=>{
   assert.doesNotMatch(html,/localStorage\.setItem\([^\n]*(?:token|accessToken)/i);
   assert.match(html,/window\.__PORTAL_TOKEN__=token/);
 });
