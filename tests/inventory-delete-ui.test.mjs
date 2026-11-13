@@ -9,7 +9,7 @@ function ui(){
   function element(id=''){
     const classes=new Set();const el={id,textContent:'',disabled:false,className:'',dataset:{},
       classList:{add(...names){names.forEach(name=>classes.add(name))},remove(...names){names.forEach(name=>classes.delete(name))},toggle(name,on){on?classes.add(name):classes.delete(name)},contains(name){return classes.has(name)}},
-      before(button){buttons.push(button)},appendChild(){},querySelector(){return null},querySelectorAll(){return []},remove(){buttons.splice(buttons.indexOf(el),1)}};
+      before(button){buttons.push(button)},appendChild(){},prepend(child){el.notice=child},setAttribute(){},querySelector(){return null},querySelectorAll(){return []},remove(){buttons.splice(buttons.indexOf(el),1)}};
     if(id)elements.set(id,el);return el;
   }
   for(const id of ['modalCancel','modalSave','modal','modalBody','pStatus'])element(id);
@@ -45,4 +45,14 @@ test('trocar componentes mantém a solicitação no rodapé e reinicia somente a
   assert.equal(page.buttons.length,1);assert.equal(page.buttons[0].textContent,'Solicitar exclusão');
   vm.runInContext('modal("Outro formulário", "", null)',page.context);
   assert.equal(dialog.classList.contains('inventory-product-dialog'),false);
+});
+
+test('solicitação fica habilitada ao trocar entre itens ativos e inativos',()=>{
+  const page=ui();page.open(false);
+  page.context.product={product_id:'PROD-49E977CA',status:'INATIVO'};
+  vm.runInContext('openProduct(product)',page.context);
+  assert.equal(page.buttons.length,1);assert.equal(page.buttons[0].textContent,'Solicitar exclusão');
+  assert.equal(page.buttons[0].disabled,false);assert.match(page.elements.get('modalBody').notice.textContent,/também pode solicitar/);
+  page.open(false);assert.equal(page.buttons.length,1);assert.equal(page.buttons[0].disabled,false);
+  assert.equal(page.buttons[0].textContent,'Solicitar exclusão');
 });

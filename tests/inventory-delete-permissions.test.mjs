@@ -78,8 +78,9 @@ test('editar produto não permite contornar a permissão mudando o status para I
   const s=service();await assert.rejects(s.call('product',actor('OPERACIONAL',['estoque.editar_produto']),{product_id:'P1',pn:'PN1',description:'Item',item_type:'Componente',status:'INATIVO'}),/FORBIDDEN/);
   assert.equal(s.tables.inventory_products[0].status,'ATIVO');
 });
-test('solicitação para item inativo é recusada',async()=>{
+test('qualquer item, inclusive inativo, aceita solicitação para análise',async()=>{
   const s=service();s.tables.inventory_stock_current[0].status='INATIVO';
-  await assert.rejects(s.call('productDeleteRequest',actor(),{product_id:'P1',reason:'Excluir'}),/INVALID_INACTIVE_PRODUCT/);
-  assert.equal(s.tables.inventory_product_delete_requests.length,0);
+  const result=await s.call('productDeleteRequest',actor(),{product_id:'P1',reason:'Excluir cadastro inativo'});
+  assert.equal(result.ok,true);assert.equal(s.tables.inventory_product_delete_requests.length,1);
+  assert.equal(s.tables.inventory_product_delete_requests[0].status,'PENDENTE');
 });

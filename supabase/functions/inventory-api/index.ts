@@ -262,7 +262,7 @@ async function productDeleteRequest(a:any,b:any){
   const action=String(b.action||'CREATE').toUpperCase(),requestId=String(b.request_id||''),now=new Date().toISOString();
   if(action==='CREATE'){
     const productId=String(b.product_id||''),reason=String(b.reason||'').trim();if(!productId||reason.length<3)throw Error('INVALID_DELETE_REQUEST');
-    const product=await db.from('inventory_stock_current').select('product_id,pn,description,unit,balance,status').eq('product_id',productId).maybeSingle();if(product.error)throw product.error;if(!product.data)throw Error('NOT_FOUND');if(product.data.status==='INATIVO')throw Error('INVALID_INACTIVE_PRODUCT');
+    const product=await db.from('inventory_stock_current').select('product_id,pn,description,unit,balance,status').eq('product_id',productId).maybeSingle();if(product.error)throw product.error;if(!product.data)throw Error('NOT_FOUND');
     const existing=await db.from('inventory_product_delete_requests').select('*').eq('product_id',productId).eq('status','PENDENTE').maybeSingle();if(existing.error)throw existing.error;if(existing.data)return{ok:true,duplicate:true,request:existing.data};
     const inserted=await db.from('inventory_product_delete_requests').insert({product_id:productId,product_pn:product.data.pn||'',product_name:product.data.description||product.data.pn||productId,product_unit:product.data.unit||null,balance_at_request:Number(product.data.balance||0),reason,status:'PENDENTE',requested_by:a.email}).select().single();if(inserted.error)throw inserted.error;
     await audit(a,'INVENTORY_PRODUCT_DELETE_REQUEST',productId,{request_id:inserted.data.request_id,reason,balance:product.data.balance});return{ok:true,request:inserted.data};
