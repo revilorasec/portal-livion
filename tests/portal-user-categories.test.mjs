@@ -62,6 +62,36 @@ test('categoria é independente das permissões e sobrevive a uma gravação ant
  db.state.written=null;result=await runUser(db,{...input,person_category:'INVALIDA'});assert.equal(result.status,400);assert.equal(db.state.written,null);
 });
 
+test('salvar administrador normaliza acesso completo mesmo com aplicativos vazios ou curinga',async()=>{
+ const db=userDb({email:'marcelo@example.test',profile:'ADMINISTRADOR',companies:['LIVION']});
+ for(const apps of [['*'],[],['app']]){
+  const result=await runUser(db,{email:'marcelo@example.test',name:'Marcelo',profile:'ADMINISTRADOR',entity_key:'LIVION',active:true,apps,actions:['app.ver']});
+  assert.equal(result.status,200);assert.deepEqual(db.state.written.apps,['app']);assert.deepEqual(db.state.written.actions,['*']);
+ }
+});
+
+test('tela do administrador mostra todos os aplicativos e ações marcados e bloqueados',()=>{
+ const snippet=frontend.slice(frontend.indexOf('function userAppHtml('),frontend.indexOf('function wireUserForm('));
+ const context=vm.createContext({esc:String,isViewAction:()=>true});vm.runInContext(snippet,context);
+ context.app={key:'estoque',title:'Estoque',actions:[{key:'estoque.excluir_produto',label:'Excluir'}]};
+ context.form={profile:'ADMINISTRADOR',apps:['*'],actions:[]};
+ const html=vm.runInContext('userAppHtml(app,form)',context);
+ assert.equal((html.match(/checked disabled/g)||[]).length,2);
+ context.form={profile:'OPERACIONAL',apps:['estoque'],actions:[]};
+ const operational=vm.runInContext('userAppHtml(app,form)',context);
+ assert.doesNotMatch(operational,/disabled/);assert.equal((operational.match(/checked/g)||[]).length,1);
+});
+
+test('catálogo do Portal mantém a permissão de exclusão do estoque sem duplicá-la',async()=>{
+ const snippet=backend.slice(backend.indexOf('async function appsRegistry('),backend.indexOf('async function profilesRegistry(')).replaceAll(':any','');
+ const rows=[{key:'estoque',actions:[{key:'estoque.editar_produto'},{key:'estoque.excluir_produto'}]},{key:'outro',actions:[]}];
+ const db={from(){return {select(){return this},order(){return this},eq(){return this},then(resolve){return Promise.resolve({data:rows,error:null}).then(resolve)}}}};
+ const context=vm.createContext({db});vm.runInContext(snippet,context);const result=await vm.runInContext('appsRegistry()',context);
+ assert.equal(result[0].actions.filter(action=>action.key==='estoque.excluir_produto').length,1);
+ assert.ok(result[0].actions.some(action=>action.key==='estoque.editar_produto'));assert.equal(result[1],rows[1]);
+ rows[0].actions=[];const missing=await vm.runInContext('appsRegistry()',context);assert.equal(missing[0].actions[0].key,'estoque.excluir_produto');
+});
+
 test('alteração rápida de categoria grava somente categoria e data',async()=>{
  const record={id:7,user_type:'INTERNO',person_category:null,profile:'SOCIO',apps:['app'],actions:['app.ver']};let updatePayload;
  const db={from(table){assert.equal(table,'portal_users');return {select(){return this},eq(){return this},async maybeSingle(){return {data:record,error:null}},update(payload){updatePayload=payload;return this}}}};

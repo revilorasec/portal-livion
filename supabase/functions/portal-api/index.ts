@@ -80,7 +80,7 @@ async function identity(req:Request){
  if(!id)authFail('identity');
  return {id,email,name:String(c.name||email),token};
 }
-async function appsRegistry(all=false){let q=db.from('portal_apps').select('key,title,description,icon,eyebrow,href,active,audience,audience_types,companies,actions,sort_order').order('sort_order');if(!all)q=q.eq('active',true);const r=await q;if(r.error)throw r.error;return r.data||[];}
+async function appsRegistry(all=false){let q=db.from('portal_apps').select('key,title,description,icon,eyebrow,href,active,audience,audience_types,companies,actions,sort_order').order('sort_order');if(!all)q=q.eq('active',true);const r=await q;if(r.error)throw r.error;return (r.data||[]).map((app:any)=>app.key==='estoque'?{...app,actions:[...(app.actions||[]).filter((action:any)=>action.key!=='estoque.excluir_produto'),{key:'estoque.excluir_produto',label:'Excluir produtos e analisar solicitações de exclusão'}]}:app);}
 async function profilesRegistry(){const r=await db.from('portal_profiles').select('key,label,description,default_apps,default_companies,default_actions,active').eq('active',true).order('key');if(r.error){console.warn('portal-profiles-fallback',r.error.message);return PROFILE_REGISTRY;}const rows=(r.data||[]).filter((p:any)=>PROFILES.includes(p.key)).map((p:any)=>({key:p.key,label:String(p.label||p.key),description:String(p.description||''),defaultApps:Array.isArray(p.default_apps)?p.default_apps:[],defaultCompanies:Array.isArray(p.default_companies)?p.default_companies:[],defaultActions:Array.isArray(p.default_actions)?p.default_actions:[]}));return rows.length?PROFILES.map(key=>rows.find((p:any)=>p.key===key)||PROFILE_REGISTRY.find(p=>p.key===key)!):PROFILE_REGISTRY;}
 function audiences(app:any){const x=Array.isArray(app.audience_types)?app.audience_types:[];if(x.length)return x.map((v:any)=>String(v).toUpperCase());if(app.audience==='BOTH')return ['INTERNO','CLIENTE'];return [String(app.audience||'INTERNO').toUpperCase()];}
 function appAllowedForType(app:any,userType:string){return audiences(app).includes(userType);}
@@ -128,6 +128,7 @@ Deno.serve(async(req)=>{const origin=req.headers.get('origin');if(req.method==='
   const apps=await appsRegistry(true),allowedApps=apps.filter((a:any)=>a.active&&appAllowedForType(a,userType)),appKeys=allowedApps.map((a:any)=>a.key),actionOwners=new Map(apps.flatMap((a:any)=>Array.isArray(a.actions)?a.actions.map((x:any)=>[x.key,a.key]):[]));
   let selectedApps=Array.isArray(body.apps)?body.apps.filter((x:string)=>appKeys.includes(x)):[];
   let selectedActions=Array.isArray(body.actions)?body.actions.filter((x:string)=>x==='*'||selectedApps.includes(actionOwners.get(x))):[];
+  if(body.profile==='ADMINISTRADOR'){selectedApps=appKeys;selectedActions=['*'];}
   if(body.profile==='VISUALIZADOR')selectedActions=selectedActions.filter(viewOnlyAction);
   if(body.profile==='FUNCIONARIO'){selectedApps=appKeys.includes('rh')?['rh']:[];selectedActions=[];}
   const companyKeys=(await entities()).filter((e:any)=>e.entity_type==='EMPRESA').map((e:any)=>e.key);

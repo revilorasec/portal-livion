@@ -7,13 +7,13 @@ const ui=readFileSync(new URL('../estoque-product-delete-requests.js',import.met
 const html=readFileSync(new URL('../estoque.html',import.meta.url),'utf8');
 const migration=readFileSync(new URL('../supabase/migrations/20261105143000_inventory_product_delete_requests.sql',import.meta.url),'utf8');
 
-test('usuário do estoque pode sugerir exclusão, mas somente administrador decide',()=>{
+test('usuário do estoque pode solicitar exclusão e responsáveis autorizados decidem',()=>{
   assert.match(api,/action==='CREATE'/);
   assert.match(api,/requested_by:a\.email/);
-  assert.match(api,/if\(!a\.admin\)throw Error\('FORBIDDEN'\)/);
-  assert.match(ui,/Sugerir exclusão/);
-  assert.match(ui,/D\.user\?\.administrator/);
-  assert.match(ui,/Analisar exclusões/);
+  assert.match(api,/if\(!canDeleteProduct\(a\)\)throw Error\('FORBIDDEN'\)/);
+  assert.match(ui,/Solicitar exclusão/);
+  assert.match(ui,/D\?\.permissions\?\.productDelete/);
+  assert.match(ui,/Solicitações de exclusão/);
 });
 
 test('exclusão administrativa inativa e preserva histórico com auditoria',()=>{
@@ -37,5 +37,5 @@ test('solicitações são privadas e a V19 carrega o fluxo',()=>{
   assert.match(migration,/revoke all .* from anon,authenticated/);
   assert.match(migration,/grant select,insert,update .* to service_role/);
   assert.match(html,/data-app-version="19"/);
-  assert.match(html,/estoque-product-delete-requests\.js\?v=1/);
+  assert.match(html,/estoque-product-delete-requests\.js\?v=3/);
 });
