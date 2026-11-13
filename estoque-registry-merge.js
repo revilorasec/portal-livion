@@ -9,6 +9,7 @@
   function countRows(counts={}){return Object.entries(counts).filter(([,value])=>Number(value)!==0).map(([key,value])=>`<li><b>${esc(value)}</b> ${esc(countLabels[key]||key)}</li>`).join('')||'<li>Nenhum vínculo adicional; somente o cadastro duplicado será ocultado.</li>'}
 
   function openMerge(type,target){
+    if(!D?.user?.administrator)return;
     cleanupActionButtons();
     const targetId=entityId(type,target),rows=candidates(type,targetId),label=entityLabel(type),targetName=entityName(type,target);
     modal(`Mesclar ${label} duplicado`,`<div class="merge-registry"><div class="merge-keep"><small>Cadastro correto que permanecerá</small><b>${esc(targetName)}</b></div><div class="field"><label>Escolha o cadastro incorreto que será retirado</label><select id="mergeSource"><option value="">Selecione…</option>${rows.map(x=>`<option value="${esc(entityId(type,x))}">${esc(entityName(type,x))}${String(x.status||'ATIVO').toUpperCase()==='INATIVO'?' · INATIVO':''}</option>`).join('')}</select></div><p class="merge-help">Os saldos, notas, produtos vinculados, compras, arquivos e histórico passarão a aparecer no cadastro correto. O cadastro incorreto será retirado das listas, mas a auditoria será preservada.</p><div id="mergePreview"></div></div>`,async()=>{
@@ -26,6 +27,7 @@
   }
 
   function reviewPair(type,left,right){
+    if(!D?.user?.administrator)return;
     cleanupActionButtons();
     const leftId=entityId(type,left),rightId=entityId(type,right),label=entityLabel(type);
     let stage='choose',sourceId='',targetId='',preview=null;
@@ -55,11 +57,11 @@
   function addButton(type,row){
     const id=entityId(type,row);if(!id)return;
     document.querySelectorAll('.registry-merge-button').forEach(x=>x.remove());
-    const allowed=type==='PRODUCT'?D.permissions?.product:D.permissions?.supplier;if(!allowed)return;
+    if(!D?.user?.administrator)return;
     const button=document.createElement('button');button.type='button';button.className='btn registry-merge-button';button.textContent='Mesclar e retirar duplicado';button.onclick=()=>openMerge(type,row);$('modalCancel').before(button);
   }
 
-  function pendingProductMerges(){return(D.registry_merges||[]).filter(row=>row.entity_type==='PRODUCT'&&String(row.review_status||'PENDENTE')!=='CONFIRMADO').sort((a,b)=>String(b.merged_at||'').localeCompare(String(a.merged_at||'')))}
+  function pendingProductMerges(){return(D?.registry_merges||[]).filter(row=>row.entity_type==='PRODUCT'&&String(row.review_status||'PENDENTE')!=='CONFIRMADO').sort((a,b)=>String(b.merged_at||'').localeCompare(String(a.merged_at||'')))}
   function currentTargetBalance(row){return(D.stock||[]).find(product=>product.product_id===row.target_id)?.balance}
   function balanceReviewHtml(row){
     const snapshot=row.detail?.balance_review,current=currentTargetBalance(row),unit=snapshot?.unit||(D.stock||[]).find(product=>product.product_id===row.target_id)?.unit||'';
@@ -71,8 +73,9 @@
     body.innerHTML=rows.map(row=>`<article class="merge-review-card" data-merge-id="${esc(row.merge_id)}"><div><small>Cadastro retirado</small><b>${esc(row.source_name)}</b></div><div><small>Cadastro que permaneceu</small><b>${esc(row.target_name)}</b></div>${balanceReviewHtml(row)}<div class="merge-review-meta">Mesclado em ${dt(row.merged_at)} por ${esc(row.merged_by||'—')}</div><button type="button" class="btn good merge-review-confirm">Saldo conferido — OK</button></article>`).join('')||'<div class="empty">Todas as mesclagens já foram conferidas.</div>';
     body.querySelectorAll('.merge-review-confirm').forEach(button=>button.onclick=async()=>{const card=button.closest('[data-merge-id]'),mergeId=card.dataset.mergeId;button.disabled=true;button.textContent='Confirmando…';try{await api('/registry-merge-review',{method:'POST',body:JSON.stringify({merge_id:mergeId})});const row=(D.registry_merges||[]).find(item=>item.merge_id===mergeId);if(row)row.review_status='CONFIRMADO';flash('Saldo da mesclagem confirmado.');renderPendingMergeList();ensurePendingMergeButton()}catch(error){button.disabled=false;button.textContent='Saldo conferido — OK';alert(error.message)}})
   }
-  function openPendingMergeReview(){modal('Conferir saldos após mesclagem','<p class="merge-help">Confira o resultado de cada mesclagem. Ao marcar como conferido, o item sai desta fila e continua disponível na auditoria.</p><div id="pendingMergeList" class="merge-review-list"></div>',null);$('modalSave').classList.add('hidden');renderPendingMergeList()}
+  function openPendingMergeReview(){if(!D?.user?.administrator)return;modal('Conferir saldos após mesclagem','<p class="merge-help">Confira o resultado de cada mesclagem. Ao marcar como conferido, o item sai desta fila e continua disponível na auditoria.</p><div id="pendingMergeList" class="merge-review-list"></div>',null);$('modalSave').classList.add('hidden');renderPendingMergeList()}
   function ensurePendingMergeButton(){
+    if(!D?.user?.administrator){$('pendingMergeReviewButton')?.remove();return}
     const hero=document.querySelector('#cadastros .hero');if(!hero)return;let actions=hero.querySelector('.actions');if(!actions){actions=document.createElement('div');actions.className='actions';hero.appendChild(actions)}
     let button=$('pendingMergeReviewButton');if(!button){button=document.createElement('button');button.id='pendingMergeReviewButton';button.type='button';button.className='btn';button.onclick=openPendingMergeReview;actions.appendChild(button)}
     const count=pendingProductMerges().length;button.textContent=`Conferir mesclagens (${count})`;button.classList.toggle('good',count>0);button.disabled=count===0;

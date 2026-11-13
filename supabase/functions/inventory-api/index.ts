@@ -3,22 +3,12 @@ const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVI
 function jwt(t:string){try{return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))}catch{return{}}}
 async function auth(r:Request){const t=(r.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');if(!t||jwt(t).tid!==TENANT)throw Error('UNAUTHORIZED');const g=await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName',{headers:{authorization:`Bearer ${t}`}});if(!g.ok)throw Error('UNAUTHORIZED');const me=await g.json(),email=String(me.mail||me.userPrincipalName||'').toLowerCase();let q=await db.from('portal_users').select('*').eq('microsoft_id',me.id).maybeSingle();if(!q.data)q=await db.from('portal_users').select('*').ilike('email',email).maybeSingle();const u=q.data,admin=u?.profile==='ADMINISTRADOR';if(!u?.active||(!admin&&!(u.apps||[]).includes('estoque')))throw Error('FORBIDDEN');return{u,email,admin,actions:Array.isArray(u.actions)?u.actions:[]}}
 const can=(a:any,k:string)=>a.admin||a.actions.includes(k);
-const canDeleteProduct=(a:any)=>a.admin||(['SOCIO','OPERACIONAL'].includes(a.u.profile)&&a.actions.includes('estoque.excluir_produto'));
+const canDeleteProduct=(a:any)=>a.admin;
 async function productDeletePermissions(a:any,b?:any){
   if(!a.admin)throw Error('FORBIDDEN');
-  if(b){
-    if(typeof b.allowed!=='boolean'||!b.user_id)throw Error('INVALID_DELETE_PERMISSION');
-    const current=await db.from('portal_users').select('id,email,profile,active,apps,actions,updated_at').eq('id',String(b.user_id)).maybeSingle();if(current.error)throw current.error;
-    const user=current.data;if(!user)throw Error('NOT_FOUND');
-    if(!user.active||!['SOCIO','OPERACIONAL'].includes(user.profile)||!(user.apps||[]).includes('estoque'))throw Error('INVALID_DELETE_PERMISSION_USER');
-    const before=Array.isArray(user.actions)?user.actions:[],actions=before.filter((key:string)=>key!=='estoque.excluir_produto');if(b.allowed)actions.push('estoque.excluir_produto');
-    let update=db.from('portal_users').update({actions,updated_at:new Date().toISOString()}).eq('id',user.id);update=user.updated_at?update.eq('updated_at',user.updated_at):update.is('updated_at',null);
-    const saved=await update.select('id').maybeSingle();if(saved.error)throw saved.error;if(!saved.data)throw Error('INVALID_PERMISSION_CONFLICT_REFRESH');
-    await audit(a,'INVENTORY_PRODUCT_DELETE_PERMISSION',user.email,{before:before.includes('estoque.excluir_produto'),allowed:b.allowed});
-    return{ok:true};
-  }
+  if(b)throw Error('FORBIDDEN_ADMIN_ONLY');
   const result=await db.from('portal_users').select('id,email,name,profile,active,apps,actions').eq('active',true).order('name');if(result.error)throw result.error;
-  return{users:(result.data||[]).filter((user:any)=>user.profile==='ADMINISTRADOR'||(user.apps||[]).includes('estoque')).map((user:any)=>({id:user.id,email:user.email,name:user.name,profile:user.profile,allowed:user.profile==='ADMINISTRADOR'||(['SOCIO','OPERACIONAL'].includes(user.profile)&&(user.actions||[]).includes('estoque.excluir_produto')),editable:['SOCIO','OPERACIONAL'].includes(user.profile)}))};
+  return{users:(result.data||[]).filter((user:any)=>user.profile==='ADMINISTRADOR'||(user.apps||[]).includes('estoque')).map((user:any)=>({id:user.id,email:user.email,name:user.name,profile:user.profile,allowed:user.profile==='ADMINISTRADOR',editable:false}))};
 }
 async function audit(a:any,action:string,target:string,detail:any={}){await db.from('access_audit').insert({actor_email:a.email,action,target,detail:{...detail,server_at:new Date().toISOString()}})}
 async function mediaMap(type:string,ids:string[]){if(!ids.length)return{};const r=await db.from('inventory_media').select('*').eq('entity_type',type).in('entity_id',ids).order('position'),out:any={};for(const m of r.data||[]){const s=await db.storage.from(m.bucket).createSignedUrl(m.object_path,3600);if(s.data?.signedUrl)(out[m.entity_id]??=[]).push({...m,url:s.data.signedUrl})}return out}
@@ -232,6 +222,7 @@ upload=async function(a:any,r:Request,u:URL){
 };
 
 async function registryMerge(a:any,b:any){
+  if(!a.admin)throw Error('FORBIDDEN');
   const entityType=String(b.entity_type||'').toUpperCase(),sourceId=String(b.source_id||''),targetId=String(b.target_id||''),apply=!!b.apply;
   if(entityType==='PRODUCT'){if(!can(a,'estoque.editar_produto')&&!a.admin)throw Error('FORBIDDEN')}
   else if(entityType==='SUPPLIER'){if(!can(a,'estoque.gerenciar_fornecedores')&&!a.admin)throw Error('FORBIDDEN')}
@@ -291,7 +282,7 @@ async function productDeleteRequest(a:any,b:any){
   throw Error('INVALID_DELETE_REQUEST');
 }
 async function registryMergeReview(a:any,b:any){
-  if(!can(a,'estoque.editar_produto')&&!a.admin)throw Error('FORBIDDEN');const mergeId=String(b.merge_id||'');if(!mergeId)throw Error('INVALID_MERGE_REVIEW');
+  if(!a.admin)throw Error('FORBIDDEN');const mergeId=String(b.merge_id||'');if(!mergeId)throw Error('INVALID_MERGE_REVIEW');
   const row=await db.from('inventory_registry_merges').select('*').eq('merge_id',mergeId).eq('entity_type','PRODUCT').maybeSingle();if(row.error)throw row.error;if(!row.data)throw Error('MERGE_REVIEW_NOT_FOUND');
   const update=await db.from('inventory_registry_merges').update({review_status:'CONFIRMADO',reviewed_at:new Date().toISOString(),reviewed_by:a.email}).eq('merge_id',mergeId).eq('review_status','PENDENTE');if(update.error)throw update.error;
   await audit(a,'INVENTORY_REGISTRY_MERGE_REVIEW',row.data.target_id,{merge_id:mergeId,source_id:row.data.source_id,status:'CONFIRMADO'});return{ok:true,merge_id:mergeId,status:'CONFIRMADO'};

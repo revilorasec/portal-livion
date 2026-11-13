@@ -14,16 +14,30 @@ function ui(){
   }
   for(const id of ['modalCancel','modalSave','modal','modalBody','pStatus'])element(id);
   elements.get('modalBody').parentElement=element('productDialog');
-  const context=vm.createContext({D:null,document:{head:{appendChild(){}},createElement:()=>element(),querySelectorAll:()=>buttons.filter(button=>button.className.includes('product-delete-')),getElementById:id=>elements.get(id)},$:id=>elements.get(id),esc:String,fmt:String,dt:String,console,modal(){},closeModal(){},render(){},openProduct(){},api(){throw Error('Não deve aguardar a rede para mostrar a ação')}});
+  const context=vm.createContext({D:null,document:{head:{appendChild(){}},createElement:()=>element(),querySelectorAll:selector=>buttons.filter(button=>selector.includes('#quoteProductBtn')?(button.id==='quoteProductBtn'||button.className.includes('registry-merge-button')||button.className.includes('person-delete')):button.className.includes('product-delete-')),getElementById:id=>elements.get(id)},$:id=>elements.get(id),esc:String,fmt:String,dt:String,console,modal(){},closeModal(){},render(){},openProduct(){},api(){throw Error('Não deve aguardar a rede para mostrar a ação')}});
   vm.runInContext(script,context);
   const product={product_id:'P1',pn:'PN1',status:'ATIVO'};
-  return {context,buttons,elements,open(permission){context.D={user:{administrator:false},permissions:{productDelete:permission}};context.product=product;vm.runInContext('openProduct(product)',context)}};
+  return {context,buttons,elements,open(permission){context.D={user:{administrator:permission},permissions:{productDelete:permission}};context.product=product;vm.runInContext('openProduct(product)',context)}};
 }
-test('responsável delegado vê Excluir imediatamente sem carregar solicitações',()=>{
+test('administrador vê Excluir imediatamente sem carregar solicitações',()=>{
   const page=ui();page.open(true);assert.equal(page.buttons.length,1);assert.equal(page.buttons[0].textContent,'Excluir do estoque');
 });
 test('solicitante vê Solicitar exclusão imediatamente e nenhuma ação de exclusão direta',()=>{
   const page=ui();page.open(false);assert.equal(page.buttons.length,1);assert.equal(page.buttons[0].textContent,'Solicitar exclusão');
+});
+
+test('formulário de solicitação remove Cotar e Mesclar herdados do componente',()=>{
+  const page=ui();page.open(false);const request=page.buttons[0];
+  const quote=page.context.document.createElement('button');quote.id='quoteProductBtn';quote.className='btn quote-product-btn';
+  const merge=page.context.document.createElement('button');merge.className='btn registry-merge-button';
+  page.buttons.push(quote,merge);request.onclick();
+  assert.equal(page.buttons.length,0);assert.equal(page.elements.get('modalSave').textContent,'Enviar para análise');
+});
+
+test('permissão individual antiga não exibe exclusão direta para operacional',()=>{
+  const page=ui();page.open(false);page.context.D.permissions.productDelete=true;
+  vm.runInContext('openProduct(product)',page.context);
+  assert.equal(page.buttons[0].textContent,'Solicitar exclusão');
 });
 test('fechar ou trocar o modal remove a ação do produto anterior',()=>{
   const page=ui();page.open(true);vm.runInContext('modal("Outro formulário", "", null)',page.context);assert.equal(page.buttons.length,0);

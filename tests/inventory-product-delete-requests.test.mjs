@@ -12,7 +12,7 @@ test('usuário do estoque pode solicitar exclusão e responsáveis autorizados d
   assert.match(api,/requested_by:a\.email/);
   assert.match(api,/if\(!canDeleteProduct\(a\)\)throw Error\('FORBIDDEN'\)/);
   assert.match(ui,/Solicitar exclusão/);
-  assert.match(ui,/D\?\.permissions\?\.productDelete/);
+  assert.match(ui,/D\?\.user\?\.administrator/);
   assert.match(ui,/Solicitações de exclusão/);
 });
 
@@ -37,5 +37,5 @@ test('solicitações são privadas e a V19 carrega o fluxo',()=>{
   assert.match(migration,/revoke all .* from anon,authenticated/);
   assert.match(migration,/grant select,insert,update .* to service_role/);
   assert.match(html,/data-app-version="19"/);
-  assert.match(html,/estoque-product-delete-requests\.js\?v=5/);
+  assert.match(html,/estoque-product-delete-requests\.js\?v=6/);
 });

@@ -1,6 +1,6 @@
 (function(){
   let requests=[],loading=null,loadedAt=0,loadError='';
-  const canReview=()=>!!D?.permissions?.productDelete;
+  const canReview=()=>!!D?.user?.administrator;
   const pending=()=>requests.filter(x=>x.status==='PENDENTE');
   const productName=row=>`${row.product_pn||''}${row.product_name&&row.product_name!==row.product_pn?' — '+row.product_name:''}`;
   const currentProduct=id=>(D.stock||[]).find(x=>x.product_id===id);
@@ -13,7 +13,7 @@
   function requestFor(productId){return pending().find(x=>x.product_id===productId)}
 
   function openSuggestion(product){
-    modal('Solicitar exclusão do estoque',`<div class="delete-request-form"><div class="delete-request-product"><small>Item marcado para análise</small><b>${esc(product.pn)} — ${esc(product.description)}</b><span>Saldo atual: ${fmt(product.balance||0)} ${esc(product.unit||'')}</span></div><div class="field"><label>Por que este cadastro pode ser excluído ou mesclado?</label><textarea id="deleteRequestReason" placeholder="Ex.: cadastro duplicado, nome incorreto ou item que não é mais utilizado"></textarea></div><p class="delete-request-help">Nada será excluído agora. Uma pessoa autorizada analisará se o item deve ser mesclado, mantido ou retirado de uso.</p></div>`,async()=>{
+    modal('Solicitar exclusão do estoque',`<div class="delete-request-form"><div class="delete-request-product"><small>Item marcado para análise</small><b>${esc(product.pn)} — ${esc(product.description)}</b><span>Saldo atual: ${fmt(product.balance||0)} ${esc(product.unit||'')}</span></div><div class="field"><label>Por que este cadastro pode ser excluído ou mesclado?</label><textarea id="deleteRequestReason" placeholder="Ex.: cadastro duplicado, nome incorreto ou item que não é mais utilizado"></textarea></div><p class="delete-request-help">Nada será excluído agora. Um administrador analisará se o item deve ser mesclado, mantido ou retirado de uso.</p></div>`,async()=>{
       const reason=$('deleteRequestReason').value.trim();if(reason.length<3)throw new Error('Informe o motivo da solicitação.');
       await api('/product-delete-request',{method:'POST',body:JSON.stringify({action:'CREATE',product_id:product.product_id,reason})});closeModal();flash('Solicitação de exclusão enviada para análise.');await loadRequests(true)
     });$('modalSave').textContent='Enviar para análise';
@@ -62,11 +62,7 @@
   }
   async function openPermissions(){
     const result=await api('/product-delete-permissions');
-    modal('Quem pode excluir itens do estoque',`<p class="delete-request-help">Os selecionados poderão excluir itens e aprovar ou recusar solicitações. Administradores gerais já têm essa permissão.</p><div class="delete-permission-users">${result.users.map(user=>`<label class="delete-request-product"><span><input type="checkbox" data-delete-user="${esc(user.id)}" ${user.allowed?'checked':''} ${user.editable?'':'disabled'}> <b>${esc(user.name||user.email)}</b></span><small>${esc(user.email)} · ${esc(user.profile)}</small><span data-permission-result="${esc(user.id)}" role="status"></span></label>`).join('')}</div>`,async()=>{
-      const changes=[...document.querySelectorAll('[data-delete-user]:not(:disabled)')].filter(input=>input.checked!==result.users.find(user=>user.id===input.dataset.deleteUser)?.allowed);
-      for(const input of changes){await api('/product-delete-permissions',{method:'POST',body:JSON.stringify({user_id:input.dataset.deleteUser,allowed:input.checked})});result.users.find(user=>user.id===input.dataset.deleteUser).allowed=input.checked;document.querySelector(`[data-permission-result="${input.dataset.deleteUser}"]`).textContent='Permissão salva.'}
-      closeModal();flash('Permissões de exclusão salvas.');
-    });$('modalSave').textContent='Salvar permissões';
+    modal('Quem pode excluir itens do estoque',`<p class="delete-request-help">Somente administradores podem mesclar, excluir e decidir sobre solicitações. Os demais usuários podem solicitar exclusão de qualquer item.</p><div class="delete-permission-users">${result.users.filter(user=>user.allowed).map(user=>`<div class="delete-request-product"><b>${esc(user.name||user.email)}</b><small>${esc(user.email)} · Administrador</small></div>`).join('')}</div>`,null);$('modalSave').classList.add('hidden');
   }
   function ensureQueueButton(){
     if(!D?.user)return;const button=$('productDeleteReviewButton');if(!button)return;button.onclick=openQueue;
@@ -81,7 +77,7 @@
     if(!canReview()){$('pStatus')?.querySelector('option[value="INATIVO"],option:last-child')?.setAttribute('disabled','')}
   }
 
-  const modalBase=modal;modal=function(...args){cleanupButtons();$('modalBody')?.parentElement?.classList.remove('inventory-product-dialog');$('modalSave').classList.remove('bad');return modalBase(...args)};
+  const modalBase=modal;modal=function(...args){cleanupButtons();document.querySelectorAll('#quoteProductBtn,.registry-merge-button,.person-delete').forEach(button=>button.remove());$('modalBody')?.parentElement?.classList.remove('inventory-product-dialog');$('modalSave').classList.remove('bad');return modalBase(...args)};
   const closeBase=closeModal;closeModal=function(){cleanupButtons();return closeBase()};
   const productBase=openProduct;openProduct=function(product={}){cleanupButtons();productBase(product);const body=$('modalBody'),dialog=body?.parentElement;dialog?.classList.add('inventory-product-dialog');if(dialog)dialog.scrollTop=0;if(body)body.scrollTop=0;if(product.product_id)addProductAction(product)};
   const renderBase=render;render=function(){renderBase();ensureQueueButton();loadRequests().catch(()=>{})};

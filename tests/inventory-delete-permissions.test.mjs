@@ -25,26 +25,26 @@ function service(){
   return {tables,conflict(){conflict=true},call:(name,...args)=>{context.args=args;return vm.runInContext(`${name}(...args)`,context)}};
 }
 
-test('permissão delegada permite revisar sem tornar o usuário administrador',()=>{
-  const s=service();assert.equal(s.call('canDeleteProduct',delegate()),true);assert.equal(s.call('canDeleteProduct',actor()),false);
+test('somente perfil administrador pode revisar mesmo que haja permissão antiga delegada',()=>{
+  const s=service();assert.equal(s.call('canDeleteProduct',delegate()),false);assert.equal(s.call('canDeleteProduct',actor()),false);
   assert.equal(s.call('canDeleteProduct',actor('VISUALIZADOR',['estoque.excluir_produto'])),false);
   assert.equal(s.call('canDeleteProduct',actor('ADMINISTRADOR')),true);
 });
 test('fila mostra todos os pedidos ao responsável e apenas os próprios ao solicitante',async()=>{
   const s=service();s.tables.inventory_product_delete_requests.push({request_id:'R1',requested_by:'outra@example.com'},{request_id:'R2',requested_by:'pessoa@example.com'});
   assert.equal((await s.call('productDeleteRequests',actor())).requests.length,1);
-  assert.equal((await s.call('productDeleteRequests',delegate())).requests.length,2);
+  assert.equal((await s.call('productDeleteRequests',actor('ADMINISTRADOR'))).requests.length,2);
 });
-test('solicitar mantém item e saldo; responsável delegado pode recusar',async()=>{
+test('solicitar mantém item e saldo; administrador pode recusar',async()=>{
   const s=service();const created=await s.call('productDeleteRequest',actor(),{product_id:'P1',reason:'Duplicado'});
   assert.equal(s.tables.inventory_products[0].status,'ATIVO');assert.equal(s.tables.inventory_stock_current[0].balance,7);
-  await s.call('productDeleteRequest',delegate(),{action:'REJECT',request_id:created.request.request_id,decision_notes:'Cadastro correto'});
+  await s.call('productDeleteRequest',actor('ADMINISTRADOR'),{action:'REJECT',request_id:created.request.request_id,decision_notes:'Cadastro correto'});
   assert.equal(s.tables.inventory_product_delete_requests[0].status,'RECUSADO');assert.equal(s.tables.inventory_products[0].status,'ATIVO');
   assert.equal(s.tables.access_audit.at(-1).action,'INVENTORY_PRODUCT_DELETE_REJECT');
 });
-test('aprovação delegada inativa o item, registra decisão e preserva saldo',async()=>{
+test('aprovação administrativa inativa o item, registra decisão e preserva saldo',async()=>{
   const s=service();const created=await s.call('productDeleteRequest',actor(),{product_id:'P1',reason:'Cadastro duplicado'});
-  await s.call('productDeleteRequest',delegate(),{action:'INACTIVATE',request_id:created.request.request_id,decision_notes:'Aprovado após análise'});
+  await s.call('productDeleteRequest',actor('ADMINISTRADOR'),{action:'INACTIVATE',request_id:created.request.request_id,decision_notes:'Aprovado após análise'});
   assert.equal(s.tables.inventory_products[0].status,'INATIVO');assert.equal(s.tables.inventory_products.length,1);
   assert.equal(s.tables.inventory_stock_current[0].balance,7);assert.equal(s.tables.inventory_product_delete_requests[0].status,'INATIVADO');
   assert.equal(s.tables.inventory_product_delete_requests[0].reviewed_by,'pessoa@example.com');
@@ -54,26 +54,21 @@ test('usuário sem permissão não pode decidir nem excluir diretamente',async()
   const s=service();for(const action of ['REJECT','INACTIVATE','MERGED'])await assert.rejects(s.call('productDeleteRequest',actor(),{action,product_id:'P1'}),/FORBIDDEN/);
   assert.equal(s.tables.inventory_products[0].status,'ATIVO');assert.equal(s.tables.access_audit.length,0);
 });
-test('somente administrador pode conceder e revogar exclusão, preservando outras ações',async()=>{
-  const s=service();s.tables.portal_users.push({id:'U1',email:'marcelo@example.com',name:'Marcelo',profile:'OPERACIONAL',active:true,apps:['estoque'],actions:['estoque.editar_produto'],updated_at:null});
+test('nenhuma permissão individual permite conceder exclusão a operacional',async()=>{
+  const s=service();s.tables.portal_users.push({id:'U1',email:'operador@example.com',name:'Operador',profile:'OPERACIONAL',active:true,apps:['estoque'],actions:['estoque.excluir_produto']},{id:'A1',profile:'ADMINISTRADOR',active:true,actions:[]});
   await assert.rejects(s.call('productDeletePermissions',delegate()),/FORBIDDEN/);
-  await assert.rejects(s.call('productDeletePermissions',delegate(),{user_id:'U1',allowed:true}),/FORBIDDEN/);
-  await s.call('productDeletePermissions',actor('ADMINISTRADOR'),{user_id:'U1',allowed:true});
-  assert.deepEqual(s.tables.portal_users[0].actions,['estoque.editar_produto','estoque.excluir_produto']);
-  assert.equal((await s.call('productDeletePermissions',actor('ADMINISTRADOR'))).users[0].allowed,true);
-  await s.call('productDeletePermissions',actor('ADMINISTRADOR'),{user_id:'U1',allowed:false});
-  assert.deepEqual(s.tables.portal_users[0].actions,['estoque.editar_produto']);
-  assert.equal(s.tables.access_audit.length,2);
+  await assert.rejects(s.call('productDeletePermissions',actor('ADMINISTRADOR'),{user_id:'U1',allowed:true}),/FORBIDDEN_ADMIN_ONLY/);
+  const users=(await s.call('productDeletePermissions',actor('ADMINISTRADOR'))).users;
+  assert.equal(users.find(user=>user.id==='U1').allowed,false);assert.equal(users.find(user=>user.id==='A1').allowed,true);
 });
-test('concessão rejeita visualizadores, usuários sem acesso e alteração concorrente',async()=>{
-  const s=service();const user={id:'U1',profile:'VISUALIZADOR',active:true,apps:['estoque'],actions:[]};s.tables.portal_users.push(user);
-  await assert.rejects(s.call('productDeletePermissions',actor('ADMINISTRADOR'),{user_id:'U1',allowed:true}),/INVALID_DELETE_PERMISSION_USER/);
-  user.profile='OPERACIONAL';user.apps=[];
-  await assert.rejects(s.call('productDeletePermissions',actor('ADMINISTRADOR'),{user_id:'U1',allowed:true}),/INVALID_DELETE_PERMISSION_USER/);
-  user.apps=['estoque'];s.conflict();
-  await assert.rejects(s.call('productDeletePermissions',actor('ADMINISTRADOR'),{user_id:'U1',allowed:true}),/CONFLICT_REFRESH/);
-  assert.deepEqual(user.actions,[]);
+test('permissão antiga de exclusão e edição não autoriza mesclar nem decidir pedidos',async()=>{
+  const s=service(),operational=actor('OPERACIONAL',['estoque.editar_produto','estoque.excluir_produto','estoque.gerenciar_fornecedores']);
+  for(const action of ['REJECT','INACTIVATE','MERGED'])await assert.rejects(s.call('productDeleteRequest',operational,{action,product_id:'P1'}),/FORBIDDEN/);
+  for(const entity_type of ['PRODUCT','SUPPLIER'])await assert.rejects(s.call('registryMerge',operational,{entity_type,source_id:'P1',target_id:'P2',apply:true}),/FORBIDDEN/);
+  await assert.rejects(s.call('registryMergeReview',operational,{merge_id:'M1'}),/FORBIDDEN/);
+  assert.equal(s.tables.inventory_products[0].status,'ATIVO');assert.equal(s.tables.access_audit.length,0);
 });
+
 test('editar produto não permite contornar a permissão mudando o status para INATIVO',async()=>{
   const s=service();await assert.rejects(s.call('product',actor('OPERACIONAL',['estoque.editar_produto']),{product_id:'P1',pn:'PN1',description:'Item',item_type:'Componente',status:'INATIVO'}),/FORBIDDEN/);
   assert.equal(s.tables.inventory_products[0].status,'ATIVO');
