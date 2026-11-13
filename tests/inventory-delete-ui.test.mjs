@@ -13,6 +13,7 @@ function ui(){
     if(id)elements.set(id,el);return el;
   }
   for(const id of ['modalCancel','modalSave','modal','modalBody','pStatus'])element(id);
+  elements.get('modalBody').parentElement=element('productDialog');
   const context=vm.createContext({D:null,document:{head:{appendChild(){}},createElement:()=>element(),querySelectorAll:()=>buttons.filter(button=>button.className.includes('product-delete-')),getElementById:id=>elements.get(id)},$:id=>elements.get(id),esc:String,fmt:String,dt:String,console,modal(){},closeModal(){},render(){},openProduct(){},api(){throw Error('Não deve aguardar a rede para mostrar a ação')}});
   vm.runInContext(script,context);
   const product={product_id:'P1',pn:'PN1',status:'ATIVO'};
@@ -31,4 +32,17 @@ test('fechar ou trocar o modal remove a ação do produto anterior',()=>{
 test('abrir outro item ou um novo cadastro não deixa botões duplicados',()=>{
   const page=ui();page.open(true);page.open(true);assert.equal(page.buttons.length,1);
   vm.runInContext('openProduct({})',page.context);assert.equal(page.buttons.length,0);
+});
+
+test('trocar componentes mantém a solicitação no rodapé e reinicia somente a rolagem do formulário',()=>{
+  const page=ui();page.open(false);
+  const body=page.elements.get('modalBody'),dialog=body.parentElement;
+  dialog.scrollTop=700;body.scrollTop=500;
+  vm.runInContext('closeModal()',page.context);page.context.product={product_id:'P2',status:'ATIVO'};
+  vm.runInContext('openProduct(product)',page.context);
+  assert.equal(dialog.classList.contains('inventory-product-dialog'),true);
+  assert.equal(dialog.scrollTop,0);assert.equal(body.scrollTop,0);
+  assert.equal(page.buttons.length,1);assert.equal(page.buttons[0].textContent,'Solicitar exclusão');
+  vm.runInContext('modal("Outro formulário", "", null)',page.context);
+  assert.equal(dialog.classList.contains('inventory-product-dialog'),false);
 });

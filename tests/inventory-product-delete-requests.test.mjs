@@ -37,5 +37,5 @@ test('solicitações são privadas e a V19 carrega o fluxo',()=>{
   assert.match(migration,/revoke all .* from anon,authenticated/);
   assert.match(migration,/grant select,insert,update .* to service_role/);
   assert.match(html,/data-app-version="19"/);
-  assert.match(html,/estoque-product-delete-requests\.js\?v=3/);
+  assert.match(html,/estoque-product-delete-requests\.js\?v=4/);
 });
