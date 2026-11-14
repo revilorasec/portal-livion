@@ -1,0 +1,6 @@
+th[data-table-sortable]{cursor:pointer;user-select:none}
+th[data-table-sortable]::after{content:' ↕';opacity:.45;font-size:.9em;white-space:nowrap}
+th[data-table-sortable][aria-sort=ascending]::after{content:' ▲';opacity:1}
+th[data-table-sortable][aria-sort=descending]::after{content:' ▼';opacity:1}
+th[data-table-sortable]:hover{background:#eaf1fd;color:#153f73}
+th[data-table-sortable]:focus-visible{outline:3px solid #28a9dc;outline-offset:-3px}
