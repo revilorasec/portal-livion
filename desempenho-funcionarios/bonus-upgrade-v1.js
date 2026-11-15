@@ -69,7 +69,7 @@ async function restoreSavedRules(){
 function applyAdminAccess(){document.querySelectorAll('[data-bonus-admin]').forEach(node=>{node.disabled=!settingsCanManage||saveInFlight||node.dataset.removeBand==='0'||(node.dataset.field==='baseLow'&&node.closest('[data-index="0"]'))});document.querySelectorAll('[data-save-bonus]').forEach(node=>node.disabled=!settingsCanManage||saveInFlight||!hasUnsavedChanges());const note=$('bonusAdminAccessNote');if(note)note.textContent=settingsCanManage?'Alterações só são compartilhadas após clicar em Gravar regras.':'Somente administradores podem alterar estas configurações.'}
 
 function injectUi(){
-  const link=document.createElement('link');link.rel='stylesheet';link.href='bonus-upgrade-v1.css?v=20261001-3';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='bonus-upgrade-v1.css?v=20261115-modal1';document.head.appendChild(link);
   const tabs=document.querySelector('.tabs'),bonusButton=tabs?.querySelector('[data-tab="bonus"]');
   if(tabs&&bonusButton&&!tabs.querySelector('[data-tab="complexity"]')){const button=document.createElement('button');button.className='tab';button.dataset.tab='complexity';button.textContent='Complexidade por PN';bonusButton.after(button);button.onclick=()=>openTab('complexity')}
   const bonusTab=$('tab-bonus');
@@ -171,4 +171,5 @@ renderComplexityAdmin();
 renderTechnicianAdmin();
 loadRemoteSettings().then(()=>{if(RAW.length){setupTeam();setupBonus();renderAll()}});
 })();
+
 
