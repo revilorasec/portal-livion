@@ -1,51 +1,65 @@
 (function(){
-  'use strict';
-  const printStyle=`
-    @page{size:A4 portrait;margin:12mm}
-    *{box-sizing:border-box}body{margin:0;background:#fff;color:#172033;font:10pt/1.35 Arial,sans-serif}
-    h1{font-size:17pt;margin:0 0 3mm}h2{font-size:13pt}h3{font-size:11pt;margin:3mm 0 2mm}
-    .print-meta{font-size:9pt;color:#526177;margin-bottom:4mm}.bonus-detail-hero{display:flex;justify-content:space-between;gap:5mm;padding:3mm;background:#f4f8fd;border:1px solid #dfe6f0;border-radius:2mm;break-inside:avoid}
-    .bonus-detail-hero h3{margin:0 0 2mm}.bonus-detail-total{font-size:18pt;font-weight:bold;white-space:nowrap;color:#087443}
-    .bonus-detail-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2mm;margin:3mm 0}.mini{border:1px solid #dfe6f0;border-radius:2mm;padding:2mm;break-inside:avoid}.mini span{display:block;font-size:8pt;color:#526177}.mini b{display:block;font-size:10pt;margin-top:1mm}
-    .bonus-reasons{border:1px solid #dfe6f0;padding:2.5mm;margin:3mm 0;break-inside:avoid}.bonus-reasons ul{margin:1mm 0;padding-left:5mm}.bonus-reasons p{margin:1mm 0}.bonus-muted{color:#526177;font-size:9pt}
-    .tablewrap{overflow:visible!important;max-height:none!important;border:0!important}table{width:100%;border-collapse:collapse;table-layout:fixed;white-space:normal;font-size:8pt;margin:2mm 0 4mm}th,td{position:static!important;padding:1.7mm;text-align:left;border-bottom:1px solid #dfe6f0;overflow-wrap:anywhere;vertical-align:top}th{background:#f4f8fd;font-weight:bold}thead{display:table-header-group}tr{break-inside:avoid}
-    .status-pill{font-size:8pt}.print-signature{margin-top:5mm;break-inside:avoid;border-top:1px solid #dfe6f0;padding-top:3mm}.print-signature p{margin:0 0 4mm}.signature-lines{display:grid;grid-template-columns:1fr 2fr;gap:8mm;margin-top:9mm}.signature-lines span{border-top:1px solid #172033;padding-top:2mm;text-align:center;font-size:9pt}
-    .print-annex{break-before:page}.print-annex h2{margin:0 0 3mm}details{display:block}summary{display:block;font-weight:bold;margin:3mm 0}button,input,select{display:none!important}
-    body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  `;
-  function printAudit(){
-    const source=document.getElementById('bonusDetailContent');
-    if(!source?.children.length)return;
-    const content=source.cloneNode(true);
-    content.removeAttribute('id');
-    content.querySelectorAll('button,script').forEach(node=>node.remove());
-    content.querySelectorAll('details').forEach(node=>node.open=true);
-    const annexes=[...content.querySelectorAll(':scope > details')];
-    annexes.forEach(node=>node.remove());
-    const doc=document.implementation.createHTMLDocument('Demonstrativo do bônus');
-    doc.documentElement.lang='pt-BR';
-    const tech=source.querySelector('.bonus-detail-hero h3')?.textContent.trim()||'Técnico';
-    const period=source.querySelector('.bonus-detail-hero > div > div')?.textContent.trim()||'';
-    doc.title=`Bônus - ${tech} - ${period}`;
-    const style=doc.createElement('style');style.textContent=printStyle;doc.head.appendChild(style);
-    const heading=doc.createElement('h1');heading.textContent='Demonstrativo de bônus — conferência';doc.body.appendChild(heading);
-    const meta=doc.createElement('div');meta.className='print-meta';meta.textContent='Livion Solutions · Emitido em '+new Date().toLocaleString('pt-BR');doc.body.appendChild(meta);
-    doc.body.appendChild(doc.importNode(content,true));
-    const signature=doc.createElement('section');signature.className='print-signature';
-    signature.innerHTML='<p>Declaro que conferi as quantidades e o cálculo do bônus apresentados neste demonstrativo.</p><p>Observações: ____________________________________________________________________</p><div class="signature-lines"><span>Data da conferência</span><span>Assinatura do técnico</span></div>';
-    doc.body.appendChild(signature);
-    if(annexes.length){const annex=doc.createElement('section');annex.className='print-annex';const title=doc.createElement('h2');title.textContent='Anexo — equipamentos e composição do cálculo';annex.appendChild(title);const owner=doc.createElement('p');owner.textContent=tech+' · '+period;annex.appendChild(owner);annexes.forEach(node=>annex.appendChild(doc.importNode(node,true)));doc.body.appendChild(annex);}
-    document.getElementById('bonusAuditPrintFrame')?.remove();
-    const frame=document.createElement('iframe');frame.id='bonusAuditPrintFrame';frame.title='Impressão do demonstrativo de bônus';frame.setAttribute('aria-hidden','true');frame.style.cssText='position:fixed;width:1px;height:1px;left:-10000px;top:0;border:0';
-    frame.onload=()=>{frame.contentWindow.focus();frame.contentWindow.print();};
-    frame.srcdoc='<!doctype html>'+doc.documentElement.outerHTML;document.body.appendChild(frame);
+ 'use strict';
+ const BASE='2026-10',API=PANEL_API.replace(/\/panel-data$/,'/bonus-statements'),money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),pct=n=>n===null?'—':Number(n).toFixed(2).replace('.',',')+'%',esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const monthLabel=m=>new Date(m+'-15T12:00:00').toLocaleDateString('pt-BR',{month:'short',year:'numeric'}),nowMonth=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit'}).format(new Date());
+ let pdfPromise,context=null,requestId=0;
+ const stable=value=>JSON.stringify(value,(_key,item)=>item&&typeof item==='object'&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
+ function monthsTo(end){const months=[];for(let m=BASE;m<=end&&months.length<120;){months.push(m);const [y,n]=m.split('-').map(Number);m=n===12?(y+1)+'-01':y+'-'+String(n+1).padStart(2,'0');}return months;}
+ function calculate(name,month,client,config){
+  const result=BonusEngine.calculateMonth(bonusRowsForMonth(month,client),month,config,{client,returnMonth,selectedTechs:[name],includeInactive:true}).find(r=>r.name===name)||{name,repaired:0,irreparable:0,repairability:null,bonus:0,bandIndex:0,band:config.bands[0],active:BonusEngine.techIsActive(config,name),payable:false,complexity:[],partNumbers:[],reasons:['Sem devoluções elegíveis neste mês.'],repairedRows:[]};
+  const equipment=(result.repairedRows||[]).map(r=>({client:r.cliente,id:r.id,date:r.dataDevolucao,measurement:r.medicao,partNumber:r.partNumber,warranty:r.garantia}));
+  const {repairedRows,...summary}=result;
+  return {version:1,name,month,client,config:JSON.parse(JSON.stringify(config)),result:summary,equipment,createdAt:new Date().toISOString()};
+ }
+ async function history(name,client,statement){
+  const call=async force=>fetch(API+'?technician='+encodeURIComponent(name)+'&client='+encodeURIComponent(client),{method:statement?'PUT':'GET',cache:'no-store',headers:{Authorization:'Bearer '+await portalToken(force),'Content-Type':'application/json'},...(statement?{body:JSON.stringify(statement)}:{})});
+  let response=await call(false);if(response.status===401)response=await call(true);const body=await response.json();if(!response.ok)throw Error(body.message||'Histórico indisponível.');return body.statements||[];
+ }
+ function timeline(ctx){return monthsTo(ctx.month).map(month=>{const saved=ctx.records.find(r=>r.month===month);return {statement:saved?.statement||calculate(ctx.name,month,ctx.client,ctx.config),registered:!!saved,partial:month>=nowMonth()};});}
+ function nextGoal(s){const next=s.config.bands.find((b,i)=>i>0&&b.baseLow>0&&b.min>s.result.repaired);return next?`Próxima faixa: ${next.min} reparadas. Faltam ${next.min-s.result.repaired} peças; Baixa: ${money(next.baseLow)}/peça.`:'Você está na maior faixa disponível. Cada nova reparada aumenta o bônus.';}
+ function criterion(s){return `Faixa pela quantidade reparada; tarifa aplicada a todas as reparadas. Média +${s.config.mediumPct}%; Alta +${s.config.highComplexityPct}%.${s.config.highRepairabilityPct?` Reparabilidade ≥ 80%: +${s.config.highRepairabilityPct}%.`:''} Irreparáveis não geram bônus. PNs sem classificação usam a Baixa.`;}
+ function chartSvg(series,keys,width=320,height=140){
+  const plot=series.slice(-12),left=36,right=12,top=16,bottom=32,w=width-left-right,h=height-top-bottom,max=Math.max(1,...plot.flatMap(p=>keys.map(k=>p.statement.result[k]||0))),x=i=>left+(plot.length===1?w/2:i*w/(plot.length-1)),y=v=>top+h-v/max*h,colors=['#174f91','#bd5b19'];
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Evolução mensal desde outubro de 2026"><line x1="${left}" y1="${top+h}" x2="${width-right}" y2="${top+h}" stroke="#dfe6f0"/><text x="0" y="${top+8}" font-size="10">${Math.ceil(max)}</text><text x="12" y="${top+h}" font-size="10">0</text>`;
+  keys.forEach((key,k)=>{if(plot.length>1)svg+=`<polyline fill="none" stroke="${colors[k]}" stroke-width="2" points="${plot.map((p,i)=>x(i)+','+y(p.statement.result[key]||0)).join(' ')}"/>`;plot.forEach((p,i)=>svg+=`<circle cx="${x(i)}" cy="${y(p.statement.result[key]||0)}" r="3" fill="${colors[k]}"/>`);});
+  plot.forEach((p,i)=>svg+=`<text x="${x(i)}" y="${height-9}" font-size="10" text-anchor="${i===0?"start":i===plot.length-1?"end":"middle"}">${esc(p.statement.month.slice(5)+"/"+p.statement.month.slice(2,4))}</text>`);return svg+'</svg>';
+ }
+ function renderPanel(ctx){const panel=document.getElementById('bonusStatementPreview');if(!panel)return;const saved=ctx.records.find(r=>r.month===ctx.month),s=saved?.statement||calculate(ctx.name,ctx.month,ctx.client,ctx.config),series=timeline(ctx),base=series[0]?.statement.result,delta=base?s.result.repaired-base.repaired:0;
+  panel.innerHTML=`<h3>Como ganhar mais</h3><p><b>${esc(nextGoal(s))}</b></p><div class="tablewrap"><table><thead><tr><th>Reparadas no mês</th><th>Baixa por peça</th></tr></thead><tbody>${s.config.bands.map(b=>`<tr><td>${b.min}–${b.max??'sem limite'}</td><td>${money(b.baseLow)}</td></tr>`).join('')}</tbody></table></div><p>${esc(criterion(s))}</p><h3>Evolução desde outubro/2026</h3><p>${saved?`Demonstrativo registrado: <b>${money(s.result.bonus)}</b>. O PDF preserva os dados e as regras dessa emissão.`:ctx.month>=nowMonth()?'Mês em andamento: valores parciais.':'Primeira emissão: confira os dados antes de baixar; o registro deste mês será preservado.'}</p>${series.length?`<p>${delta>=0?'+':''}${delta} reparadas em relação a outubro. Outubro é a referência inicial, com sua produção real.</p><div class="bonus-statement-charts"><div><b>Reparadas (azul) / irreparáveis (laranja)</b>${chartSvg(series,['repaired','irreparable'])}</div><div><b>Bônus calculado (R$)</b>${chartSvg(series,['bonus'])}</div></div>`:'<p>Comparativo disponível a partir de outubro/2026.</p>'}<p class="bonus-muted">Meses sem registro são simulações com regras atuais. Bônus não comprova pagamento. ${ctx.error?'Histórico indisponível: '+esc(ctx.error):''}</p>`;
+ }
+ async function refresh(){if(!document.getElementById('bonusDetailModal')?.classList.contains('open'))return;const name=document.querySelector('#bonusDetailContent .bonus-detail-hero h3')?.textContent.trim(),month=document.getElementById('bonusMonth').value,client=document.getElementById('bonusClient').value||'';if(!name||!month)return;const id=++requestId,ctx={name,month,client,config:BonusEngine.migrateConfig(savedBonusConfig()),records:[],error:''};context=ctx;renderPanel(ctx);try{ctx.records=await history(name,client);}catch(e){ctx.error=e.message;}if(id===requestId){context=ctx;renderPanel(ctx);}}
+ function script(src){return new Promise((resolve,reject)=>{const el=document.createElement('script');el.src=src;el.onload=resolve;el.onerror=()=>{el.remove();reject(Error('Não foi possível carregar a biblioteca PDF. Tente novamente.'));};document.head.appendChild(el);});}
+ function loadPdf(){if(!pdfPromise)pdfPromise=(async()=>{await script('https://cdn.jsdelivr.net/npm/pdfmake@0.2.21/build/pdfmake.min.js');await script('https://cdn.jsdelivr.net/npm/pdfmake@0.2.21/build/vfs_fonts.js');return window.pdfMake;})().catch(e=>{pdfPromise=null;throw e;});return pdfPromise;}
+ const table=(headers,rows,widths)=>({table:{headerRows:1,dontBreakRows:true,widths:widths||headers.map(()=>'*'),body:[headers.map(text=>({text,bold:true,fillColor:'#edf3fa'})),...rows.map(row=>row.map(cell=>String(cell??'—')))]},layout:'lightHorizontalLines',fontSize:8,margin:[0,5,0,8]});
+ function definition(s,series,registered){
+  const r=s.result,content=[{text:'LIVION SOLUTIONS · DEMONSTRATIVO DO BÔNUS',style:'title'},{text:`${s.name} · ${monthLabel(s.month)} · ${s.client||'Claro + Nokia'}`,style:'subtitle'},{text:`${registered?'Registro preservado de '+new Date(s.createdAt).toLocaleDateString('pt-BR'):'Prévia do mês em andamento'} · Gerado em ${new Date().toLocaleString('pt-BR')}`,style:'small'},
+   {columns:[{text:'Bônus calculado',bold:true},{text:money(r.bonus),style:'amount',alignment:'right'}],margin:[0,9,0,5]},table(['Reparadas','Irreparáveis','Reparabilidade','Faixa'],[[r.repaired,r.irreparable,pct(r.repairability),'Faixa '+r.bandIndex]]),
+   {text:'Critérios e próxima meta',style:'heading'},{text:nextGoal(s),bold:true,fontSize:9,margin:[0,2,0,3]},table(['Reparadas','Baixa / peça','Média / peça','Alta / peça'],s.config.bands.map(b=>[`${b.min}–${b.max??'sem limite'}`,money(b.baseLow),money(BonusEngine.unitRate(s.config,b,1)),money(BonusEngine.unitRate(s.config,b,2))])),{text:criterion(s),style:'small'},
+   {text:'Seu cálculo',style:'heading'},table(['Complexidade','Quantidade','Valor por peça','Subtotal'],(r.complexity||[]).map(c=>[c.label,c.quantity,money(c.unitRate),money(c.subtotal)])),{text:(r.reasons||[]).join(' '),style:'small'}];
+  if(series.length){content.push({text:'Evolução · outubro/2026 é o ponto de partida',style:'heading'},{text:'Outubro mantém sua produção real. Meses em andamento são parciais. Bônus é valor calculado, não confirmação de pagamento.',style:'small'});
+   if(series.length>1){const base=series[0].statement.result,d=r.repaired-base.repaired;content.push({text:`Desde outubro: ${d>=0?'+':''}${d} reparadas · ${money(r.bonus-base.bonus)} de diferença no bônus.`,bold:true,fontSize:9,margin:[0,4,0,4]},{columns:[{stack:[{text:'Reparadas (azul) / irreparáveis (laranja)',fontSize:8},{svg:chartSvg(series,['repaired','irreparable'],245,100),width:245}]},{stack:[{text:'Bônus calculado (R$)',fontSize:8},{svg:chartSvg(series,['bonus'],245,100),width:245}]}],columnGap:10});}
+   content.push(table(['Mês','Reparadas','Irreparáveis','Reparabilidade','Bônus','Situação'],series.map(p=>[monthLabel(p.statement.month),p.statement.result.repaired,p.statement.result.irreparable,pct(p.statement.result.repairability),money(p.statement.result.bonus),p.partial?'Parcial':p.registered?'Registrado':'Simulação'])),{text:'Simulação: mês sem registro, calculado com regras atuais. Alterações de faixa, complexidade ou regras também podem alterar o bônus.',style:'small'});
   }
-  function install(){
-    const header=document.querySelector('#bonusDetailModal .modalhead');
-    if(!header||document.getElementById('bonusAuditPrint'))return;
-    const actions=document.createElement('div');actions.className='actions';
-    const button=document.createElement('button');button.id='bonusAuditPrint';button.type='button';button.className='btn';button.textContent='Imprimir / Salvar PDF';button.onclick=printAudit;actions.appendChild(button);
-    const close=header.querySelector('[data-close]');if(close)actions.appendChild(close);header.appendChild(actions);
-  }
-  install();new MutationObserver(install).observe(document.body,{childList:true,subtree:true});
+  content.push({unbreakable:true,stack:[{text:'Conferência do técnico',style:'heading'},{text:'Conferi as quantidades e o cálculo apresentados neste demonstrativo.',fontSize:9},{text:'Observações: __________________________________________________________________',fontSize:9,margin:[0,7,0,18]},{columns:[{text:'____________________\nData da conferência',fontSize:9},{text:'________________________________________\nAssinatura do técnico',fontSize:9}]}]});
+  content.push({text:'Anexo · equipamentos considerados',pageBreak:'before',style:'heading'},{text:`${s.name} · ${monthLabel(s.month)} · ${s.equipment.length} reparadas identificadas`,style:'small'},table(['Cliente','ID','Devolução','Medição','Part Number','Garantia'],s.equipment.map(e=>[e.client,e.id,e.date,e.measurement&&e.measurement!=='SEM_MEDICAO'?e.measurement:'Não informada',e.partNumber,e.warranty]),[40,85,70,55,105,'*']));
+  return {pageSize:'A4',pageMargins:[30,30,30,36],info:{title:`Bônus - ${s.name} - ${s.month}`,author:'Livion Solutions'},defaultStyle:{font:'Roboto',fontSize:9,color:'#172033'},styles:{title:{fontSize:15,bold:true,margin:[0,0,0,5]},subtitle:{fontSize:12,bold:true,margin:[0,0,0,4]},amount:{fontSize:20,bold:true,color:'#087443'},heading:{fontSize:11,bold:true,margin:[0,9,0,4]},small:{fontSize:8,color:'#526177',margin:[0,0,0,3]}},footer:(page,total)=>({text:`${s.name} · ${s.month} · ${page}/${total}`,fontSize:8,color:'#526177',alignment:'right',margin:[30,10,30,0]}),content};
+ }
+ async function download(){const button=document.getElementById('bonusAuditPrint'),status=document.getElementById('bonusStatementStatus');if(!context)return;const ctx={...context};button.disabled=true;button.textContent='Gerando PDF…';status.textContent='';
+  try{
+   const library=await loadPdf();ctx.records=await history(ctx.name,ctx.client);
+   const savedConfig=await fetch(PANEL_API.replace(/\/panel-data$/,'/bonus-settings'),{headers:{Authorization:'Bearer '+await portalToken(false)},cache:'no-store'}).then(async response=>{if(!response.ok)throw Error('Não foi possível conferir as regras gravadas.');return response.json();});
+   if(!ctx.records.some(r=>r.month===ctx.month)&&stable(BonusEngine.migrateConfig(savedConfig.config))!==stable(ctx.config))throw Error('Há regras não gravadas ou alteradas por outra pessoa. Grave ou restaure as regras antes de emitir o PDF.');
+   for(const month of [...new Set([BASE,ctx.month])]){if(month>ctx.month||month>=nowMonth()||ctx.records.some(r=>r.month===month))continue;ctx.records=await history(ctx.name,ctx.client,calculate(ctx.name,month,ctx.client,ctx.config));}
+   const record=ctx.records.find(r=>r.month===ctx.month),s=record?.statement||calculate(ctx.name,ctx.month,ctx.client,ctx.config),series=timeline(ctx),doc=definition(s,series,!!record),blob=await new Promise(resolve=>library.createPdf(doc).getBlob(resolve));
+   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`Bonus_${ctx.name.replace(/[^\p{L}\p{N}]+/gu,'_')}_${ctx.month}.pdf`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+   if(context?.name===ctx.name&&context?.month===ctx.month){context=ctx;renderPanel(ctx);}status.textContent='PDF baixado.';
+  }catch(e){status.textContent=e.message;}finally{button.disabled=false;button.textContent='Baixar PDF';}
+ }
+ function install(){const header=document.querySelector('#bonusDetailModal .modalhead'),source=document.getElementById('bonusDetailContent');if(!header||!source)return;
+  if(!document.getElementById('bonusAuditPrint')){const actions=document.createElement('div');actions.className='actions';const button=document.createElement('button');button.id='bonusAuditPrint';button.type='button';button.className='btn';button.textContent='Baixar PDF';button.onclick=download;actions.appendChild(button);const close=header.querySelector('[data-close]');if(close)actions.appendChild(close);header.appendChild(actions);const status=document.createElement('span');status.id='bonusStatementStatus';status.setAttribute('role','status');status.style.cssText='font-size:12px;max-width:360px';actions.appendChild(status);}
+  if(source.children.length&&!document.getElementById('bonusStatementPreview')){const panel=document.createElement('section');panel.id='bonusStatementPreview';panel.style.cssText='margin:12px 0;padding:12px;border:1px solid #dfe6f0;border-radius:10px;background:#f8faff';source.firstElementChild.after(panel);refresh();}
+ }
+ const style=document.createElement('style');style.textContent='#bonusStatementPreview p{margin:6px 0;font-size:12px}#bonusStatementPreview h3{margin:6px 0}#bonusStatementPreview .tablewrap{max-height:180px}#bonusStatementPreview table{white-space:normal}#bonusStatementPreview th,#bonusStatementPreview td{padding:4px 8px;text-align:left}.bonus-statement-charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}.bonus-statement-charts svg{display:block;width:100%;height:auto;background:#fff;color:#172033}.bonus-statement-charts b{font-size:11px}@media(max-width:760px){.bonus-statement-charts{grid-template-columns:1fr}}';document.head.appendChild(style);
+ install();new MutationObserver(install).observe(document.body,{childList:true,subtree:true});
+ window.BonusStatementPdf={calculate,definition,monthsTo};
 })();

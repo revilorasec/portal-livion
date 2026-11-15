@@ -1,3 +1,4 @@
+import {bonusStatements,statementFilter} from './bonus-statements.mjs';
 import {CLIENTS, VERSION, normalizeBatch} from './domain.mjs';
 export const APP_KEY='desempenho-funcionarios';
 const TENANT='911e1aee-070e-421b-ae71-439f01c2263e';
@@ -51,7 +52,7 @@ export function createService(deps){
   if(origin&&!ORIGINS.has(origin))throw new ApiError(403,'Origem não autorizada.');
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers:headers(origin)});
   const path=new URL(req.url).pathname.replace(/^.*\/desempenho-api/,'');
-  if(!['/data','/access','/panel-data','/bonus-settings'].includes(path)||!['GET','PUT'].includes(req.method)||((path==='/data'||path==='/panel-data')&&req.method!=='GET'))throw new ApiError(405,'Operação não permitida.');
+  if(!['/data','/access','/panel-data','/bonus-settings','/bonus-statements'].includes(path)||!['GET','PUT'].includes(req.method)||((path==='/data'||path==='/panel-data')&&req.method!=='GET'))throw new ApiError(405,'Operação não permitida.');
   const raw=req.headers.get('authorization')||'';if(!raw.startsWith('Bearer '))throw new ApiError(401,'Sessão necessária.');
   const token=raw.slice(7);validateClaims(decodeClaims(token));
   // Microsoft Graph validates the token cryptographically; decoded claims are only additional constraints.
@@ -71,6 +72,7 @@ export function createService(deps){
    if(!current||current.id!==user.id||(current.microsoft_id&&current.microsoft_id!==identity.id)||!current.active||(current.profile!=='ADMINISTRADOR'&&!(current.apps||[]).includes(appKey))||!(await db.app(appKey))?.active)throw new ApiError(403,'Acesso alterado. Atualize a sessão.');
    return out(200,{panel,rows:normalizePanelRows(panel,source.rows,claroSource.rows),updatedAt:source.updatedAt,stale:source.stale===true||claroSource.stale===true});
   }
+  if(path==='/bonus-statements')return await bonusStatements(req,user,db,out);
   if(path==='/bonus-settings'){
    const appKey='desempenho-funcionarios';
    if(!user?.active||user.user_type!=='INTERNO'||(user.profile!=='ADMINISTRADOR'&&!(user.apps||[]).includes(appKey)))throw new ApiError(403,'Aplicativo não liberado para este usuário.');
@@ -149,6 +151,8 @@ export function runtimeDependencies(env,fetcher=fetch){
    grants:()=>readAll('desempenho_access?select=user_id,clients,revision&order=user_id'),
    eligibleUsers:()=>readAll('portal_users?select=id,name,email&active=eq.true&user_type=eq.INTERNO&profile=in.(SOCIO,ADMINISTRADOR)&order=id'),
    saveGrant:g=>rest('rpc/desempenho_save_access',{method:'POST',body:JSON.stringify({p_user_id:g.user_id,p_clients:g.clients,p_revision:g.revision,p_actor:g.actor})})
+   ,bonusStatements:(name,client)=>rest('desempenho_bonus_statements?select=month,statement,created_at&technician=eq.'+statementFilter(name)+'&client=eq.'+statementFilter(client)+'&order=month')
+   ,insertBonusStatement:record=>rest('desempenho_bonus_statements?on_conflict=month,technician,client',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=representation'},body:JSON.stringify(record)})
    ,bonusSettings:()=>first('desempenho_bonus_settings?select=config,revision,updated_at,updated_by&id=eq.1')
    ,saveBonusSettings:async g=>{
     const rows=await rest('rpc/desempenho_save_bonus_settings',{method:'POST',body:JSON.stringify({p_config:g.config,p_revision:g.revision,p_actor:g.actor})});
@@ -205,4 +209,6 @@ export function runtimeDependencies(env,fetcher=fetch){
   }
  };
 }
+
+
 
