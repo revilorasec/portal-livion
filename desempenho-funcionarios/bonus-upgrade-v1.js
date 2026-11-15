@@ -3,7 +3,7 @@
 const Engine=window.BonusEngine;
 if(!Engine)throw new Error('BonusEngine não carregado.');
 const SETTINGS_API=PANEL_API.replace(/\/panel-data$/,'/bonus-settings');
-let bonusConfigState=loadLocalConfig(),settingsRevision=0,settingsCanManage=false,settingsLoaded=false,saveTimer=null,saveInFlight=false,savePending=false,lastBonusResults=[];
+let bonusConfigState=loadLocalConfig(),savedBonusState=null,settingsRevision=0,settingsCanManage=false,settingsLoaded=false,settingsLoadPromise=null,saveInFlight=false,lastBonusResults=[];
 const metricMeta={repairability:{label:'Reparabilidade (%)',axis:'Percentual',format:v=>v===null?'—':Number(v).toFixed(2).replace('.',',')+'%',color:'#153f73'},bonus:{label:'Valor recebido (R$)',axis:'Reais',format:v=>money(v),color:'#118a63'},repaired:{label:'Peças reparadas',axis:'Quantidade',format:v=>String(Number(v)||0),color:'#d31d2b'}};
 
 function loadLocalConfig(){
@@ -27,31 +27,53 @@ async function settingsRequest(method='GET',body){
   const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.message||'Não foi possível acessar as configurações do bônus.');return payload;
 }
 async function loadRemoteSettings(){
+  if(settingsLoadPromise)return settingsLoadPromise;
+  settingsLoadPromise=(async()=>{
   try{
     const payload=await settingsRequest();settingsRevision=Number(payload.revision)||0;settingsCanManage=payload.canManage===true;settingsLoaded=true;
     const remote=payload.config&&Object.keys(payload.config).length?Engine.migrateConfig(payload.config):null;
-    if(remote){persistLocal(remote);settingsStatus(payload.updatedAt?'Configuração compartilhada carregada':'Configuração carregada','saved')}
-    else{persistLocal(bonusConfigState);settingsStatus(settingsCanManage?'Configuração local pronta para migração':'Configuração padrão carregada');if(settingsCanManage)queueRemoteSave()}
+    if(remote){rememberSavedConfig(remote);persistLocal(remote);settingsStatus('Últimas regras gravadas carregadas','saved')}
+    else{settingsStatus(settingsCanManage?'Confira as regras e clique em Gravar regras.':'Ainda não há regras gravadas.','pending')}
   }catch(error){settingsLoaded=true;settingsCanManage=['127.0.0.1','localhost'].includes(location.hostname);settingsStatus((settingsCanManage?'Modo local: ':'Configuração compartilhada indisponível: ')+error.message,'error')}
   applyAdminAccess();
+  })();return settingsLoadPromise;
 }
+function rememberSavedConfig(config){savedBonusState=Engine.migrateConfig(config);localStorage.setItem('portalBonusSavedConfigV1',JSON.stringify(savedBonusState))}
+function hasUnsavedChanges(){return !savedBonusState||JSON.stringify(Engine.migrateConfig(bonusConfigState))!==JSON.stringify(savedBonusState)}
 function queueRemoteSave(){
   if(!settingsLoaded||!settingsCanManage)return;
-  clearTimeout(saveTimer);settingsStatus('Salvando…');saveTimer=setTimeout(saveRemoteSettings,450);
+  settingsStatus(hasUnsavedChanges()?'Alterações não gravadas. Clique em Gravar regras.':'Regras gravadas',hasUnsavedChanges()?'pending':'saved');applyAdminAccess();
 }
 async function saveRemoteSettings(){
-  if(saveInFlight){savePending=true;return}saveInFlight=true;
-  try{const payload=await settingsRequest('PUT',{config:bonusConfigState,revision:settingsRevision});settingsRevision=Number(payload.revision);persistLocal(payload.config);settingsStatus('Salvo para todos os administradores','saved')}
+  if(saveInFlight||!settingsCanManage)return;
+  const validation=Engine.validateConfig(readBonusConfig());
+  if(validation.warnings.length){showBonusWarnings(validation.config);settingsStatus('Corrija as faixas antes de gravar.','error');return}
+  const submitted=Engine.migrateConfig(validation.config);saveInFlight=true;applyAdminAccess();settingsStatus('Gravando regras…');
+  try{const payload=await settingsRequest('PUT',{config:submitted,revision:settingsRevision});settingsRevision=Number(payload.revision);rememberSavedConfig(payload.config);persistLocal(payload.config);settingsStatus('Regras gravadas para todos os administradores','saved')}
   catch(error){settingsStatus(error.message,'error')}
-  finally{saveInFlight=false;if(savePending){savePending=false;queueRemoteSave()}}
+  finally{saveInFlight=false;applyAdminAccess()}
 }
-function applyAdminAccess(){document.querySelectorAll('[data-bonus-admin]').forEach(node=>{node.disabled=!settingsCanManage});const note=$('bonusAdminAccessNote');if(note)note.textContent=settingsCanManage?'Alterações são compartilhadas e auditadas.':'Somente administradores podem alterar estas configurações.'}
+async function restoreSavedRules(){
+  if(!settingsCanManage||saveInFlight||!confirm('Descartar as edições das faixas e acréscimos e recuperar as últimas regras gravadas?'))return;
+  saveInFlight=true;applyAdminAccess();
+  try{
+    const payload=await settingsRequest();
+    if(!payload.config||!Object.keys(payload.config).length)throw Error('Ainda não há regras gravadas para restaurar.');
+    const saved=Engine.migrateConfig(payload.config);settingsRevision=Number(payload.revision);rememberSavedConfig(saved);
+    persistLocal({...bonusConfigState,bands:saved.bands,mediumPct:saved.mediumPct,highComplexityPct:saved.highComplexityPct,highRepairabilityPct:saved.highRepairabilityPct});
+    renderBonusConfig();renderBonus();renderBonusTrend();renderComplexityAdmin();
+    settingsStatus(hasUnsavedChanges()?'Regras restauradas. Há classificações ou técnicos ainda não gravados.':'Últimas regras gravadas restauradas','saved');
+  }catch(error){settingsStatus(error.message,'error')}
+  finally{saveInFlight=false;applyAdminAccess()}
+}
+function applyAdminAccess(){document.querySelectorAll('[data-bonus-admin]').forEach(node=>{node.disabled=!settingsCanManage||saveInFlight||node.dataset.removeBand==='0'||(node.dataset.field==='baseLow'&&node.closest('[data-index="0"]'))});document.querySelectorAll('[data-save-bonus]').forEach(node=>node.disabled=!settingsCanManage||saveInFlight||!hasUnsavedChanges());const note=$('bonusAdminAccessNote');if(note)note.textContent=settingsCanManage?'Alterações só são compartilhadas após clicar em Gravar regras.':'Somente administradores podem alterar estas configurações.'}
 
 function injectUi(){
   const link=document.createElement('link');link.rel='stylesheet';link.href='bonus-upgrade-v1.css?v=20261001-3';document.head.appendChild(link);
   const tabs=document.querySelector('.tabs'),bonusButton=tabs?.querySelector('[data-tab="bonus"]');
   if(tabs&&bonusButton&&!tabs.querySelector('[data-tab="complexity"]')){const button=document.createElement('button');button.className='tab';button.dataset.tab='complexity';button.textContent='Complexidade por PN';bonusButton.after(button);button.onclick=()=>openTab('complexity')}
   const bonusTab=$('tab-bonus');
+  if($('bonusRestore')){$('bonusRestore').setAttribute('data-bonus-admin','');const button=document.createElement('button');button.id='bonusSave';button.className='btn';button.textContent='Gravar regras';button.dataset.saveBonus='true';button.onclick=saveRemoteSettings;$('bonusRestore').before(button)}
   if(bonusTab&&!$('tab-complexity')){const panel=document.createElement('section');panel.id='tab-complexity';panel.className='tabpanel';panel.innerHTML=`<section class="card bonus-pn-admin"><div class="toolbar"><div><h2>Complexidade por Part Number</h2><p class="footnote">A classificação pertence somente ao PN normalizado e vale igualmente para Claro e Nokia. Pontos, espaços e outros separadores são ignorados.</p></div><span id="complexityPnCount"></span></div><div class="bonus-filter-grid bonus-filter-grid-pn"><label>Buscar PN ou descrição<input id="complexityPnSearch" placeholder="Digite o Part Number ou descrição"></label><label>Complexidade<select id="complexityLevel"><option value="">Todas</option><option value="missing">Não classificado</option><option value="0">Baixa</option><option value="1">Média</option><option value="2">Alta</option></select></label><label class="checkline"><input id="complexityOnlyMissing" type="checkbox"> Somente não classificados</label></div><div class="tablewrap"><table id="complexityPnTable"></table></div></section><section class="card bonus-tech-admin"><div class="toolbar"><div><h2>Cadastro de técnicos</h2><p class="footnote">Inativar remove o técnico das operações atuais sem apagar seu histórico.</p></div><span id="bonusAdminAccessNote"></span></div><label class="checkline"><input id="showInactiveTechs" type="checkbox" checked> Mostrar técnicos inativos</label><div class="tablewrap"><table id="bonusTechAdminTable"></table></div></section>`;bonusTab.after(panel)}
   const params=$('bonusParameters');
   if(params)params.innerHTML=`<div class="toolbar"><h2>Acréscimos por complexidade — editáveis</h2><span id="bonusSettingsStatus" class="bonus-settings-status">Carregando configuração…</span></div><div class="bonus-admin-grid bonus-admin-grid-simple"><label>Complexidade Média — acréscimo sobre a Baixa (%)<input id="bonusMediumPct" data-bonus-admin type="number" min="0" step="0.01"></label><label>Complexidade Alta — acréscimo sobre a Baixa (%)<input id="bonusComplexHighPct" data-bonus-admin type="number" min="0" step="0.01"></label></div><p class="bonus-help">Em cada faixa, você informa o valor da Baixa. O app calcula automaticamente Média e Alta usando estes percentuais.</p>`;
@@ -61,6 +83,7 @@ function injectUi(){
   const trendCard=$('bonusTrendChart')?.closest('.card');
   if(trendCard){const controls=trendCard.querySelector('.bonus-trend-controls');if(controls)controls.innerHTML=`<div><span class="bonus-muted">Métricas no gráfico</span><div id="bonusTrendMetrics" class="bonus-trend-metrics"><label><input type="checkbox" value="repairability" checked> Reparabilidade (%)</label><label><input type="checkbox" value="bonus"> Valor recebido (R$)</label><label><input type="checkbox" value="repaired"> Peças reparadas</label></div></div><label>Quantidade de meses<input id="bonusTrendMonths" type="number" min="1" max="36" step="1" value="10"></label><label class="checkline"><input id="bonusTrendIncludeInactive" type="checkbox"> Incluir inativos no histórico</label>`;const chartBox=$('bonusTrendChart')?.closest('.chart');if(chartBox)chartBox.outerHTML='<div id="bonusTrendCharts" class="bonus-chart-grid"></div>'}
   if(!$('bonusDetailModal')){const modal=document.createElement('div');modal.id='bonusDetailModal';modal.className='modal bonus-detail-modal';modal.innerHTML='<div class="modalbox"><div class="modalhead"><h2>Auditoria do bônus</h2><button class="btn alt" data-close="bonusDetailModal">Fechar</button></div><div id="bonusDetailContent"></div></div>';document.body.appendChild(modal);modal.onclick=e=>{if(e.target===modal)modal.classList.remove('open')};modal.querySelector('[data-close]').onclick=()=>modal.classList.remove('open')}
+  const saveComplexity=document.createElement('button');saveComplexity.id='complexitySaveConfig';saveComplexity.className='btn';saveComplexity.textContent='Gravar alterações';saveComplexity.dataset.saveBonus='true';saveComplexity.onclick=saveRemoteSettings;$('complexityPnCount')?.after(saveComplexity);
   applyAdminAccess();bindStaticUpgradeEvents();
 }
 function openTab(name){document.querySelectorAll('.tab').forEach(button=>button.classList.toggle('active',button.dataset.tab===name));document.querySelectorAll('.tabpanel').forEach(panel=>panel.classList.toggle('active',panel.id==='tab-'+name));if(name==='complexity'){renderComplexityAdmin();renderTechnicianAdmin()}if(name==='bonus'){renderBonus();renderBonusTrend()}setTimeout(()=>Object.values(charts).forEach(item=>item.resize()),50)}
@@ -71,7 +94,7 @@ function bindStaticUpgradeEvents(){
   bindInput('bonusTrendIncludeInactive',()=>{setupBonusTrendTechs();renderBonusTrend()});
   document.querySelectorAll('#bonusTrendMetrics input').forEach(input=>input.onchange=()=>{if(!document.querySelector('#bonusTrendMetrics input:checked'))input.checked=true;localStorage.setItem('portalBonusTrendMetricsV1',JSON.stringify(selectedMetrics()));renderBonusTrend()});
   try{const saved=JSON.parse(localStorage.getItem('portalBonusTrendMetricsV1')||'null');if(Array.isArray(saved)&&saved.length)document.querySelectorAll('#bonusTrendMetrics input').forEach(input=>input.checked=saved.includes(input.value))}catch{}
-  if($('bonusRestore'))$('bonusRestore').onclick=()=>{if(!settingsCanManage||!confirm('Restaurar acréscimos e faixas, preservando classificações de PN e status dos técnicos?'))return;const reset=Engine.defaults();reset.pnLevels={...bonusConfigState.pnLevels};reset.technicians={...bonusConfigState.technicians};saveBonusConfig(reset);renderBonusConfig();renderBonus();renderBonusTrend();renderComplexityAdmin()};
+  if($('bonusRestore'))$('bonusRestore').onclick=restoreSavedRules;
   if($('markAll'))$('markAll').onclick=()=>{activeTechs=new Set(activeTechnicianNames());saveTeam();setupTeam();renderAll()};
   if($('clearAll'))$('clearAll').onclick=()=>{activeTechs.clear();saveTeam();setupTeam();renderAll()};
 }
