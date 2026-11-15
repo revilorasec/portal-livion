@@ -29,10 +29,19 @@ export function normalizePanelReturnDate(row,sourceRow=null){
  const dataFormula=isFormula(formula);
  return {...row,dataDevolucao:date,returnedAt:date,dataFormula,returnedFormulaToday:dataFormula,devolvido:!dataFormula&&Boolean(String(date??'').trim())};
 }
-export function normalizePanelRows(panel,rows,claroRows=[]){
+export function panelEquipmentFields(row,sourceRow=null){
+ const claro=sourceNorm(row?.cliente??row?.client)==='CLARO',sources=[sourceRow,row];
+ const text=value=>String(value??'').trim();
+ const state=text(firstDefined(sources,claro?['UF - REGIONAL','uf']:['Entidade','uf'])).toUpperCase().match(/(?:^|[^A-Z])([A-Z]{2})$/);
+ const uf=state&&'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ').includes(state[1])?state[1]:'';
+ const sla=firstDefined(sources,claro?['Dias na Livion','sla','dias']:['Dias em Reparo','sla','dias']);
+ return {serial:text(firstDefined(sources,claro?['Nº de Série','serial']:['Nº Série','serial'])),sla:sla===''?null:sla,uf,customerDocument:text(firstDefined(sources,claro?['Nota Fiscal Claro','customerDocument']:['Nº Doc Envio','customerDocument']))};
+}
+export function normalizePanelRows(panel,rows,claroRows=[],nokiaRows=[]){
  if(panel!=='combined')return rows;
  const claroById=new Map(claroRows.map(row=>[String(row?.ID??row?.id??'').trim(),row]).filter(([id])=>id));
- return rows.map(row=>normalizePanelReturnDate(row,claroById.get(String(row?.ID??row?.id??'').trim())));
+ const nokiaById=new Map(nokiaRows.map(row=>[String(row?.ID??row?.id??'').trim(),row]).filter(([id])=>id));
+ return rows.map(row=>{const id=String(row?.ID??row?.id??'').trim(),sourceRow=(sourceNorm(row?.cliente??row?.client)==='CLARO'?claroById:nokiaById).get(id);return {...normalizePanelReturnDate(row,sourceRow),...panelEquipmentFields(row,sourceRow)};});
 }
 export function authorizedClients(user,grant,registered=CLIENTS.map(c=>c.key)){
  if(!user?.active||user.user_type!=='INTERNO'||!['SOCIO','ADMINISTRADOR'].includes(user.profile))throw new ApiError(403,'Acesso restrito a sócios e administradores internos.');
@@ -65,12 +74,12 @@ export function createService(deps){
    if(!user?.active||user.user_type!=='INTERNO'||(user.profile!=='ADMINISTRADOR'&&!(user.apps||[]).includes(appKey)))throw new ApiError(403,'Aplicativo não liberado para este usuário.');
    if(!(await db.app(appKey))?.active)throw new ApiError(403,'Aplicativo não liberado.');
    const force=new URL(req.url).searchParams.get('refresh')==='1';
-   const [source,claroSource]=panel==='combined'
-    ?await Promise.all([fetchPanelSource(panel,{force}),fetchClaroPanelSource({force})])
-    :[await fetchPanelSource(panel,{force}),{rows:[]}];
+   const [source,claroSource,nokiaSource]=panel==='combined'
+    ?await Promise.all([fetchPanelSource(panel,{force}),fetchClaroPanelSource({force}),fetchPanelSource('nokia',{force}).catch(()=>({rows:[],metadataUnavailable:true}))])
+    :[await fetchPanelSource(panel,{force}),{rows:[]},{rows:[]}];
    const current=await db.userByEmail(identity.email.toLowerCase());
    if(!current||current.id!==user.id||(current.microsoft_id&&current.microsoft_id!==identity.id)||!current.active||(current.profile!=='ADMINISTRADOR'&&!(current.apps||[]).includes(appKey))||!(await db.app(appKey))?.active)throw new ApiError(403,'Acesso alterado. Atualize a sessão.');
-   return out(200,{panel,rows:normalizePanelRows(panel,source.rows,claroSource.rows),updatedAt:source.updatedAt,stale:source.stale===true||claroSource.stale===true});
+   return out(200,{panel,rows:normalizePanelRows(panel,source.rows,claroSource.rows,nokiaSource.rows),updatedAt:source.updatedAt,stale:source.stale===true||claroSource.stale===true,metadataIncomplete:nokiaSource.metadataUnavailable===true||nokiaSource.stale===true});
   }
   if(path==='/bonus-statements')return await bonusStatements(req,user,db,out);
   if(path==='/bonus-settings'){
