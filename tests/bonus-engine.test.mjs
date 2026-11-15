@@ -12,6 +12,61 @@ const config=()=>Engine.migrateConfig({
   pnLevels:{'Claro|LOW':0,'Claro|MED':1,'Claro|HIGH':2},technicians:{}
 });
 
+test('bônus Nokia usa U mesmo com W em outro mês ou marcada como fórmula',()=>{
+  const original={...row('ANA','REPARADO','LOW','Nokia','2026-06-01'),dataFormula:true,devolvido:false,'Data da Expedição':'2026-05-10','_formula_Data da Expedição':'','Data eSmart (Devolução)':'2026-06-01','_formula_Data eSmart (Devolução)':'=HOJE()'};
+  const normalized=Engine.bonusReturnRow(original);
+  const [result]=Engine.calculateMonth([normalized],'2026-05',config(),{returnMonth:month});
+  assert.equal(result.repaired,1);
+  assert.equal(result.bonus,2.5);
+  assert.equal(Engine.calculateMonth([normalized],'2026-06',config(),{returnMonth:month}).length,0);
+  assert.equal(original.dataDevolucao,'2026-06-01');
+  assert.equal(original.dataFormula,true);
+});
+
+test('bônus Nokia exclui U vazia ou com fórmula sem recorrer a W; Claro preserva AJ',()=>{
+  const base=row('ANA','REPARADO','LOW','Nokia');
+  const rows=[
+    {...base,'Data da Expedição':'','Data eSmart (Devolução)':'2026-05-10'},
+    {...base,'Data da Expedição':'2026-05-10','_formula_Data da Expedição':'=HOJE()'},
+    {...base,'Data da Expedição':'=HOJE()'},
+    {...base,'Data da Expedição':'2026-05-10','_formula_Data da Expedição':true},
+    base
+  ].map(Engine.bonusReturnRow);
+  assert.equal(Engine.calculateMonth(rows,'2026-05',config(),{returnMonth:month}).length,0);
+  const claro={...row('BIA','REPARADO','LOW'),'Data da Expedição':'2026-06-01'};
+  assert.equal(Engine.bonusReturnRow(claro),claro);
+  assert.equal(Engine.calculateMonth([Engine.bonusReturnRow(claro)],'2026-05',config(),{returnMonth:month})[0].repaired,1);
+});
+
+test('Argeu outubro/2026: os 13 IDs informados entram por U; W deixa a NF 1938 em novembro',()=>{
+  const fixtures=[
+    ['N_00000007364','05/10/2026','05/10/2026'],
+    ['N_00000007540','09/10/2026','09/10/2026'],
+    ['N_00000007551','09/10/2026','09/10/2026'],
+    ['N_00000007553','09/10/2026','09/10/2026'],
+    ['N_00000007555','09/10/2026','09/10/2026'],
+    ['N_00000007572','19/10/2026','19/10/2026'],
+    ['N_00000007654','19/10/2026','19/10/2026'],
+    ['N_00000007675','19/10/2026','19/10/2026'],
+    ['N_00000007678','19/10/2026','19/10/2026'],
+    ['N_00000007680','19/10/2026','19/10/2026'],
+    ['N_00000007592','30/10/2026','14/11/2026'],
+    ['N_00000007643','30/10/2026','14/11/2026'],
+    ['N_00000007644','30/10/2026','14/11/2026']
+  ];
+  const rows=fixtures.map(([id,u,w])=>({...row('ARGEU CÉSAR','IRREPARÁVEL','PN','Nokia',w),id,
+    medicao:id==='N_00000007592'||id==='N_00000007643'||id==='N_00000007644'?'':'outubro, 2026',
+    'Data da Expedição':u,'Data eSmart (Devolução)':w}));
+  const returnMonth=value=>{const [day,month,year]=String(value).split('/');return `${year}-${month}`};
+  const options={returnMonth,client:'Nokia',selectedTechs:['ARGEU CÉSAR']};
+  assert.equal(Engine.calculateMonth(rows,'2026-10',Engine.defaults(),options)[0].irreparable,10);
+  const corrected=rows.map(Engine.bonusReturnRow);
+  assert.equal(Engine.calculateMonth(corrected,'2026-10',Engine.defaults(),options)[0].irreparable,13);
+  assert.equal(Engine.calculateMonth(corrected,'2026-11',Engine.defaults(),options).length,0);
+  assert.deepEqual(rows.filter(r=>returnMonth(r.dataDevolucao)!=='2026-10').map(r=>r.id),
+    ['N_00000007592','N_00000007643','N_00000007644']);
+});
+
 test('migra multiplicadores e classificações existentes sem perder os PNs',()=>{
   const migrated=Engine.migrateConfig({startPct:70,highPct:80,multipliers:[1,1.25,1.5],bands:[{min:0,max:60,standard:0,high:0},{min:61,max:null,standard:2.5,high:3}],pnLevels:{'Claro|ABC':2}});
   assert.equal(migrated.mediumPct,25);assert.equal(migrated.highComplexityPct,50);assert.equal(migrated.highRepairabilityPct,0);

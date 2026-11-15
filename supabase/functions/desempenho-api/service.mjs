@@ -1,4 +1,5 @@
 import {bonusStatements,statementFilter} from './bonus-statements.mjs';
+import {readNokiaExpedition} from './nokia-expedition.mjs';
 import {CLIENTS, VERSION, normalizeBatch} from './domain.mjs';
 export const APP_KEY='desempenho-funcionarios';
 const TENANT='911e1aee-070e-421b-ae71-439f01c2263e';
@@ -53,7 +54,7 @@ export function validateClaims(c,now=Date.now()/1000){
  if(c.tid!==TENANT||!c.exp||c.exp<=now||(c.nbf&&c.nbf>now+60)||(c.azp||c.appid)!==PORTAL_CLIENT)throw new ApiError(401,'Sessão inválida.');
 }
 export function createService(deps){
- const {db,fetchSource,fetchPanelSource,fetchClaroPanelSource,identify}=deps;
+ const {db,fetchSource,fetchPanelSource,fetchClaroPanelSource,fetchNokiaExpedition,identify}=deps;
  const headers=origin=>({'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store, max-age=0','Pragma':'no-cache','Vary':'Origin','Access-Control-Allow-Origin':ORIGINS.has(origin)?origin:'https://portal.livionsolutions.com.br','Access-Control-Allow-Headers':'authorization, content-type','Access-Control-Allow-Methods':'GET, PUT, OPTIONS','X-Content-Type-Options':'nosniff'});
  return async req=>{
  const origin=req.headers.get('origin');const out=(status,body)=>new Response(JSON.stringify(body),{status,headers:headers(origin)});
@@ -74,12 +75,14 @@ export function createService(deps){
    if(!user?.active||user.user_type!=='INTERNO'||(user.profile!=='ADMINISTRADOR'&&!(user.apps||[]).includes(appKey)))throw new ApiError(403,'Aplicativo não liberado para este usuário.');
    if(!(await db.app(appKey))?.active)throw new ApiError(403,'Aplicativo não liberado.');
    const force=new URL(req.url).searchParams.get('refresh')==='1';
-   const [source,claroSource,nokiaSource]=panel==='combined'
-    ?await Promise.all([fetchPanelSource(panel,{force}),fetchClaroPanelSource({force}),fetchPanelSource('nokia',{force}).catch(()=>({rows:[],metadataUnavailable:true}))])
-    :[await fetchPanelSource(panel,{force}),{rows:[]},{rows:[]}];
+   const [source,claroSource,nokiaSource,shipments]=panel==='combined'
+    ?await Promise.all([fetchPanelSource(panel,{force}),fetchClaroPanelSource({force}),fetchPanelSource('nokia',{force}).catch(()=>({rows:[],metadataUnavailable:true})),fetchNokiaExpedition({force})])
+    :[await fetchPanelSource(panel,{force}),{rows:[]},{rows:[]},null];
    const current=await db.userByEmail(identity.email.toLowerCase());
    if(!current||current.id!==user.id||(current.microsoft_id&&current.microsoft_id!==identity.id)||!current.active||(current.profile!=='ADMINISTRADOR'&&!(current.apps||[]).includes(appKey))||!(await db.app(appKey))?.active)throw new ApiError(403,'Acesso alterado. Atualize a sessão.');
-   return out(200,{panel,rows:normalizePanelRows(panel,source.rows,claroSource.rows,nokiaSource.rows),updatedAt:source.updatedAt,stale:source.stale===true||claroSource.stale===true,metadataIncomplete:nokiaSource.metadataUnavailable===true||nokiaSource.stale===true});
+   let rows=normalizePanelRows(panel,source.rows,claroSource.rows,nokiaSource.rows);
+   if(shipments){const byId=new Map(shipments.rows.map(r=>[r.ID,r]));rows=rows.map(row=>{if(sourceNorm(row.cliente)!=='NOKIA')return row;const shipment=byId.get(String(row.id??row.ID??'').trim());if(!shipment)throw new ApiError(502,'Uma peça Nokia não foi encontrada na origem da coluna U.');return {...row,'Data da Expedição':shipment['Data da Expedição'],'_formula_Data da Expedição':false};});}
+   return out(200,{panel,rows,updatedAt:source.updatedAt,stale:source.stale===true||claroSource.stale===true,nokiaShipmentSource:shipments?{column:'U',updatedAt:shipments.updatedAt}:null,metadataIncomplete:nokiaSource.metadataUnavailable===true||nokiaSource.stale===true});
   }
   if(path==='/bonus-statements')return await bonusStatements(req,user,db,out);
   if(path==='/bonus-settings'){
@@ -161,6 +164,8 @@ export function runtimeDependencies(env,fetcher=fetch){
    eligibleUsers:()=>readAll('portal_users?select=id,name,email&active=eq.true&user_type=eq.INTERNO&profile=in.(SOCIO,ADMINISTRADOR)&order=id'),
    saveGrant:g=>rest('rpc/desempenho_save_access',{method:'POST',body:JSON.stringify({p_user_id:g.user_id,p_clients:g.clients,p_revision:g.revision,p_actor:g.actor})})
    ,bonusStatements:(name,client)=>rest('desempenho_bonus_statements?select=month,statement,created_at&technician=eq.'+statementFilter(name)+'&client=eq.'+statementFilter(client)+'&order=month')
+   ,bonusStatementCorrections:(name,client)=>rest('desempenho_bonus_statement_corrections?select=month,statement,created_at&technician=eq.'+statementFilter(name)+'&client=eq.'+statementFilter(client)+'&order=month')
+   ,insertBonusStatementCorrection:record=>rest('desempenho_bonus_statement_corrections?on_conflict=month,technician,client',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=representation'},body:JSON.stringify(record)})
    ,insertBonusStatement:record=>rest('desempenho_bonus_statements?on_conflict=month,technician,client',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=representation'},body:JSON.stringify(record)})
    ,bonusSettings:()=>first('desempenho_bonus_settings?select=config,revision,updated_at,updated_by&id=eq.1')
    ,saveBonusSettings:async g=>{
@@ -168,6 +173,12 @@ export function runtimeDependencies(env,fetcher=fetch){
     if(!Array.isArray(rows)||!rows[0])throw new ApiError(409,'As regras foram alteradas por outra pessoa. Atualize antes de salvar.');
     return rows[0];
    }
+  },
+  fetchNokiaExpedition:async(options={})=>{
+   const cached=panelCache.get('nokia-U');if(!options.force&&cached&&Date.now()-cached.at<sourceTtl)return cached.value;
+   try{const value=await readNokiaExpedition(env,fetcher),canonical=value.rows.map(r=>r.ID+'|'+r['Data da Expedição']).sort().join('\n'),hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(canonical));
+    console.info('nokia_u_read_ready',JSON.stringify({rows:value.rows.length,fingerprint:[...new Uint8Array(hash)].map(n=>n.toString(16).padStart(2,'0')).join('')}));panelCache.set('nokia-U',{at:Date.now(),value});return value;
+   }catch(error){console.warn('nokia_u_read_failed',String(error.message));throw new ApiError(502,'Não foi possível ler a coluna U da Nokia. Nenhuma data eSmart foi usada como alternativa.');}
   },
   fetchPanelSource:async(panel,options={})=>{
    const cached=panelCache.get(panel);if(!options.force&&cached&&Date.now()-cached.at<sourceTtl)return {rows:cached.rows,updatedAt:cached.updatedAt,stale:false};

@@ -12,6 +12,15 @@
   const clone=value=>JSON.parse(JSON.stringify(value));
   const canonicalPn=value=>String(value??'').normalize('NFKC').toUpperCase().replace(/[^A-Z0-9]/g,'');
 
+  function bonusReturnRow(row){
+    if(String(row.cliente||'').trim().toUpperCase()!=='NOKIA')return row;
+    // Nokia bonus competence uses U; W remains available to the other panels.
+    const date=String(row['Data da Expedição']??'').trim();
+    const formula=row['_formula_Data da Expedição'];
+    const dataFormula=(typeof formula==='string'?formula.trim().startsWith('='):formula===true)||date.startsWith('=');
+    return {...row,dataDevolucao:date,dataFormula,devolvido:!!date&&!dataFormula};
+  }
+
   function defaults(){
     return {
       version:6,
@@ -151,5 +160,5 @@
     });
   }
 
-  return {LEVELS,LEVEL_LABELS,HIGH_REPAIRABILITY_THRESHOLD,roundMoney,canonicalPn,defaults,migrateConfig,validateConfig,techIsActive,levelFor,unitRate,calculateMonth};
+  return {LEVELS,LEVEL_LABELS,HIGH_REPAIRABILITY_THRESHOLD,roundMoney,canonicalPn,bonusReturnRow,defaults,migrateConfig,validateConfig,techIsActive,levelFor,unitRate,calculateMonth};
 });
