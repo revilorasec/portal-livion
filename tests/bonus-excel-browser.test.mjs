@@ -53,10 +53,14 @@ test('download Excel usa filtros do bônus, período e aba atual; tela e arquivo
     // Trend has its own selected technicians and number of months.
     await page.locator('#bonusTrendTechs input[value="ANA"]').uncheck();
     await page.locator('#bonusTrendTechs input[value="CARLOS"]').uncheck();
-    await page.locator('#bonusTrendMonths').fill('2');await page.locator('#bonusTrendMonths').press('Tab');
-    const period=await downloadBook('#exportBonusPeriodExcel','bonus-periodo-teste.xlsx'),periodSheet=period.getWorksheet('Pagamentos');
+    await page.locator('#bonusTrendMonths').fill('10');await page.locator('#bonusTrendMonths').press('Tab');
+    const period=await downloadBook('#exportBonusPeriodExcel','bonus-periodo-teste.xlsx'),periodSheet=period.getWorksheet('Evolução mensal');
+    assert.deepEqual(period.worksheets.map(sheet=>sheet.name),['Resumo por técnico','Evolução mensal','Equipamentos','Regras']);
+    assert.equal(period.getWorksheet('Resumo por técnico').getCell('B8').value,10);
+    assert.equal(period.getWorksheet('Resumo por técnico').getCell('F8').value,165);
     assert.equal(periodSheet.getCell('B8').value,'BIA');assert.equal(periodSheet.getCell('B9').value,'BIA');
-    assert.equal(periodSheet.getCell('C5').value.result,165);assert.equal(periodSheet.getCell('A8').value.getUTCMonth(),8);assert.equal(periodSheet.getCell('A9').value.getUTCMonth(),9);
+    assert.equal(periodSheet.getCell('C5').value.result,165);assert.equal(periodSheet.getCell('A8').value.getUTCMonth(),0);assert.equal(periodSheet.getCell('A17').value.getUTCMonth(),9);
+    assert.equal(periodSheet.rowCount,18);
     // General export contains the filtered displayed table, including name casing.
     await page.locator('[data-tab="overview"]').click();await page.locator('#fClient').selectOption('Nokia');
     const view=await downloadBook('#exportPerformanceExcel','desempenho-filtrado-teste.xlsx');

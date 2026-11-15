@@ -44,7 +44,7 @@
       if(detail.filter(row=>row.status==='REPARADO').length!==result.repaired||detail.filter(row=>row.status==='IRREPARÁVEL').length!==result.irreparable||round(detail.reduce((sum,row)=>sum+row.bonus,0))!==round(result.bonus))
         throw Error('O detalhamento não confere com o bônus de '+result.name+'. Atualize os dados antes de exportar.');
     }
-    return {kind:'bonus',title:input.includeEmpty?'Bônus por devolução — evolução mensal':'Bônus por devolução — pagamentos',
+    return {kind:'bonus',evolution:input.includeEmpty===true,title:input.includeEmpty?'Bônus por devolução — evolução mensal':'Bônus por devolução — pagamentos',
       createdAt:input.createdAt||new Date().toISOString(),client:input.client||'Claro + Nokia',months,names,config,results,equipment,
       total:round(results.reduce((sum,result)=>sum+result.bonus,0)),sourceStatus:input.sourceStatus||'',configStatus:input.configStatus||'',
       nokiaDateSource:typeof Engine.bonusReturnRow==='function'?'Coluna U — Data da Expedição':'Coluna W — Data eSmart (Devolução)'};
@@ -77,6 +77,12 @@
     sheet.getRow(row).height=28;
   }
   function sumFormula(column,end,result){return {formula:`SUM(${column}8:${column}${end})`,result}}
+  function periodSummary(report){
+    return [...report.names].sort(collator.compare).map(name=>{
+      const points=report.results.filter(result=>result.name===name),repaired=points.reduce((sum,result)=>sum+result.repaired,0),irreparable=points.reduce((sum,result)=>sum+result.irreparable,0),bonus=round(points.reduce((sum,result)=>sum+result.bonus,0));
+      return {name,months:report.months.length,repaired,irreparable,repairability:repaired+irreparable?repaired/(repaired+irreparable):null,bonus,averageBonus:bonus/report.months.length};
+    });
+  }
   async function createWorkbook(report,ExcelJS){
     const workbook=new ExcelJS.Workbook();workbook.creator='Portal Livion';workbook.created=new Date(report.createdAt);workbook.modified=new Date(report.createdAt);workbook.calcProperties.fullCalcOnLoad=true;
     if(report.kind!=='bonus'){
@@ -88,11 +94,22 @@
     }
     const period=report.months.length===1?monthLabel(report.months[0]):monthLabel(report.months[0])+' a '+monthLabel(report.months.at(-1));
     const filters=period+' · '+report.client+' · '+report.names.length+' técnico(s) selecionado(s)';
-    const context={createdAt:report.createdAt,filters,note:'Fonte: Desempenho Técnico do Portal Livion. Valores exibidos na data da exportação.'+(report.configStatus?' Regras: '+report.configStatus:'')};
-    const payment=baseSheet(workbook,'Pagamentos',report.title,context,[22,29,19,14,15,19,18,21,48]);
-    const paymentRows=report.results.map(result=>[excelDate(result.month),result.name,result.bonus,result.repaired,result.irreparable,
+    const context={createdAt:report.createdAt,filters,note:'Fonte: Desempenho Técnico do Portal Livion. Bônus calculados com as regras exibidas na exportação.'+(report.configStatus?' Regras: '+report.configStatus:'')};
+    if(report.evolution){
+      const summary=baseSheet(workbook,'Resumo por técnico','Comparativo dos técnicos no período',context,[30,20,17,25,25,24,27]);
+      const data=periodSummary(report),end=7+data.length,total=end+1;
+      table(summary,'ResumoDoPeriodo',['Técnico','Meses no período','Reparadas','Sucatas / irreparáveis','Reparabilidade no período','Total do bônus (R$)','Média mensal do bônus (R$)'],data.map(item=>[item.name,item.months,item.repaired,item.irreparable,item.repairability,item.bonus,item.averageBonus]),{5:PERCENT,6:MONEY,7:MONEY});
+      const repaired=data.reduce((sum,item)=>sum+item.repaired,0),irreparable=data.reduce((sum,item)=>sum+item.irreparable,0);
+      totalRow(summary,total,['TOTAL',report.months.length,sumFormula('C',end,repaired),sumFormula('D',end,irreparable),
+        {formula:`IF(C${total}+D${total}=0,0,C${total}/(C${total}+D${total}))`,result:repaired+irreparable?repaired/(repaired+irreparable):0},sumFormula('F',end,report.total),{formula:`F${total}/B${total}`,result:report.total/report.months.length}]);
+      summary.getCell(total,5).numFmt=PERCENT;summary.getCell(total,6).numFmt=MONEY;summary.getCell(total,7).numFmt=MONEY;
+      summary.mergeCells('A5:D5');summary.getCell('A5').value='EVOLUÇÃO MÊS A MÊS NA PRÓXIMA ABA';summary.getCell('A5').font={name:'Aptos',size:11,bold:true,color:{argb:'FF153F73'}};
+    }
+    const payment=baseSheet(workbook,report.evolution?'Evolução mensal':'Pagamentos',report.title,context,[22,29,19,14,25,19,18,21,48]);
+    const paymentResults=report.evolution?[...report.results].sort((a,b)=>collator.compare(a.name,b.name)||a.month.localeCompare(b.month)):report.results;
+    const paymentRows=paymentResults.map(result=>[excelDate(result.month),result.name,result.bonus,result.repaired,result.irreparable,
       result.repairability===null?null:result.repairability/100,result.band?`Faixa ${result.bandIndex}`:'Sem faixa',result.rate,result.reasons.join(' ')]);
-    table(payment,'BonusPorTecnico',['Competência','Técnico','Bônus a pagar (R$)','Reparadas','Irreparáveis','Reparabilidade','Faixa aplicada','Valor médio/peça (R$)','Observações do cálculo'],paymentRows,{1:'[$-416]mmmm/yyyy',3:MONEY,6:PERCENT,8:MONEY});
+    table(payment,'BonusPorTecnico',['Competência','Técnico',report.evolution?'Bônus calculado (R$)':'Bônus a pagar (R$)','Reparadas','Sucatas / irreparáveis','Reparabilidade','Faixa aplicada','Valor médio/peça (R$)','Observações do cálculo'],paymentRows,{1:'[$-416]mmmm/yyyy',3:MONEY,6:PERCENT,8:MONEY});
     const last=7+paymentRows.length,total=last+1,repaired=report.results.reduce((sum,r)=>sum+r.repaired,0),irreparable=report.results.reduce((sum,r)=>sum+r.irreparable,0);
     totalRow(payment,total,['TOTAL','',sumFormula('C',last,report.total),sumFormula('D',last,repaired),sumFormula('E',last,irreparable),
       {formula:`IF(D${total}+E${total}=0,0,D${total}/(D${total}+E${total}))`,result:repaired+irreparable?repaired/(repaired+irreparable):0},'',null,'']);
@@ -184,7 +201,7 @@
     function button(parent,id,label,trend=false){if(!parent||doc.getElementById(id))return;const node=doc.createElement('button');node.id=id;node.className='btn alt';node.dataset.exportExcel='true';node.textContent=label;node.onclick=()=>download(node,trend);parent.appendChild(node)}
     button(doc.querySelector('header .actions'),'exportPerformanceExcel','Exportar Excel');
     button(doc.getElementById('bonusGrandTotal')?.closest('.toolbar'),'exportBonusExcel','Exportar mês (Excel)');
-    button(doc.getElementById('bonusTrendCount')?.closest('.toolbar'),'exportBonusPeriodExcel','Exportar período (Excel)',true);
+    button(doc.getElementById('bonusTrendCount')?.closest('.toolbar'),'exportBonusPeriodExcel','Exportar evolução (Excel)',true);
   }
-  return {buildBonusReport,createWorkbook,fileName,excelDate,install};
+  return {buildBonusReport,periodSummary,createWorkbook,fileName,excelDate,install};
 });
