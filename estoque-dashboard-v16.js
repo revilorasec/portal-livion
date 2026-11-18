@@ -125,7 +125,7 @@
       </section>
     </div>`;
 
-  const normalizeDashboardText = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  const normalizeDashboardText = InventoryPerformance.normalize;
   const localDay = date => {
     const d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
     return d.toISOString().slice(0, 10);
@@ -140,7 +140,7 @@
     const now = new Date();
     return {from: localDay(new Date(now.getFullYear(), now.getMonth(), 1)), to: localDay(now)};
   };
-  const getProduct = id => (D?.stock || []).find(product => product.product_id === id);
+  const getProduct = id => InventoryPerformance.lookup(D?.stock, 'product_id', id);
   const statusPriority = {NEGATIVO: 0, ZERADO: 1, BAIXO: 2, OK: 3};
   const roundedRect = (context, x, y, width, height, radius = 0) => {
     if (typeof context.roundRect === 'function') {
