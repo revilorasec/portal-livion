@@ -21,11 +21,11 @@ test('roll exits require whole positive quantities',()=>{
 
 test('backend stores both operational and base quantities',()=>{
   const source=readFileSync(new URL('../supabase/functions/inventory-packaging-api/index.ts',import.meta.url),'utf8');
-  assert.match(source,/dispatch_quantity:dispatchQuantity/);
+  assert.match(source,/p_dispatch_quantity:dispatchQuantity/);
   assert.match(source,/unit:baseUnit,dispatch_unit:dispatchUnit/);
-  assert.match(source,/base_quantity_per_dispatch_unit:product\.data\.base_quantity_per_dispatch_unit/);
-  assert.match(source,/p_quantity:baseQuantity/);
-  assert.match(source,/INSUFFICIENT_STOCK/);
+  assert.match(source,/row\.base_quantity_per_dispatch_unit/);
+  assert.match(source,/inventory_register_dispatch_exit/);
+  assert.doesNotMatch(source,/from\('inventory_movements'\)\.update/);
   assert.match(source,/factorBasis=body\.base_quantity==null\?stock\.data\.balance:body\.base_quantity/);
   assert.match(source,/DISPATCH_FACTOR_CONFLICT/);
 });
