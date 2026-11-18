@@ -106,8 +106,50 @@
     if (!view || !body || typeof renderMov !== 'function') return;
     const renderMovBase = renderMov;
     let dirty = true;
+    const modalRoot = document.getElementById('modal');
+    const parked = new Map();
+    const tableHeights = new WeakMap(), observedTables = new WeakSet();
+    const sizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(entries => {
+      for (const entry of entries) if (!parked.has(entry.target)) tableHeights.set(entry.target, entry.contentRect.height);
+    }) : null;
+    function observeTables() {
+      document.querySelectorAll('#app tbody').forEach(tableBody => {
+        if (!observedTables.has(tableBody)) { sizeObserver?.observe(tableBody); observedTables.add(tableBody); }
+      });
+    }
+    observeTables();
+    function parkBackgroundTables() {
+      observeTables();
+      document.querySelectorAll('#app tbody').forEach(tableBody => {
+        if (parked.has(tableBody) || tableBody.rows.length < 100) return;
+        // Reuse the last painted size; reading layout here would freeze the first field.
+        const height = tableHeights.get(tableBody) ?? tableBody.rows.length * 40;
+        const fragment = document.createDocumentFragment();
+        while (tableBody.firstChild) fragment.appendChild(tableBody.firstChild);
+        const placeholder = document.createElement('tr'), cell = document.createElement('td');
+        cell.colSpan = tableBody.closest('table')?.tHead?.rows[0]?.cells.length || 1;
+        cell.style.height = Math.max(0, height) + 'px'; cell.style.padding = '0';
+        placeholder.appendChild(cell); tableBody.appendChild(placeholder);
+        parked.set(tableBody, {fragment, placeholder});
+      });
+    }
+    function restoreBackgroundTables() {
+      for (const [tableBody, {fragment, placeholder}] of parked) {
+        // A genuine data refresh takes precedence over the saved table snapshot.
+        if (placeholder.parentNode === tableBody) { placeholder.remove(); tableBody.appendChild(fragment); }
+      }
+      parked.clear();
+      if (dirty && view.classList.contains('active')) renderMov();
+    }
+    const modalBase = modal, closeBase = closeModal;
+    modal = function (...args) { const result = modalBase(...args); parkBackgroundTables(); return result; };
+    closeModal = function (...args) { const result = closeBase(...args); restoreBackgroundTables(); return result; };
+    document.getElementById('modalCancel').onclick = () => closeModal();
+    new MutationObserver(() => {
+      if (modalRoot.classList.contains('hidden')) restoreBackgroundTables(); else parkBackgroundTables();
+    }).observe(modalRoot, {attributes: true, attributeFilter: ['class']});
     renderMov = function () {
-      if (!view.classList.contains('active')) { dirty = true; return; }
+      if (!view.classList.contains('active') || !modalRoot.classList.contains('hidden')) { dirty = true; return; }
       dirty = false; return renderMovBase();
     };
     const visibilityChanged = () => {

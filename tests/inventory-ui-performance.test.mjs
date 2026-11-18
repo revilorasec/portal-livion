@@ -13,7 +13,7 @@ test('buscas e datas funcionam com catálogo grande sem reconstruir dados a cada
   const imported=await import(pathToFileURL(playwrightPath).href),{chromium}=imported.default||imported;
   const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
   try{
-    const page=await browser.newPage(),errors=[];
+    const page=await browser.newPage(),errors=[],writes=[];
     page.on('pageerror',error=>errors.push(error.message));
     const stock=Array.from({length:1000},(_,i)=>({product_id:'P'+i,pn:'PN-'+String(i).padStart(4,'0'),description:'Componente de teste '+i,unit:'UNIDADE',balance:20,min_stock:2,status:'ATIVO',stock_status:'OK',item_type:'Componente'}));
     const requesters=Array.from({length:100},(_,i)=>({requester_id:'R'+i,name:'Pessoa '+i,status:'ATIVO'}));
@@ -26,6 +26,7 @@ test('buscas e datas funcionam com catálogo grande sem reconstruir dados a cada
     await page.route('**/*',async route=>{
       const url=new URL(route.request().url());
       if(url.hostname==='kvfjjtkwxxbvzlicwnrz.supabase.co'){
+        if(route.request().method()==='POST')writes.push(url.pathname);
         const body=url.pathname.includes('inventory-packaging-api')?{configurations:[]}:url.pathname.endsWith('/bootstrap')?fixture:{requests:[],files:[]};
         return route.fulfill({json:body});
       }
@@ -38,18 +39,33 @@ test('buscas e datas funcionam com catálogo grande sem reconstruir dados a cada
     });
     await page.goto('https://inventory.test/estoque.html');
     await page.waitForFunction(()=>!!document.querySelector('#stockBody tr[data-row-product]'));
+    await page.locator('.nav button[data-v="movements"]').click();
+    await page.waitForFunction(()=>document.querySelectorAll('#movBody tr[data-movement-id]').length===5000);
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     const measurements=await page.evaluate(()=>{
       const measure=action=>{const start=performance.now();action();return Math.round((performance.now()-start)*10)/10};
-      return {nodes:document.querySelectorAll('*').length,stockMs:measure(()=>renderStock()),movementsMs:measure(()=>renderMov()),exitOpenMs:measure(()=>manualExit()),dateFocusMs:measure(()=>{document.getElementById('fOccurredDate').focus();document.getElementById('fOccurredDate').getBoundingClientRect()}),comboSearchMs:measure(()=>{const input=document.querySelector('#fProduct')._comboInput;input.value='PN-0999';input.dispatchEvent(new Event('input',{bubbles:true}))})};
+      return {nodes:document.querySelectorAll('*').length,stockMs:measure(()=>renderStock()),movementsMs:measure(()=>renderMov()),exitOpenMs:measure(()=>manualExit()),formNodes:document.querySelectorAll('*').length,dateFocusMs:measure(()=>{document.getElementById('fOccurredDate').focus();document.getElementById('fOccurredDate').getBoundingClientRect()}),comboSearchMs:measure(()=>{const input=document.querySelector('#fProduct')._comboInput;input.value='PN-0999';input.dispatchEvent(new Event('input',{bubbles:true}))})};
     });
     if(process.env.INVENTORY_PERF_REPORT)writeFileSync(process.env.INVENTORY_PERF_REPORT,JSON.stringify(measurements,null,2));
     console.log('Inventory measurements:',JSON.stringify(measurements));
+    if(await page.evaluate(()=>!!document.querySelector('#fPurpose option[value=""]'))){
+      assert.deepEqual(await page.evaluate(()=>['fProduct','fParty','fPurpose'].map(id=>document.getElementById(id).value)),['','','']);
+      assert.ok(measurements.formNodes<10000,'background tables must not remain in the live form DOM');
+    }
     await page.locator('#fOccurredDate').fill('2026-10-14');
     assert.equal(await page.locator('#fOccurredDate').inputValue(),'2026-10-14');
     await page.locator('#fProduct').locator('..').locator('.smart-combo-input').fill('PN-0999');
     await page.locator('#fProduct').locator('..').locator('.smart-combo-input').press('ArrowDown');
     await page.locator('#fProduct').locator('..').locator('.smart-combo-input').press('Enter');
     assert.equal(await page.locator('#fProduct').inputValue(),'P999');
+    if(await page.locator('#fPurpose option[value=""]').count()){
+      await page.locator('#fQty').fill('1');await page.locator('#fParty').selectOption('R0');
+      const validation=await page.evaluate(async()=>{try{await saveFn();return 'unexpected save'}catch(error){return error.message}});
+      assert.equal(validation,'Selecione a finalidade da saída.');assert.equal(writes.length,0);
+      await page.locator('#fPurpose').locator('..').locator('.smart-combo-input').fill('Projeto');
+      await page.locator('#fPurpose').locator('..').locator('.smart-combo-menu [data-smart-index]').filter({hasText:'Projeto'}).click();
+      assert.equal(await page.locator('#fPurpose').inputValue(),'PROJETO');
+    }
     const cacheCheck=await page.evaluate(()=>{
       if(!window.InventoryPerformance)return null;
       const select=document.getElementById('fProduct'),input=select._comboInput;
