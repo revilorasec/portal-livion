@@ -110,7 +110,8 @@
   }
   for(const id of ['wDateFrom','wDateTo',...Object.keys(filterFields)])$(id).addEventListener('change',()=>refresh());
   for(const [id,kind] of [['weeklyPrevious','previous'],['weeklyCurrent','current']])$(id).onclick=()=>{const period=weekRange(kind,now());$('wDateFrom').value=period.from;$('wDateTo').value=period.to;refresh()};
-  $('weeklyClear').onclick=()=>{for(const id of ['wDateFrom','wDateTo',...Object.keys(filterFields)])$(id).value='';refresh()};
+  const clearFilters=()=>{for(const id of ['wDateFrom','wDateTo',...Object.keys(filterFields)])$(id).value='';refresh()};
+  $('weeklyClear').onclick=clearFilters;$('weeklyClearBottom').onclick=clearFilters;
   $('weeklyPrevPage').onclick=()=>{if(page>1){page--;renderPage()}};$('weeklyNextPage').onclick=()=>{if(page*pageSize<filtered.length){page++;renderPage()}};
   $('weeklyExport').onclick=download;refresh();return {refresh};
  }

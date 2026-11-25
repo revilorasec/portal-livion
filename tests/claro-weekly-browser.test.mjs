@@ -39,6 +39,9 @@ test('aba semanal independente exporta todas as páginas no modelo Claro e trata
   failTemplate=true;await frame.locator('#weeklyExport').click();await frame.locator('#weeklyMessage.error').waitFor();assert.equal(await frame.locator('#weeklyExport').isEnabled(),true);failTemplate=false;
   await frame.locator('#wDateFrom').fill('2026-11-26');await frame.locator('#wDateFrom').dispatchEvent('change');assert.equal(await frame.locator('#weeklyExport').isDisabled(),true);assert.match(await frame.locator('#weeklyMessage').textContent(),/data inicial/);
   await frame.locator('#weeklyClear').click();assert.equal(await frame.locator('#weeklyCount').textContent(),'126 registros');
+  for(const id of ['wDateFrom','wDateTo','wLocation','wStatus','wRegional','wUF','wCD'])assert.equal(await frame.locator('#'+id).inputValue(),'');
+  assert.equal(await frame.locator('#weeklyPeriod').textContent(),'Todos os períodos');assert.equal(await frame.locator('#weeklyCurrent').getAttribute('aria-pressed'),'false');assert.equal(await frame.locator('#weeklyPrevious').getAttribute('aria-pressed'),'false');
+  await frame.locator('#weeklyPrevious').click();await frame.locator('#weeklyClearBottom').click();assert.equal(await frame.locator('#weeklyCount').textContent(),'126 registros');assert.equal(await frame.locator('#wDateFrom').inputValue(),'');
   await frame.locator('#weeklyCurrent').click();await page.screenshot({path:resolve(output,'weekly-desktop.png'),fullPage:true});
   await page.setViewportSize({width:430,height:900});await page.screenshot({path:resolve(output,'weekly-mobile.png'),fullPage:true});
   await frame.locator('[data-tab="base"]').click();assert.equal(await frame.locator('body > .app > section.filters').isVisible(),true);assert.equal(await frame.locator('#fSearch').inputValue(),'ATUAL');assert.deepEqual(errors,[]);

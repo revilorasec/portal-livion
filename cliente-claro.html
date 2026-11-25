@@ -300,7 +300,7 @@ html.portal-embedded .app{padding-top:10px!important}
 <section id="semanal" class="panel">
  <div class="card weekly-card">
   <div class="card-head"><div><h2>Relatório semanal</h2><p>Filtre pela data de recebimento na Livion e exporte no modelo da Claro.</p></div><span id="weeklyCount" class="badge blue">0 registros</span></div>
-  <div class="weekly-actions"><button id="weeklyPrevious" class="btn soft">Última semana</button><button id="weeklyCurrent" class="btn soft">Semana atual</button><span id="weeklyPeriod" class="small" aria-live="polite">Todos os períodos</span></div>
+  <div class="weekly-actions"><button id="weeklyPrevious" class="btn soft">Última semana</button><button id="weeklyCurrent" class="btn soft">Semana atual</button><button id="weeklyClear" class="btn weekly-clear">Limpar filtros</button><span id="weeklyPeriod" class="small" aria-live="polite">Todos os períodos</span></div>
   <div class="filters weekly-filters">
    <label class="date-filter"><span>Recebido de</span><input id="wDateFrom" type="date" aria-label="Relatório semanal: recebido de"></label>
    <label class="date-filter"><span>Recebido até</span><input id="wDateTo" type="date" aria-label="Relatório semanal: recebido até"></label>
@@ -309,7 +309,7 @@ html.portal-embedded .app{padding-top:10px!important}
    <label class="date-filter"><span>Regional</span><select id="wRegional" aria-label="Relatório semanal: regional"></select></label>
    <label class="date-filter"><span>UF</span><select id="wUF" aria-label="Relatório semanal: UF"></select></label>
    <label class="date-filter"><span>CD</span><select id="wCD" aria-label="Relatório semanal: CD"></select></label>
-   <div class="filter-actions"><button id="weeklyClear" class="btn soft">Limpar</button><button id="weeklyExport" class="btn weekly-export">Exportar Excel (.xlsx)</button></div>
+   <div class="filter-actions"><button id="weeklyClearBottom" class="btn soft">Limpar filtros</button><button id="weeklyExport" class="btn weekly-export">Exportar Excel (.xlsx)</button></div>
   </div>
   <p id="weeklyMessage" class="small" role="status" aria-live="polite"></p>
   <div class="table-wrap"><table id="weeklyTable" class="table"></table></div>
@@ -321,8 +321,8 @@ html.portal-embedded .app{padding-top:10px!important}
 
 <div id="drawerBackdrop" class="drawer-backdrop"><aside class="drawer"><div class="drawer-head"><div><span class="eyebrow">Detalhes do equipamento</span><h2 id="drawerTitle">-</h2><div id="drawerStage" style="margin-top:7px"></div></div><button id="closeDrawer" class="close">×</button></div><div id="detailGrid" class="detail-grid"></div></aside></div>
 
-<link rel="stylesheet" href="./claro-weekly-report.css?v=1">
-<script src="./claro-weekly-report.js?v=1"></script>
+<link rel="stylesheet" href="./claro-weekly-report.css?v=2">
+<script src="./claro-weekly-report.js?v=2"></script>
 <script>
 'use strict';
 const SAFE_FIELDS=["ID","Tipo de reparo","Urgência","Onde está","SLA Claro","Dias na Livion","Nota Fiscal Claro","Data Emisão Nota fiscal","Centro","REGIONAL","UF - REGIONAL","CD","CD ou EA","Data recebimento na Livion","Part. Number","Nº de Série","Descrição","IW","CÓD. SAP","Linha LPU","Valor Reparo","BP/SGP/NS (Nº EQUIPAMENTO)","Família","Part. Number Devolvido","Nº de Série Devolvido","Fabricante da unidade","Status","Detalhe do Status","Data Expedição","Caixa","Nota fiscal retorno","Data nota fiscal de retorno","Data Entrega na Claro"];

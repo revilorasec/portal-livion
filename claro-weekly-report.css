@@ -5,6 +5,8 @@ body.weekly-view .app>section.filters{display:none}
 .weekly-card{border-top:3px solid #e77a13}
 .weekly-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 16px}
 .weekly-actions .btn[aria-pressed=true]{background:#fff0d9;color:#8a3400;outline:2px solid #df7412}
+.weekly-actions .weekly-clear{color:#a12916;background:#fff3ec;border:1px solid #da8c73}
+.weekly-actions .weekly-clear:hover{background:#ffe3d3;border-color:#a12916}
 .weekly-filters.filters{box-shadow:none;border:1px solid var(--line);padding:14px;margin-bottom:12px}
 .btn.weekly-export{background:#b95000;color:#fff}
 .btn.weekly-export:hover{background:#963d00}
