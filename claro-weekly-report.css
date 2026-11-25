@@ -1,0 +1,15 @@
+.tabs .weekly-tab{color:#8a3400;border-color:#f5a344;background:#fff0d9;box-shadow:0 3px 10px #b85a151c}
+.tabs .weekly-tab:hover{color:#762900;border-color:#d76b08;background:#ffe2b4}
+.tabs .weekly-tab.active{color:#fff;border-color:#a74700;background:linear-gradient(135deg,#ad4500,#db6907);box-shadow:0 8px 20px #b85a1533}
+body.weekly-view .app>section.filters{display:none}
+.weekly-card{border-top:3px solid #e77a13}
+.weekly-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 16px}
+.weekly-actions .btn[aria-pressed=true]{background:#fff0d9;color:#8a3400;outline:2px solid #df7412}
+.weekly-filters.filters{box-shadow:none;border:1px solid var(--line);padding:14px;margin-bottom:12px}
+.btn.weekly-export{background:#b95000;color:#fff}
+.btn.weekly-export:hover{background:#963d00}
+.btn.weekly-export:disabled{opacity:.55;cursor:not-allowed}
+#weeklyMessage{min-height:1.4em;margin:8px 0 14px}
+#weeklyMessage.error{color:#a61924}
+#weeklyTable th{cursor:default}
+@media(max-width:700px){.weekly-actions .small{flex-basis:100%}.weekly-filters .filter-actions{flex-wrap:wrap}}
