@@ -36,7 +36,7 @@ test('xlsx preserva cabeçalhos, larguras e estilos do modelo; remove instruçõ
  const book=await report.buildWorkbook(ExcelJS,bytes,[row,{...row,_entregaFormula:false}]);
  const reloaded=new ExcelJS.Workbook();await reloaded.xlsx.load(await book.xlsx.writeBuffer());const sheet=reloaded.worksheets[0];
  assert.equal(sheet.rowCount,3);assert.equal(sheet.columnCount,13);assert.equal(reloaded.worksheets.length,1);
- for(let i=1;i<=13;i++){assert.equal(sheet.getCell(1,i).value,template.getCell(2,i).value);assert.deepEqual(sheet.getCell(1,i).style,template.getCell(2,i).style);assert.equal(sheet.getColumn(i).width,template.getColumn(i).width)}
+ for(let i=1;i<=13;i++){assert.equal(sheet.getCell(1,i).value,i===4?'Data NF Claro':template.getCell(2,i).value);assert.deepEqual(sheet.getCell(1,i).style,template.getCell(2,i).style);assert.equal(sheet.getColumn(i).width,template.getColumn(i).width)}
  assert.equal(sheet.getCell('B2').value,'Livion Solutions');assert.equal(sheet.getCell('B3').value,'Livion Solutions');assert.equal(sheet.getCell('E2').value,row['Nº de Série']);assert.equal(sheet.getCell('I2').value,'=TEXTO');assert.equal(sheet.getCell('I2').type,ExcelJS.ValueType.String);
  assert.ok(!sheet.getCell('K2').value);assert.equal(sheet.getCell('K3').value.toISOString().slice(0,10),'2026-11-25');assert.equal(sheet.views[0].ySplit,1);
  const empty=await report.buildWorkbook(ExcelJS,bytes,[]);assert.equal(empty.worksheets[0].rowCount,1);

@@ -3,7 +3,7 @@
  const text=v=>v==null?'':String(v).trim();
  const escape=v=>text(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const columns=[
-  ['Centro','Centro'],[' Fornecedores',null],['NF CLARO','Nota Fiscal Claro'],['Data de Lançt','Data Emisão Nota fiscal'],
+  ['Centro','Centro'],[' Fornecedores',null],['NF CLARO','Nota Fiscal Claro'],['Data NF Claro','Data Emisão Nota fiscal'],
   ['SERIAL_RECEBIDO','Nº de Série'],['Nº Equipamento','BP/SGP/NS (Nº EQUIPAMENTO)'],['NF REPARADOR','Nota fiscal retorno'],
   ['DT NF REPARADOR','Data nota fiscal de retorno'],['SERIAL DEVOLVIDO','Nº de Série Devolvido'],['Nº Equipamento','BP/SGP/NS (Nº EQUIPAMENTO)'],
   ['DT ENTREGA NA CLARO','Data Entrega na Claro'],['STATUS','Status'],['DETALHE DO STATUS','Detalhe do Status']
@@ -44,7 +44,7 @@
   const book=new ExcelJS.Workbook(),sheet=book.addWorksheet(model.name,{properties:structuredClone(model.properties),pageSetup:structuredClone(model.pageSetup),headerFooter:structuredClone(model.headerFooter)});
   for(let i=1;i<=13;i++){
    const from=model.getColumn(i),to=sheet.getColumn(i);to.width=from.width;to.hidden=from.hidden;to.style=structuredClone(from.style);
-   const header=sheet.getCell(1,i);header.value=model.getCell(2,i).value;header.style=structuredClone(model.getCell(2,i).style);
+   const header=sheet.getCell(1,i);header.value=i===4?columns[3][0]:model.getCell(2,i).value;header.style=structuredClone(model.getCell(2,i).style);
   }
   if(model.getRow(2).height)sheet.getRow(1).height=model.getRow(2).height;
   const dataStyles=Array.from({length:13},(_,i)=>structuredClone(model.getCell(3,i+1).style));
